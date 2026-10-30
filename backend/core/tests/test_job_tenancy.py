@@ -1,5 +1,7 @@
 """Jobs are tenant-scoped (D36, ADR 0001): a company id on every tenant job, under row-level security."""
 
+from importlib import import_module
+
 import pytest
 from django.conf import settings
 from django.db import DatabaseError, connection, transaction
@@ -12,6 +14,8 @@ from core.rls import tenant_policy_sql
 
 from .factories import PASSWORD
 from .test_tenancy import query
+
+job_migration = import_module("core.migrations.0017_job_tenancy")
 
 
 @pytest.fixture
@@ -245,14 +249,58 @@ def test_the_worker_cannot_write_a_row_for_another_company(registry, world, docu
     assert query("SELECT count(*) FROM probe_doc WHERE body = 'planted'") == [(0,)]
 
 
-def test_the_worker_claims_jobs_of_every_company_but_cannot_change_their_company_or_content(world):
+def test_the_worker_without_a_company_sees_no_tenant_jobs(world):
     jobs.enqueue("a", company=world["acme"])
     jobs.enqueue("b", company=world["beta"])
+    jobs.enqueue("system")
     with connection.cursor() as cursor:
         cursor.execute("SET ROLE worker")
         try:
-            assert query("SELECT count(*) FROM core_job") == [(2,)]
-            query("UPDATE core_job SET status = 'done' RETURNING id")
+            assert query("SELECT name FROM core_job") == [("system",)]
+        finally:
+            cursor.execute("RESET ROLE")
+
+
+def test_a_handler_cannot_see_or_change_another_companys_jobs(registry, world):
+    seen = {}
+
+    def handler(**payload):
+        seen["visible"] = query("SELECT count(*) FROM core_job WHERE company_id = %s", [world["beta"].pk])[0][0]
+        seen["changed"] = query("UPDATE core_job SET status = 'done' WHERE company_id = %s", [world["beta"].pk])
+
+    jobs.register("mine")(handler)
+    mine = jobs.enqueue("mine", company=world["acme"])
+    theirs = jobs.enqueue("theirs", company=world["beta"])
+
+    assert jobs.run_pending(limit=1) == 1
+
+    theirs.refresh_from_db()
+    mine.refresh_from_db()
+    assert mine.status == Job.DONE and seen == {"visible": 0, "changed": 0}
+    assert theirs.status == Job.PENDING
+
+
+def test_the_runner_claims_the_jobs_of_every_company_and_each_handler_sees_only_its_own(registry, world):
+    seen = []
+
+    def handler(**payload):
+        seen.append(query("SELECT coalesce(current_setting('app.company_id'), '')")[0][0])
+
+    jobs.register("probe-job")(handler)
+    for company in [world["acme"], world["beta"], None]:
+        jobs.enqueue("probe-job", company=company)
+
+    assert jobs.run_pending() == 3
+    assert seen == [str(world["acme"].pk), str(world["beta"].pk), ""]
+
+
+def test_the_worker_can_record_a_jobs_outcome_but_not_change_its_company_or_content(world):
+    job = jobs.enqueue("a", company=world["acme"])
+    with connection.cursor() as cursor:
+        cursor.execute("SET ROLE worker")
+        cursor.execute("SELECT set_config('app.company_id', %s, false)", [str(world["acme"].pk)])
+        try:
+            assert query("UPDATE core_job SET status = 'done', attempts = 1 WHERE id = %s", [job.pk]) == 1
             for column, value in [("company_id", world["beta"].pk), ("name", "'x'"), ("payload", "'{}'")]:
                 with pytest.raises(DatabaseError), transaction.atomic():
                     query(f"UPDATE core_job SET {column} = {value}")
@@ -260,6 +308,73 @@ def test_the_worker_claims_jobs_of_every_company_but_cannot_change_their_company
                 query("DELETE FROM core_job")
         finally:
             cursor.execute("RESET ROLE")
+            cursor.execute("SELECT set_config('app.company_id', '', false)")
+
+
+def test_only_the_worker_may_claim_a_job(db):
+    assert query("SELECT has_function_privilege('worker', 'claim_job()', 'EXECUTE')") == [(True,)]
+    assert query("SELECT has_function_privilege('web', 'claim_job()', 'EXECUTE')") == [(False,)]
+
+
+def test_a_handler_cannot_write_an_audit_entry_directly_only_through_the_audit_trigger(registry, world):
+    def handler(**payload):
+        query(
+            "INSERT INTO core_auditentry (company_id, actor_email, action, target_type, target_id, changed_fields) "
+            "VALUES (%s, '', 'approve', 'invoice', '1', '[]')",
+            [world["acme"].pk],
+        )
+
+    job = run_one(handler, company=world["acme"])
+
+    assert job.status == Job.FAILED and job.error == "ProgrammingError"
+    assert AuditEntry.objects.count() == 0
+
+
+def test_a_login_role_that_is_a_member_of_both_web_and_worker_is_refused(db):
+    with connection.cursor() as cursor:
+        cursor.execute("CREATE ROLE secrev_both NOLOGIN IN ROLE web, worker")
+        with pytest.raises(DatabaseError, match="separate login roles"), transaction.atomic():
+            cursor.execute(job_migration.NO_SHARED_LOGIN)
+
+
+def test_the_runner_puts_back_the_role_it_found(registry, world):
+    jobs.register("probe-job")(lambda **payload: None)
+    job = jobs.enqueue("probe-job", company=world["acme"])
+    with connection.cursor() as cursor:
+        cursor.execute("CREATE ROLE secrev_runner NOLOGIN IN ROLE worker")
+        cursor.execute("SET ROLE secrev_runner")
+        try:
+            assert jobs.run_pending() == 1
+            assert query("SELECT current_user") == [("secrev_runner",)]
+        finally:
+            cursor.execute("RESET ROLE")
+
+    job.refresh_from_db()
+    assert job.status == Job.DONE
+
+
+def test_a_worker_process_that_is_only_a_member_of_the_worker_role_runs_jobs(
+    registry, world, documents, as_worker_connection
+):
+    seen = {}
+
+    def handler(doc_id):
+        seen["who"] = query("SELECT current_user")[0][0]
+        seen["docs"] = [body for (body,) in query("SELECT body FROM probe_doc")]
+        seen["named"] = query("SELECT body FROM probe_doc WHERE id = %s", [doc_id])
+        seen["reset"] = query("RESET ROLE")  # gains nothing: the session role is the same worker login role
+
+    jobs.register("probe-job")(handler)
+    job = jobs.enqueue("probe-job", company=world["acme"], doc_id=documents["beta"])
+
+    with as_worker_connection():
+        assert jobs.run_pending() == 1
+        after = query("SELECT current_user, session_user")[0]
+
+    job.refresh_from_db()
+    assert job.status == Job.DONE
+    assert seen["who"] == "worker" and seen["docs"] == ["acme secret total RM 18,450.00"] and seen["named"] == []
+    assert after == ("app_worker_test", "app_worker_test")
 
 
 def test_a_handler_can_queue_a_follow_up_only_for_its_own_company(registry, world):

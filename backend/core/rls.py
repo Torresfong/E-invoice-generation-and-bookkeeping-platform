@@ -21,25 +21,30 @@ IDENTITY_FUNCTION = "app_user_id"
 COMPANY_SETTING = "app.company_id"
 COMPANY_FUNCTION = "app_company_id"
 
-_ACCESSIBLE_COMPANIES = f"SELECT company_id FROM core_companyaccess WHERE user_id = {IDENTITY_FUNCTION}()"
+# The two row rules behind every tenant policy. A user sees the rows of the companies they belong to; a job's
+# worker sees the rows of the company the job is for.
+USER_COMPANY_CHECK = (
+    f"company_id IN (SELECT company_id FROM core_companyaccess WHERE user_id = {IDENTITY_FUNCTION}())"
+)
+JOB_COMPANY_CHECK = f"company_id = {COMPANY_FUNCTION}()"
 
 
 def tenant_policy_sql(table):
     """SQL that puts `table` under the standard isolation policy."""
-    check = f"company_id IN ({_ACCESSIBLE_COMPANIES})"
-    in_job = f"company_id = {COMPANY_FUNCTION}()"
     return [
         f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO {WEB_ROLE}, {WORKER_ROLE}",
         f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
-        f"CREATE POLICY tenant_isolation ON {table} TO {WEB_ROLE} USING ({check}) WITH CHECK ({check})",
-        f"CREATE POLICY job_company ON {table} TO {WORKER_ROLE} USING ({in_job}) WITH CHECK ({in_job})",
+        f"CREATE POLICY tenant_isolation ON {table} TO {WEB_ROLE} "
+        f"USING ({USER_COMPANY_CHECK}) WITH CHECK ({USER_COMPANY_CHECK})",
+        f"CREATE POLICY worker_company_context ON {table} TO {WORKER_ROLE} "
+        f"USING ({JOB_COMPANY_CHECK}) WITH CHECK ({JOB_COMPANY_CHECK})",
     ]
 
 
 def drop_tenant_policy_sql(table):
     return [
-        f"DROP POLICY IF EXISTS job_company ON {table}",
+        f"DROP POLICY IF EXISTS worker_company_context ON {table}",
         f"DROP POLICY IF EXISTS tenant_isolation ON {table}",
         f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
         f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY",
@@ -66,8 +71,8 @@ def owner_policy_sql(table):
     ]
 
 
-def definer_function_sql(functions):
-    """Forward and reverse SQL for SECURITY DEFINER functions: create each, close it to everyone, open it to `web`.
+def definer_function_sql(functions, role=WEB_ROLE):
+    """Forward and reverse SQL for SECURITY DEFINER functions: create each, close it to everyone, open it to `role`.
 
     `functions` maps a signature such as "auth_lookup(text)" to its CREATE FUNCTION statement.
     """
@@ -76,7 +81,7 @@ def definer_function_sql(functions):
         forward += [
             create,
             f"REVOKE ALL ON FUNCTION {signature} FROM PUBLIC",
-            f"GRANT EXECUTE ON FUNCTION {signature} TO {WEB_ROLE}",
+            f"GRANT EXECUTE ON FUNCTION {signature} TO {role}",
         ]
         reverse.insert(0, f"DROP FUNCTION IF EXISTS {signature}")
     return forward, reverse
@@ -87,6 +92,7 @@ def secure_role_sql(role):
     onto an existing role, plus SQL that refuses to continue unless it holds and the role is a member of nothing.
 
     Changing the SUPERUSER attribute at all needs a superuser, so the role is altered only when it is unsafe.
+    Migration 0003 predates this helper and holds the same logic for `web`; a change to one needs the other.
     """
     unsafe = "rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb OR rolcanlogin"
     secure = f"""

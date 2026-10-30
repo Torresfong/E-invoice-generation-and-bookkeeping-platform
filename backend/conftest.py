@@ -91,3 +91,24 @@ def world(db):
         "beta_owner": make_member("owner@beta.example", beta, CompanyAccess.OWNER),
         "accountant": accountant,
     }
+
+
+@pytest.fixture
+def as_worker_connection(db):
+    """Make the whole connection behave like the production worker process: a login role that is only a member of the worker role."""
+
+    @contextmanager
+    def switch():
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'app_worker_test') THEN "
+                "CREATE ROLE app_worker_test LOGIN NOSUPERUSER NOBYPASSRLS IN ROLE worker; END IF; END $$"
+            )
+            cursor.execute("SET SESSION AUTHORIZATION app_worker_test")
+        try:
+            yield
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute("RESET SESSION AUTHORIZATION")
+
+    return switch
