@@ -90,17 +90,20 @@ class TenantModel(models.Model):
 
 
 class Job(models.Model):
-    """A queued background job.
+    """A queued background job (D10, D36, ADR 0001).
 
-    Interim: no company id and no row-level security yet; ticket 02 adds both (see
-    docs/adr/0001-job-queue-and-tenancy.md). `payload` holds identifiers only and `error` holds only an
-    exception class name, so the table never contains tenant content.
+    `company` is set when the job is queued, from the company the signed-in user is acting in, and is null
+    only for system jobs that touch no tenant data. The worker takes the company context for a handler from
+    this column and never from the payload. `payload` holds identifiers only and `error` holds only an
+    exception class name, so the table never contains tenant content. The table is under row-level security
+    and is not exposed in any screen or API.
     """
 
     PENDING = "pending"
     DONE = "done"
     FAILED = "failed"
 
+    company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
     name = models.CharField(max_length=100)
     payload = models.JSONField(default=dict)
     status = models.CharField(max_length=10, default=PENDING, db_index=True)

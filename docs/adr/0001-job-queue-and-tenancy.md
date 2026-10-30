@@ -23,11 +23,11 @@ Background work (extraction, MyInvois polling, reminders, exports) is queued in 
 |---|---|
 | 4 identifiers only | Built in ticket 01 and tested |
 | 5 no content in errors or logs | Built in ticket 01 and tested |
-| 1 to 3 company id, row-level security, role split | Ticket 02 (#3), with a test that company A queuing a job that names company B's record fails |
+| 1 to 3 company id, row-level security, role split | Built in ticket 02d (#34) and tested: the `worker` role, the company taken from the job's column, a payload naming another company's record reads nothing |
 | Lease, retry, backoff, idempotent external calls | Separate ticket, blocked by ticket 02, and blocking every ticket whose handler calls an external service |
 | Purge of finished jobs | Same separate ticket |
 
-Until ticket 02 lands the table has no company id and no row-level security. That is acceptable only because no tenant data exists yet; no handler may be added that touches tenant data before then.
+Since ticket 02d the table has a company id and row-level security, and handlers run as the `worker` role with the company context taken from the job's column. A handler touches tenant data only through that context. A system job (no company) sees none. Details and limits: `docs/architecture/tenancy.md`, "Background jobs".
 
 ## Why not leave the queue global
 

@@ -6,7 +6,7 @@ from django.db import DatabaseError, connection, transaction
 from django.db.utils import DataError
 
 from core.models import Company, CompanyAccess
-from core.rls import IDENTITY_SETTING, WEB_ROLE, tenant_policy_sql
+from core.rls import IDENTITY_SETTING, WEB_ROLE, WORKER_ROLE, tenant_policy_sql
 
 
 @pytest.fixture
@@ -241,15 +241,16 @@ NOT_TENANT_TABLES = {
 }
 
 
-def test_every_table_the_web_role_can_use_is_under_row_level_security_or_listed_above(db):
+def test_every_table_the_web_or_worker_role_can_use_is_under_row_level_security_or_listed_above(db):
     unprotected = {
         table
         for (table,) in query(
             "SELECT c.relname FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
             "WHERE n.nspname = 'public' AND c.relkind = 'r' "
-            "AND has_table_privilege(%s, c.oid, 'SELECT,INSERT,UPDATE,DELETE') "
+            "AND (has_table_privilege(%s, c.oid, 'SELECT,INSERT,UPDATE,DELETE') "
+            "OR has_table_privilege(%s, c.oid, 'SELECT,INSERT,UPDATE,DELETE')) "
             "AND NOT (c.relrowsecurity AND c.relforcerowsecurity)",
-            [WEB_ROLE],
+            [WEB_ROLE, WORKER_ROLE],
         )
     }
 
