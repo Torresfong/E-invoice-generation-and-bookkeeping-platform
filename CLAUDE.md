@@ -7,7 +7,7 @@ Pilot platform, two portals. Malaysian clients issue LHDN MyInvois e-invoices an
 ## Source of truth 
 
 docs/product/pilot-spec.md: user stories, decisions, out of scope.
-docs/architecture/Decision/pilot-decisions.md: decisions D1 to D49. Cite the number you rely on. If a ticket or instruction contradicts one, stop and flag it; never override silently.
+docs/architecture/Decision/pilot-decisions.md: decisions D1 to D50. Cite the number you rely on. If a ticket or instruction contradicts one, stop and flag it; never override silently.
 Issue #1 is the parent; #2 to #24 are its tickets. Ticket "NN" = issue #(NN+1).
 
 Commands (run from `backend/`; `DATABASE_URL` must be set, there is no default because Postgres is required):
@@ -36,7 +36,7 @@ Stop and ask when: a decision conflicts; scope would change; a migration alters 
 
 ## Hard rules
 - External services only through the four ports (MyInvois, AI provider, email, object storage), each a single module with a test fake. Swapping an implementation must not touch callers.
-- Tenancy: every business table has a company id; Postgres RLS enforces isolation from the first migration. Never rely on application filtering alone. The pattern, role model and its limits are in docs/architecture/tenancy.md; new tenant tables use `core.rls.enable_tenant_rls`. Business tables are also put on the audit trail with `core.audit.enable_audit` (D40 (6)); entries hold field names, never values.
+- Tenancy: every business table has a company id; Postgres RLS enforces isolation from the first migration. Never rely on application filtering alone. The pattern, role model and its limits are in docs/architecture/tenancy.md; new tenant tables use `core.rls.enable_tenant_rls`. Business tables are also put on the audit trail with `core.audit.enable_audit` (D40 (6)); entries hold field names, never values. Firm-level events go to the separate firm audit trail (D50), never into a company's trail.
 - Jobs (D36, ADR 0001): job rows carry a company id under RLS and are claimed by a separate worker role, which sets the company context from that column, never from the payload (built in 02d, #34: `enqueue(name, company=...)`, the `worker` role, and `run_pending()` setting the context from the column; a job queued without a company is a system job and sees no tenant data). Payloads hold identifiers only, enforced by `enqueue()`. A failed job keeps only the exception class, and handlers must not log content.
 - Roles (D17, D40, D48, D49): client owner, client staff, firm accountant, plus the firm administrator (firm-level, manages accountants, no client data). Only the owner approves and submits; no delegation. Access is by `CompanyAccess` membership under RLS, with no bypass role. Several firms are supported: a company has exactly one firm and an accountant sees only their own firm's companies. Owners self-register only through a link from their firm (D48, D49); staff come by owner invitation; firms are created only by the platform operator, with a first firm administrator who creates the firm's accountants and sees no client data. 2FA for owners, accountants and firm administrators is a go-live blocker.
 - Invoices: gapless numbering per company and document type. Approval copies and locks buyer details. After go-live the platform is the client's only issuer.
