@@ -70,7 +70,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 49. As an accountant, I want one monthly export per client of platform-issued sales invoices, old sales invoices uploaded from before the client adopted the platform, and verified purchase invoices and receipts, with a source column telling them apart, so that I import once by hand (D41, D42, D43).
 50. As an accountant, I want no document exported twice, and documents locked as exported only when I confirm my import worked, so that SQL Account never gets duplicates and a failed import can be redone (D43).
 51. As an accountant, I want exported documents locked, and later cancellations or corrections to appear as new items in the next batch with a "changed after export" flag, so that nothing is silently altered after import.
-52. As an accountant, I want the export to carry extracted fields with empty coding columns, so that I code in SQL Account as today.
+52. As an accountant, I want the export to carry extracted fields with my firm's default party and account codes in the coding columns that SQL Account's import requires, so that the file imports cleanly and I recode in SQL Account as today (D51).
 53. As an accountant, I want bank statements, payment vouchers, payroll and loan documents stored and searchable, so that I can find them without email.
 54. As an accountant, I want original currency and amount stored on foreign purchase documents, so that I apply the rate in SQL Account.
 55. As a backup accountant, I want to use the same review queue when the lead is away, so that the pilot does not stall.
@@ -117,7 +117,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 
 **Checklist and reminders.** The accountant sets a monthly checklist per client, plus one-off requests. Reminders go out on day 3, day 7 and day 14 after the due date, then stop and flag the client to the accountant. The accountant can pause reminders per client.
 
-**SQL Account export.** One monthly batch per client and document-date month (D42): platform-issued sales invoices, verified old sales invoices uploaded from before the client's go-live date, and verified purchase invoices and receipts, with empty coding columns and a source column (platform-issued or uploaded) (D41). The accountant imports the file into SQL Account by hand; the file can be downloaded repeatedly, and documents are locked as exported only when the accountant confirms the import worked. An unconfirmed batch can be regenerated or voided (D43). No document is exported twice. Exported documents are locked; later cancellations, credit notes or corrections appear as new items in the next batch with a "changed after export" flag. The export format is designed only after the firm has hand-built a file that its own SQL Account accepted; the firm names an owner for that test by Nov 6, 2026.
+**SQL Account export.** One monthly batch per client and document-date month (D42): platform-issued sales invoices, verified old sales invoices uploaded from before the client's go-live date, and verified purchase invoices and receipts, as an Excel file for SQL Account's own import, with the firm's default party and account codes in the columns the import requires and a source marker (platform-issued or uploaded) (D41, D51). The accountant imports the file into SQL Account by hand; the file can be downloaded repeatedly, and documents are locked as exported only when the accountant confirms the import worked. An unconfirmed batch can be regenerated or voided (D43). No document is exported twice. Exported documents are locked; later cancellations, credit notes or corrections appear as new items in the next batch with a "changed after export" flag. The export format is designed only after the firm has hand-built a file that its own SQL Account accepted; the firm names an owner for that test by Nov 6, 2026.
 
 **Retention and exit.** All invoices, documents and audit logs kept at least 7 years under a written retention agreement. Each client can receive a full export (PDFs and a data file) if the pilot ends; this exit export is a small deliverable before Gate 3.
 
@@ -144,7 +144,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 ## Out of Scope
 
 - Automatic extraction of bank statements, payment vouchers, payroll records and loan documents (stored and searchable only).
-- Account coding inside the platform; coding columns are exported empty.
+- Account coding inside the platform; the export carries only the firm's default codes (D51), and the accountant recodes in SQL Account.
 - Consolidated e-invoices for consumer sales and self-billed e-invoices for foreign suppliers.
 - SST returns and automatic tax-rate determination.
 - The platform's own ledger and financial reports; SQL Account stays the books of record.
@@ -164,6 +164,6 @@ Pilot clients: shortlist 5, aim to sign 3 to 4, with a named owner contact for e
 
 Each pilot firm commits a lead accountant and a named backup, with weekly hours in writing (D49). A Malaysian lawyer reviews the service agreement, the AI and cross-border consent text and the AI data processing agreement by week 12; no client signs before that.
 
-Still open and to be settled by dated work, not assumed: the AI provider (sample test, weeks 1 to 2); which firms join and how many clients each brings; the exchange-rate source each firm uses; the SQL Account version and file format (the import method is manual, D43); the price after the pilot (signal only); a paid review session with someone who has integrated MyInvois, before Gate 1. Two assumptions are carried without confirmation: our company is a registered Malaysian company LHDN will accept as an intermediary, and the AWS Malaysia region offers the needed managed services.
+Still open and to be settled by dated work, not assumed: the AI provider (sample test, weeks 1 to 2); which firms join and how many clients each brings; the exchange-rate source each firm uses; whether the firm's SQL Account accepts a file built to the templates of D51 (the version and import method are known, D43, D51); the price after the pilot (signal only); a paid review session with someone who has integrated MyInvois, before Gate 1. Two assumptions are carried without confirmation: our company is a registered Malaysian company LHDN will accept as an intermediary, and the AWS Malaysia region offers the needed managed services.
 
 Housekeeping before the first commit: add the environment file to the ignore list, add Dockerfiles, and replace the placeholder CI.
