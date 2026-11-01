@@ -160,6 +160,7 @@ class AuditEntry(models.Model):
     CREATE = "create"
     UPDATE = "update"
     DELETE = "delete"
+    VIEWED = "viewed"
     ACTIONS = [
         (LOGIN, _("Signed in")),
         (LOGIN_FAILED, _("Failed sign-in")),
@@ -167,6 +168,7 @@ class AuditEntry(models.Model):
         (CREATE, _("Created")),
         (UPDATE, _("Updated")),
         (DELETE, _("Deleted")),
+        (VIEWED, _("Viewed")),
     ]
 
     company = models.ForeignKey(Company, null=True, on_delete=models.PROTECT, related_name="+")

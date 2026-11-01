@@ -121,6 +121,7 @@ def _company_page(request, access, **extra):
     return render(request, "company.html", context)
 
 
+@audit.audited_read("company", id_arg="pk")
 def company(request, pk):
     if not request.user.is_authenticated:
         return HttpResponse(status=401)
@@ -168,6 +169,7 @@ def _trail_page(request, pk, action, heading, **only):
     return render(request, "audit.html", {"company": access.company, "entries": entries, "heading": heading})
 
 
+@audit.audited_read("audit trail")
 @require_safe
 def audit_trail(request, pk):
     """The company's full trail: the owner and the firm's accountants. Staff see their own activity instead."""
