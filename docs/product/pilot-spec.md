@@ -57,7 +57,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 38. As a client owner, I want text inside uploaded documents never to be able to instruct the assistant or extractor, so that a crafted document cannot alter my data.
 
 ### Firm accountant
-39. As an accountant, I want all clients' documents in one place organised per client and per month, so that the email inbox is no longer the system of record.
+39. As an accountant, I want all my firm's clients' documents in one place organised per client and per month, and no other firm's, so that the email inbox is no longer the system of record.
 40. As an accountant, I want every upload classified automatically, so that I do not sort by hand.
 41. As an accountant, I want supplier, date, amounts, tax and line items extracted from sales invoices, purchase invoices and receipts, so that I do not key them.
 42. As an accountant, I want a review queue showing the extracted fields beside the document image, so that I can check and correct quickly.
@@ -74,7 +74,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 53. As an accountant, I want bank statements, payment vouchers, payroll and loan documents stored and searchable, so that I can find them without email.
 54. As an accountant, I want original currency and amount stored on foreign purchase documents, so that I apply the rate in SQL Account.
 55. As a backup accountant, I want to use the same review queue when the lead is away, so that the pilot does not stall.
-56. As the firm lead, I want weekly time for the pilot commitment written down, so that capacity matches the targets.
+56. As a firm lead, I want weekly time for the pilot commitment written down, so that capacity matches the targets.
 
 ### Platform operator (our team)
 57. As an operator, I want each client company's data isolated by the database itself, so that a coding mistake cannot leak data across companies.
@@ -93,7 +93,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 
 **Tenancy.** Every business table carries a company identifier. Isolation is enforced by Postgres row-level security from the first migration, not only in application code. The database is designed so that per-accountant assignment, a firm administrator role and one login across several companies can be added later.
 
-**Roles.** Exactly three: client owner, client staff, firm accountant. Only the owner approves and submits invoices; there is no delegation. A company has one owner login. Staff may confirm creating a customer; only the owner may change a customer's TIN, legal name or registration number. Several accountants may use the firm portal from day one, with one `CompanyAccess` row per pilot company and no bypass role, and every read of a company's data audited (D40, D45). Staff and the assistant may propose a change to those identity fields; the owner approves, and every customer write validates the TIN with MyInvois (D46).
+**Roles.** Exactly three: client owner, client staff, firm accountant. Only the owner approves and submits invoices; there is no delegation. A company has one owner login. Staff may confirm creating a customer; only the owner may change a customer's TIN, legal name or registration number. Several firms, each with several accountants, use the firm portal from day one (D49). A company belongs to exactly one firm, and an accountant has one `CompanyAccess` row for each company of their own firm and none for any other firm, with no bypass role; every read of a company's data is audited (D40, D45). Only the platform operator creates firms and their accountants, and a client owner can sign up only through a link from their own firm. Staff and the assistant may propose a change to those identity fields; the owner approves, and every customer write validates the TIN with MyInvois (D46).
 
 **External ports.** Four boundaries, each a single module with a fake for tests: MyInvois gateway (login on behalf of taxpayers as intermediary, TIN validation, document signing, submission, status polling, cancellation, rejection handling), AI provider, email, object storage.
 
@@ -152,7 +152,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 - Automatic detection of missing documents from bank statement gaps.
 - Assistant deleting customers, approving or submitting invoices, deciding uncertain tax, or answering general accounting questions.
 - Delivery by WhatsApp or WeChat; Malay interface and bilingual PDFs.
-- Per-accountant client assignment, firm administrator role, one login across several companies, and approval delegation.
+- Per-accountant client assignment inside a firm, a firm administrator role (the platform operator creates firms and accountants, D49), one login across several companies, a company served by more than one firm, and approval delegation.
 - Foreign-currency conversion on uploaded purchase documents.
 - Offline use and a mobile app.
 
@@ -162,8 +162,8 @@ Quality targets (agreed, with definitions): every pilot client has an e-invoice 
 
 Pilot clients: shortlist 5, aim to sign 3 to 4, with a named owner contact for each by 2026-11-09. Criteria: local business-to-business sales only, no foreign supplier self-billing, existing SQL Account bookkeeping client, owner willing to approve personally.
 
-The firm commits a lead accountant and a named backup, with weekly hours in writing. A Malaysian lawyer reviews the service agreement, the AI and cross-border consent text and the AI data processing agreement by week 12; no client signs before that.
+Each pilot firm commits a lead accountant and a named backup, with weekly hours in writing (D49). A Malaysian lawyer reviews the service agreement, the AI and cross-border consent text and the AI data processing agreement by week 12; no client signs before that.
 
-Still open and to be settled by dated work, not assumed: the AI provider (sample test, weeks 1 to 2); the exchange-rate source the firm uses; the SQL Account version and file format (the import method is manual, D43); the price after the pilot (signal only); a paid review session with someone who has integrated MyInvois, before Gate 1. Two assumptions are carried without confirmation: our company is a registered Malaysian company LHDN will accept as an intermediary, and the AWS Malaysia region offers the needed managed services.
+Still open and to be settled by dated work, not assumed: the AI provider (sample test, weeks 1 to 2); which firms join and how many clients each brings; the exchange-rate source each firm uses; the SQL Account version and file format (the import method is manual, D43); the price after the pilot (signal only); a paid review session with someone who has integrated MyInvois, before Gate 1. Two assumptions are carried without confirmation: our company is a registered Malaysian company LHDN will accept as an intermediary, and the AWS Malaysia region offers the needed managed services.
 
 Housekeeping before the first commit: add the environment file to the ignore list, add Dockerfiles, and replace the placeholder CI.

@@ -47,7 +47,7 @@ This is not built in ticket 02a and is mandatory before any real client data is 
 
 Implements D40 (2), (4), (5), (7) and D48 for staff and accountants. Owner self-registration is #67.
 
-**Users and roles.** `core.User` signs in with an email address (stored lowercase, unique ignoring case) and an Argon2 password. The role is on the `CompanyAccess` row, and a partial unique index allows one `owner` row per company. Owners and staff have one row; a firm accountant has one row per pilot company, added when the company is created (`core.services.create_company_with_owner`) or when the accountant is created (`manage.py create_accountant`). Accountants are never created or invited by a client (D48).
+**Users and roles.** `core.User` signs in with an email address (stored lowercase, unique ignoring case) and an Argon2 password. The role is on the `CompanyAccess` row, and a partial unique index allows one `owner` row per company. Owners and staff have one row; a firm accountant has one row per company of their own firm, added when the company is created (`core.services.create_company_with_owner`) or when the accountant is created (`manage.py create_accountant`). Accountants are never created or invited by a client (D48). Several firms are supported (D49): the code that grants every accountant every company is replaced by one that grants only the company's own firm's accountants, in ticket 02h (#72); until then there is one firm.
 
 **Who may do what.** `core.permissions` holds the action-level rules (D40 (4)): `ACTIONS` maps an action to the roles that may perform it, `require` raises 403 in a view, and `{% can "action" company as allowed %}` offers the same check in templates. Register a new protected action in `ACTIONS`. A company the user cannot reach is a 404, so its existence is not revealed.
 
@@ -79,7 +79,7 @@ The web role has no direct access to `core_authtoken` or `core_loginfailure`, an
 
 **Firm portal language.** The firm portal is English only (CLAUDE.md), but the sign-in and company pages are shared and follow the browser's language. Fixing an accountant's language belongs with the firm portal screens.
 
-**Firm accountants.** `User.is_accountant` marks a firm accountant for good. Only the operator command sets it. Access rows follow it: an accountant created before any company still receives every company created later, because company creation looks for the marker and not for existing access rows.
+**Firm accountants.** `User.is_accountant` marks a firm accountant for good. Only the operator command sets it. Access rows follow it: an accountant created before any company still receives every company of their firm created later, because company creation looks for the marker and the firm, not for existing access rows. Today the marker is global, so every accountant receives every company; D49 changes that to the accountant's own firm (ticket 02h, #72).
 
 ## Threat model for the pre-sign-in functions (independent review of PR #68)
 
