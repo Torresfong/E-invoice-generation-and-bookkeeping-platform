@@ -496,3 +496,74 @@ def test_a_check_in_progress_holds_the_rows_so_a_concurrent_move_cannot_slip_pas
     finally:
         writer.close()
         mover.close()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_creating_an_accountant_while_their_firms_company_moves_waits_its_turn_and_never_deadlocks():
+    import threading
+    import time
+
+    alpha, beta = services.create_firm("Alpha Accounting"), services.create_firm("Beta Books")
+    company = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, alpha)
+    outcome = {}
+
+    def move():
+        try:
+            services.move_company(company, beta)
+        except Exception as error:  # reported on the main thread
+            outcome["error"] = error
+        finally:
+            connection.close()
+
+    with transaction.atomic():
+        services.create_accountant("new@alpha.example", alpha)  # holds Alpha's row; its check runs at commit
+        mover = threading.Thread(target=move)
+        mover.start()
+        for _ in range(50):  # wait until the move is queued behind us
+            waiting = query("SELECT count(*) FROM pg_locks WHERE NOT granted")  # live, unlike pg_stat_activity inside a transaction
+            if waiting[0][0]:
+                break
+            time.sleep(0.1)
+        assert waiting[0][0], f"the move should be waiting for the firm, not running ahead of us: {outcome}"
+    mover.join(timeout=20)  # the commit above ran the check and let the move go ahead
+
+    assert not mover.is_alive() and "error" not in outcome
+    company.refresh_from_db()
+    assert company.firm == beta
+    assert accountant_rows(company) == set()  # Beta has no accountant yet; Alpha's rows are gone
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_moves_of_the_same_company_queued_together_apply_one_and_report_the_other():
+    import threading
+    import time
+
+    alpha, beta, gamma = (services.create_firm(name) for name in ["Alpha Accounting", "Beta Books", "Gamma Group"])
+    company = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, alpha)
+    outcomes = []
+
+    def move(target):
+        try:
+            services.move_company(company, target)
+            outcomes.append(("moved", target.name))
+        except services.CompanyChanged:
+            outcomes.append(("changed", target.name))
+        finally:
+            connection.close()
+
+    with transaction.atomic():
+        services.create_accountant("new@alpha.example", alpha)  # holds Alpha, so both moves queue behind it
+        movers = [threading.Thread(target=move, args=(target,)) for target in (beta, gamma)]
+        for mover in movers:
+            mover.start()
+        for _ in range(50):
+            if query("SELECT count(*) FROM pg_locks WHERE NOT granted")[0][0] >= 2:
+                break
+            time.sleep(0.1)
+    for mover in movers:
+        mover.join(timeout=20)
+
+    assert sorted(kind for kind, _ in outcomes) == ["changed", "moved"]
+    [(_, winner)] = [outcome for outcome in outcomes if outcome[0] == "moved"]
+    company.refresh_from_db()
+    assert company.firm.name == winner

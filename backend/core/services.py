@@ -27,6 +27,10 @@ class CompanyNotFound(Exception):
     pass
 
 
+class CompanyChanged(Exception):
+    """Another operator command moved the company while this move waited for its turn; look again and retry."""
+
+
 def _require_new_address(email):
     if get_user_model().objects.filter(email__iexact=email.strip()).exists():
         raise EmailInUse
@@ -110,9 +114,16 @@ def move_company(company, firm):
     """Move a company to another firm: the old firm's accountants lose access, the new firm's gain it.
 
     Owners and staff are untouched. Does nothing, and records nothing, if the company is already in that firm.
+
+    Locks are taken in one order everywhere: the firms first (by id), then the company, then, when the transaction
+    commits, the rows the access check reads. `create_accountant` and `create_company_with_owner` take the same
+    order, so none of them can wait for another that waits for it.
     """
-    company = Company.objects.select_for_update().get(pk=company.pk)  # the firm it is in now, not the one we were handed
-    _lock_firms(company.firm, firm)
+    current = Company.objects.select_related("firm").get(pk=company.pk)  # not locked: only to learn which firms to lock
+    _lock_firms(current.firm, firm)
+    company = Company.objects.select_for_update().get(pk=company.pk)
+    if company.firm_id != current.firm_id:
+        raise CompanyChanged
     if company.firm_id == firm.pk:
         return company
     CompanyAccess.objects.filter(company=company, role=CompanyAccess.ACCOUNTANT).delete()

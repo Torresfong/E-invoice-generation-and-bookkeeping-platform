@@ -21,5 +21,8 @@ class Command(BaseCommand):
             raise CommandError(f"No company has id {company_id}.") from error
         except services.FirmNotFound as error:
             raise CommandError(f"No firm is called {firm}.") from error
-        services.move_company(company, target)
+        try:
+            services.move_company(company, target)
+        except services.CompanyChanged as error:
+            raise CommandError("The company was moved by someone else while this waited. Check where it is now and retry.") from error
         self.stdout.write(f"{company.name} now belongs to {target.name}.")
