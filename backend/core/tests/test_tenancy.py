@@ -25,6 +25,10 @@ def make_user(name):
 def member(name, company, role):
     """A new user with a membership row in `company`."""
     user = make_user(name)
+    if role == CompanyAccess.ACCOUNTANT:  # an accountant belongs to the company's firm (D49)
+        user.is_accountant = True
+        user.firm = company.firm
+        user.save()
     CompanyAccess.objects.create(user=user, company=company, role=role)
     return user
 

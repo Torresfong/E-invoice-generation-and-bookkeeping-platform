@@ -1,6 +1,7 @@
 """Firms: each company belongs to one firm, and a firm accountant reaches only their own firm's companies (D49)."""
 
 import re
+from importlib import import_module
 
 import pytest
 from django.core.management import CommandError, call_command
@@ -331,3 +332,111 @@ def test_a_database_with_no_data_gets_no_default_firm():
         assert Firm.objects.count() == 0
     finally:
         MigrationExecutor(connection).migrate(latest)
+
+
+# --- the database keeps an accountant's access rows in their firm -------------------------------------------
+
+accountant_triggers = import_module("core.migrations.0022_accountant_rows_match_firm")
+
+
+def check_now():
+    """Run the deferred checks at each statement, so a violation raises here instead of at commit."""
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+
+
+def test_an_accountant_row_for_a_company_of_another_firm_is_refused(world):
+    check_now()
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.create(user=world["alpha_accountant"], company=world["gamma"], role=CompanyAccess.ACCOUNTANT)
+
+
+def test_an_accountant_row_for_someone_who_is_not_an_accountant_is_refused(world):
+    owner = User.objects.get(email="owner@acme.example")
+    check_now()
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.create(user=owner, company=world["gamma"], role=CompanyAccess.ACCOUNTANT)
+
+
+def test_moving_a_company_without_going_through_the_service_is_refused_while_accountant_rows_remain(world):
+    check_now()
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        Company.objects.filter(pk=world["acme"].pk).update(firm=world["beta"])
+
+
+@pytest.mark.parametrize("change", [{"firm": "beta"}, {"is_accountant": False}])
+def test_changing_an_accountants_firm_or_status_under_their_access_rows_is_refused(world, change):
+    check_now()
+    change = {key: world[value] if isinstance(value, str) else value for key, value in change.items()}
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        User.objects.filter(pk=world["alpha_accountant"].pk).update(**change)
+
+
+def test_the_service_operations_pass_the_check_at_every_statement(world):
+    check_now()
+
+    services.create_accountant("second@alpha.example", world["alpha"])
+    services.create_company_with_owner("Delta Bhd", "owner@delta.example", PASSWORD, world["beta"])
+    services.move_company(world["acme"], world["beta"])
+
+
+def test_owner_and_staff_rows_are_not_tied_to_a_firm(world):
+    staff = User.objects.create_user("staff@x.example")
+    check_now()
+
+    CompanyAccess.objects.create(user=staff, company=world["gamma"], role=CompanyAccess.STAFF)
+    CompanyAccess.objects.create(user=staff, company=world["acme"], role=CompanyAccess.STAFF)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_wrong_row_is_refused_at_commit_even_without_asking_for_an_early_check():
+    alpha, beta = services.create_firm("Alpha Accounting"), services.create_firm("Beta Books")
+    accountant = services.create_accountant("acc@alpha.example", alpha)
+    gamma = services.create_company_with_owner("Gamma Holdings", "owner@gamma.example", PASSWORD, beta)
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.create(user=accountant, company=gamma, role=CompanyAccess.ACCOUNTANT)
+
+    assert not CompanyAccess.objects.filter(user=accountant, company=gamma).exists()
+
+
+def test_the_checks_are_deferred_constraint_triggers_so_a_move_can_take_its_steps_in_any_order(db):
+    rows = query(
+        "SELECT t.tgname, c.relname, t.tgdeferrable, t.tginitdeferred FROM pg_trigger t JOIN pg_class c ON c.oid = t.tgrelid "
+        "WHERE t.tgname LIKE 'accountant_rows_match_firm_%%' ORDER BY c.relname"
+    )
+
+    assert rows == [
+        ("accountant_rows_match_firm_company", "core_company", True, True),
+        ("accountant_rows_match_firm_access", "core_companyaccess", True, True),
+        ("accountant_rows_match_firm_user", "core_user", True, True),
+    ]
+
+
+def test_the_check_is_a_closed_definer_function(db):
+    assert query("SELECT has_function_privilege('web', 'accountant_rows_match_firm()', 'EXECUTE')") == [(False,)]
+
+
+def test_the_migration_refuses_existing_rows_that_break_the_rule(world):
+    with connection.cursor() as cursor:
+        cursor.execute("SET session_replication_role = replica")  # triggers do not fire: how a bad row could already exist
+        CompanyAccess.objects.create(user=world["alpha_accountant"], company=world["gamma"], role=CompanyAccess.ACCOUNTANT)
+        cursor.execute("SET session_replication_role = origin")
+        with pytest.raises(DatabaseError, match="existing"), transaction.atomic():
+            cursor.execute(accountant_triggers.CHECK_EXISTING_ROWS)
+    CompanyAccess.objects.filter(user=world["alpha_accountant"], company=world["gamma"]).delete()  # the test's own mess
+
+
+def test_the_migration_reverses_and_applies_again(world):
+    with connection.cursor() as cursor:
+        for statement in accountant_triggers.REVERSE:
+            cursor.execute(statement)
+        assert query("SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'accountant_rows_match_firm_%%'") == [(0,)]
+        for statement in accountant_triggers.FORWARD:
+            cursor.execute(statement)
+
+    assert query("SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'accountant_rows_match_firm_%%'") == [(3,)]
