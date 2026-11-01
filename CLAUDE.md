@@ -7,7 +7,7 @@ Pilot platform, two portals. Malaysian clients issue LHDN MyInvois e-invoices an
 ## Source of truth 
 
 docs/product/pilot-spec.md: user stories, decisions, out of scope.
-docs/architecture/Decision/pilot-decisions.md: decisions D1 to D50. Cite the number you rely on. If a ticket or instruction contradicts one, stop and flag it; never override silently.
+docs/architecture/Decision/pilot-decisions.md: decisions D1 to D51. Cite the number you rely on. If a ticket or instruction contradicts one, stop and flag it; never override silently.
 Issue #1 is the parent; #2 to #24 are its tickets. Ticket "NN" = issue #(NN+1).
 
 Commands (run from `backend/`; `DATABASE_URL` must be set, there is no default because Postgres is required):
