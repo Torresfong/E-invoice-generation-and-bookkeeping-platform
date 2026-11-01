@@ -45,6 +45,24 @@ def record(action, company, actor, target_type="", target_id="", changed_fields=
     )
 
 
+OPERATOR = "operator"
+
+
+def record_operator_event(action, company, target_type, target_id, changed_fields=()):
+    """Write a company-trail entry for something the platform operator did from a command, with no signed-in user.
+
+    The actor is shown as "operator" (D50 (1)). Like every entry it names fields and never their values.
+    """
+    return AuditEntry.objects.create(
+        company=company,
+        actor_email=OPERATOR,
+        action=action,
+        target_type=target_type,
+        target_id=str(target_id),
+        changed_fields=list(changed_fields),
+    )
+
+
 def record_read(user, company_id, target_type, target_id=""):
     """Record that `user` viewed a company's data: what kind of thing and which one, never what it contained.
 

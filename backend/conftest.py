@@ -82,6 +82,7 @@ def world(db):
     accountant = make_member("accountant@firm.example", acme, CompanyAccess.ACCOUNTANT)
     CompanyAccess.objects.create(user=accountant, company=beta, role=CompanyAccess.ACCOUNTANT)
     accountant.is_accountant = True
+    accountant.firm = acme.firm
     accountant.save()
     return {
         "acme": acme,

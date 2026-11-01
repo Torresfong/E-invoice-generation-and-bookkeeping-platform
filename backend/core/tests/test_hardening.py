@@ -34,10 +34,11 @@ def test_every_spelling_the_lookup_treats_as_one_address_shares_one_lock(db):
 
 
 def test_an_accountant_created_before_any_company_gets_access_to_companies_created_later(db, fake_ports):
-    call_command("create_accountant", "accountant@firm.example")
+    firm = services.create_firm("Alpha Accounting")
+    call_command("create_accountant", "accountant@firm.example", "Alpha Accounting")
 
-    services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", "correct horse battery")
-    services.create_company_with_owner("Beta Trading", "owner@beta.example", "correct horse battery")
+    services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", "correct horse battery", firm)
+    services.create_company_with_owner("Beta Trading", "owner@beta.example", "correct horse battery", firm)
 
     accountant_rows = CompanyAccess.objects.filter(user__email="accountant@firm.example")
     assert accountant_rows.count() == 2

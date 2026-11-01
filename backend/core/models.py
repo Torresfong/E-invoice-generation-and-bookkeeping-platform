@@ -20,6 +20,22 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra)
 
 
+class Firm(models.Model):
+    """An accounting firm (D49). Each company belongs to exactly one firm and each firm accountant to exactly one.
+
+    Created only by the platform operator. The web role can read its own firm and nothing else.
+    """
+
+    name = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(Lower("name"), name="firm_name_unique_ignoring_case")]
+
+    def __str__(self):
+        return self.name
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     """The sign-in identity: an email address and a password (D40 (5)).
 
@@ -31,13 +47,18 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Marks a firm accountant for good, so one created before any company still gets access to later ones.
     # Set only by the operator command; the database default lets the SQL functions create users without it.
     is_accountant = models.BooleanField(default=False, db_default=False)
+    # The firm of a firm accountant (D49); empty for clients. Set only by the operator commands.
+    firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="users")
     date_joined = models.DateTimeField(auto_now_add=True)
 
     objects = UserManager()
     USERNAME_FIELD = "email"
 
     class Meta:
-        constraints = [models.UniqueConstraint(Lower("email"), name="user_email_unique_ignoring_case")]
+        constraints = [
+            models.UniqueConstraint(Lower("email"), name="user_email_unique_ignoring_case"),
+            models.CheckConstraint(condition=~models.Q(is_accountant=True) | models.Q(firm__isnull=False), name="accountant_has_firm"),
+        ]
 
     def __str__(self):
         return self.email
@@ -47,6 +68,7 @@ class Company(models.Model):
     """A tenant: one business whose data is isolated from every other company (D11)."""
 
     name = models.CharField(max_length=200)
+    firm = models.ForeignKey(Firm, on_delete=models.PROTECT, related_name="companies")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

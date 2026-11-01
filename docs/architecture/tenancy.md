@@ -8,7 +8,7 @@ Implements D11 and D40 (1), (2) for `CompanyAccess`, (3) and (4). Built in ticke
 - Every business table has a `company_id` and the same policy: a row is visible and writable only when its company is among the signed-in user's `CompanyAccess` rows. The policy applies to reads, inserts, updates and deletes, with a check so a row cannot be inserted for, or moved to, another company.
 - Requests run as the database role `web`: not a superuser, no `BYPASSRLS`, and it owns no tables. Tables use `FORCE ROW LEVEL SECURITY`.
 - The signed-in user reaches the database as the transaction-local setting `app.user_id`. `core.middleware.TenantContextMiddleware` wraps each request in a transaction and sets the role and the setting with `SET LOCAL`. A missing or empty setting matches nobody, so an anonymous request sees no company.
-- The membership tables are read-only to the web role (a user sees only their own `CompanyAccess` rows). Writes to them come with the firm and invitation flows.
+- The membership tables are read-only to the web role (a user sees only their own `CompanyAccess` rows). Writes to them are made by the operator commands (firms, accountants) and the invitation functions (staff).
 - Company-level authorization is this layer. Action-level permission (who may approve, who may change a TIN) is the Django permission service in 02b (D40 (4)).
 
 ## Adding a tenant table
@@ -79,7 +79,15 @@ The web role has no direct access to `core_authtoken` or `core_loginfailure`, an
 
 **Firm portal language.** The firm portal is English only (CLAUDE.md), but the sign-in and company pages are shared and follow the browser's language. Fixing an accountant's language belongs with the firm portal screens.
 
-**Firm accountants.** `User.is_accountant` marks a firm accountant for good. Only the operator command sets it. Access rows follow it: an accountant created before any company still receives every company of their firm created later, because company creation looks for the marker and the firm, not for existing access rows. Today the marker is global, so every accountant receives every company; D49 changes that to the accountant's own firm (ticket 02h, #72).
+**Firms (D49, ticket 02h, #72).** A `Firm` is an accounting firm. Every company has exactly one (`Company.firm`, not null, foreign key with PROTECT), and every firm accountant belongs to exactly one (`User.firm`; a check constraint refuses an accountant without a firm). Firms are created, and accountants are created inside them, only by operator commands (`create_firm`, `create_accountant EMAIL FIRM`, `move_company COMPANY_ID FIRM`), never through the web: the web role has `SELECT` on `core_firm` and no write right on firms, on the firm links or on the user and membership tables, and no route creates them. Firms are named uniquely, ignoring case, and the commands find them by name.
+
+*Access follows the firm, through data.* An accountant reaches a company only through a `CompanyAccess` row, as before; there is no bypass role and no new policy on tenant tables (D40 (1), (2)). The firm decides which rows exist: creating a company for a firm grants rows to that firm's accountants, creating an accountant grants rows for that firm's companies, and `move_company` deletes the old firm's accountant rows and adds the new firm's (owner and staff rows are untouched). An accountant of another firm therefore gets 404 for every company page, as for any company they cannot reach. `User.is_accountant` stays the marker that an accountant created before any company still receives the firm's later companies. The database does not check that an accountant's rows match their firm; only the services write them, as the table owner.
+
+*The firm table.* `core_firm` is under forced row-level security. A user sees the firm named on their own user row, and no other, so an accountant sees their firm and a client sees none (a client's company-to-firm link is read through the company, not the firm table, when a later ticket needs it). The migration owner has the usual `definer_functions` policy so the operator commands can write it. The job worker has no access to it.
+
+*Audit.* Assigning a company to a firm, and moving it, are entries in that company's trail: `create` on `company` when the company is created for a firm, `update` on `company` when it moves, `changed_fields` = `["firm"]` and the actor shown as `operator` (written by `audit.record_operator_event`). They name no firm and no value, so the company's owner who reads the trail learns that the firm changed, not which firms. The firm trail (D50) comes with 02j (#75).
+
+*Existing data.* Migration 0020 puts any company and accountant that exist before firms into one "Default firm"; with no data it creates nothing. There is no production data yet.
 
 ## Threat model for the pre-sign-in functions (independent review of PR #68)
 
