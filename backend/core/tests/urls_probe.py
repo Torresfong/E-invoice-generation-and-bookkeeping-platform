@@ -4,6 +4,7 @@ from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path
 
+from core import jobs
 from core.models import Company
 
 
@@ -55,8 +56,15 @@ def note_delete(request, pk):
     return JsonResponse({"id": pk})
 
 
+def job_enqueue(request):
+    """Queues a job the way a business view will: as the signed-in user, for a company named by the view."""
+    jobs.enqueue("probe-job", company=Company(pk=int(request.POST["company"])), ref=request.POST.get("ref", "x"))
+    return JsonResponse({"queued": True})
+
+
 urlpatterns = [
     path("probe/", probe),
+    path("jobs/", job_enqueue),
     path("boom/", boom),
     path("notes/", note_create),
     path("notes/<int:pk>/update/", note_update),

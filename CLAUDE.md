@@ -29,7 +29,7 @@ Commands (run from `backend/`; `DATABASE_URL` must be set, there is no default b
 4. Test first: write a failing test at the right seam (below), then the code.
 5. Missing external input (sandbox credentials, certificate, samples, cloud account): build against the fake port and say so in the PR.
 6. Verify: run the full test suite; each acceptance-criteria checkbox must be met and evidenced.
-7.Review: for tickets touching tenancy, MyInvois, signing or money, get an independent review from a fresh agent before opening the PR.
+7. Review: for tickets touching tenancy, MyInvois, signing or money, get an independent review from a fresh agent before opening the PR.
 8. PR: body says Closes #N, lists criteria with evidence and any decisions relied on. Don't merge.
 
 Stop and ask when: a decision conflicts; scope would change; a migration alters row-level security; anything touches production, signing keys or real client data.
@@ -37,7 +37,7 @@ Stop and ask when: a decision conflicts; scope would change; a migration alters 
 ## Hard rules
 - External services only through the four ports (MyInvois, AI provider, email, object storage), each a single module with a test fake. Swapping an implementation must not touch callers.
 - Tenancy: every business table has a company id; Postgres RLS enforces isolation from the first migration. Never rely on application filtering alone. The pattern, role model and its limits are in docs/architecture/tenancy.md; new tenant tables use `core.rls.enable_tenant_rls`. Business tables are also put on the audit trail with `core.audit.enable_audit` (D40 (6)); entries hold field names, never values.
-- Jobs (D36, ADR 0001): job rows carry a company id under RLS and are claimed by a separate worker role, which sets the company context from that column, never from the payload (the column, policy and roles arrive with ticket 02, #3; until then no handler may touch tenant data). Payloads hold identifiers only, enforced by `enqueue()`. A failed job keeps only the exception class, and handlers must not log content.
+- Jobs (D36, ADR 0001): job rows carry a company id under RLS and are claimed by a separate worker role, which sets the company context from that column, never from the payload (built in 02d, #34: `enqueue(name, company=...)`, the `worker` role, and `run_pending()` setting the context from the column; a job queued without a company is a system job and sees no tenant data). Payloads hold identifiers only, enforced by `enqueue()`. A failed job keeps only the exception class, and handlers must not log content.
 - Roles (D17, D40, D48): client owner, client staff, firm accountant. Only the owner approves and submits; no delegation. Access is by `CompanyAccess` membership under RLS, with no bypass role. Owners self-register (D48); staff come by owner invitation; accountants are created only by the firm operator. 2FA for owners and accountants is a go-live blocker.
 - Invoices: gapless numbering per company and document type. Approval copies and locks buyer details. After go-live the platform is the client's only issuer.
 - Document states: uploaded → quality-checked → classified → extracted → in review → verified → exported (plus returned, rejected). Only verified documents export, and the export includes uploaded sales invoices dated before the company's go-live date (D41). Export is a manual import; documents lock when the accountant confirms it (D43). Exported documents lock; corrections go to the next batch flagged "changed after export".
@@ -45,6 +45,29 @@ Stop and ask when: a decision conflicts; scope would change; a migration alters 
 - Secrets: signing key in a key vault, never in the repo or .env. Log every signing. Separate sandbox and production certificates. Keep .env out of git.
 - Data: hosting in a Malaysian region; in-region AI preferred, not required. Firm sample documents never enter the repo.
 - Money: Decimal in code, NUMERIC in the database; never floats.
+
+## Coding principles
+
+Think before coding:
+- State important assumptions before implementation.
+- If requirements have multiple plausible interpretations,
+  explain the options and ask when the choice matters.
+- Prefer the simplest solution that satisfies the ticket.
+
+Simplicity:
+- Do not add unrequested features, abstractions or configurability.
+- Avoid speculative future-proofing and unrelated refactoring.
+
+Surgical changes:
+- Modify only what the ticket requires.
+- Preserve existing conventions and patterns.
+- Remove unused code introduced by your changes.
+- Report unrelated issues without fixing them.
+
+Goal-driven execution:
+- Define how each acceptance criterion will be verified.
+- Do not claim completion without test evide.
+
 
 ## Testing
 
@@ -59,8 +82,6 @@ Test external behaviour only, at three seams, preferring the first:
 - Client screens: English and Chinese strings from the start. Firm portal and invoice PDFs: English.
 - Scope is fixed. The schedule may slip to about 2027-04-27. Don't propose cutting features.
 - Domain terms: root GLOSSARY-MAP.md points to per-context glossaries (docs/agents/domain.md). Issue tracker conventions: docs/agents/issue-tracker.md.
-
-## Agent skills
 
 ### Issue tracker
 
