@@ -29,7 +29,7 @@ Commands (run from `backend/`; `DATABASE_URL` must be set, there is no default b
 4. Test first: write a failing test at the right seam (below), then the code.
 5. Missing external input (sandbox credentials, certificate, samples, cloud account): build against the fake port and say so in the PR.
 6. Verify: run the full test suite; each acceptance-criteria checkbox must be met and evidenced.
-7.Review: for tickets touching tenancy, MyInvois, signing or money, get an independent review from a fresh agent before opening the PR.
+7. Review: for tickets touching tenancy, MyInvois, signing or money, get an independent review from a fresh agent before opening the PR.
 8. PR: body says Closes #N, lists criteria with evidence and any decisions relied on. Don't merge.
 
 Stop and ask when: a decision conflicts; scope would change; a migration alters row-level security; anything touches production, signing keys or real client data.
@@ -46,6 +46,29 @@ Stop and ask when: a decision conflicts; scope would change; a migration alters 
 - Data: hosting in a Malaysian region; in-region AI preferred, not required. Firm sample documents never enter the repo.
 - Money: Decimal in code, NUMERIC in the database; never floats.
 
+## Coding principles
+
+Think before coding:
+- State important assumptions before implementation.
+- If requirements have multiple plausible interpretations,
+  explain the options and ask when the choice matters.
+- Prefer the simplest solution that satisfies the ticket.
+
+Simplicity:
+- Do not add unrequested features, abstractions or configurability.
+- Avoid speculative future-proofing and unrelated refactoring.
+
+Surgical changes:
+- Modify only what the ticket requires.
+- Preserve existing conventions and patterns.
+- Remove unused code introduced by your changes.
+- Report unrelated issues without fixing them.
+
+Goal-driven execution:
+- Define how each acceptance criterion will be verified.
+- Do not claim completion without test evide.
+
+
 ## Testing
 
 Test external behaviour only, at three seams, preferring the first:
@@ -59,8 +82,6 @@ Test external behaviour only, at three seams, preferring the first:
 - Client screens: English and Chinese strings from the start. Firm portal and invoice PDFs: English.
 - Scope is fixed. The schedule may slip to about 2027-04-27. Don't propose cutting features.
 - Domain terms: root GLOSSARY-MAP.md points to per-context glossaries (docs/agents/domain.md). Issue tracker conventions: docs/agents/issue-tracker.md.
-
-## Agent skills
 
 ### Issue tracker
 
