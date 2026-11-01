@@ -13,7 +13,7 @@ from django.utils import timezone
 from psycopg.pq import TransactionStatus
 
 from .models import Company, Job
-from .rls import COMPANY_SETTING, WORKER_ROLE
+from .rls import CLAIMING_SETTING, COMPANY_SETTING, WORKER_ROLE
 
 logger = logging.getLogger(__name__)
 
@@ -100,11 +100,14 @@ def _claim():
     """The oldest pending job of any company, locked for this transaction (SKIP LOCKED), or None.
 
     Claiming goes through the `claim_job()` function so that the worker's own policies can stay narrow: it sees
-    every company's pending jobs only for this one call, and no other company's jobs while a handler runs.
+    every company's pending jobs only for this one call, and no other company's jobs while a handler runs. The
+    function answers only while `app.claiming` is on, which is for this call alone.
     """
     with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config(%s, 'on', true)", [CLAIMING_SETTING])
         cursor.execute("SELECT id, company_id, name, payload, attempts FROM claim_job()")
         row = cursor.fetchone()
+        cursor.execute("SELECT set_config(%s, 'off', true)", [CLAIMING_SETTING])
     if row is None:
         return None
     # A raw cursor returns jsonb as text: Django only decodes it for model fields.

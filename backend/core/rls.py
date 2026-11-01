@@ -6,10 +6,10 @@ setting (`app.user_id`), and requests run as the `web` role, which is neither ta
 
 Background jobs run as the `worker` role (D36, ADR 0001), also neither owner nor superuser. The worker has no
 user: before a handler runs, the runner sets `app.company_id` from the job's own company column, and a tenant
-table shows the worker only the rows of that company. With no company set (a system job) it shows none.
+table opened to the worker shows it only the rows of that company. With no company set (a system job) it shows none.
 
 To add a tenant table: subclass `core.models.TenantModel`, then in the migration that creates it add
-`enable_tenant_rls("app_table")` after the CreateModel.
+`enable_tenant_rls("app_table")` after the CreateModel. Add `worker=True` only if job handlers need the table.
 """
 
 from django.db import migrations
@@ -20,6 +20,8 @@ IDENTITY_SETTING = "app.user_id"
 IDENTITY_FUNCTION = "app_user_id"
 COMPANY_SETTING = "app.company_id"
 COMPANY_FUNCTION = "app_company_id"
+# Set by the runner for the one call that claims a job; `claim_job()` returns nothing without it.
+CLAIMING_SETTING = "app.claiming"
 
 # The two row rules behind every tenant policy. A user sees the rows of the companies they belong to; a job's
 # worker sees the rows of the company the job is for.
@@ -29,17 +31,26 @@ USER_COMPANY_CHECK = (
 JOB_COMPANY_CHECK = f"company_id = {COMPANY_FUNCTION}()"
 
 
-def tenant_policy_sql(table):
-    """SQL that puts `table` under the standard isolation policy."""
-    return [
-        f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO {WEB_ROLE}, {WORKER_ROLE}",
+def tenant_policy_sql(table, worker=False):
+    """SQL that puts `table` under the standard isolation policy.
+
+    Job handlers reach the table only with `worker=True`, which is a decision for each table: a table that holds
+    secrets (credentials, signing metadata, 2FA) must stay closed to every handler.
+    """
+    roles = f"{WEB_ROLE}, {WORKER_ROLE}" if worker else WEB_ROLE
+    statements = [
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON {table} TO {roles}",
         f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
         f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
         f"CREATE POLICY tenant_isolation ON {table} TO {WEB_ROLE} "
         f"USING ({USER_COMPANY_CHECK}) WITH CHECK ({USER_COMPANY_CHECK})",
-        f"CREATE POLICY worker_company_context ON {table} TO {WORKER_ROLE} "
-        f"USING ({JOB_COMPANY_CHECK}) WITH CHECK ({JOB_COMPANY_CHECK})",
     ]
+    if worker:
+        statements.append(
+            f"CREATE POLICY worker_company_context ON {table} TO {WORKER_ROLE} "
+            f"USING ({JOB_COMPANY_CHECK}) WITH CHECK ({JOB_COMPANY_CHECK})"
+        )
+    return statements
 
 
 def drop_tenant_policy_sql(table):
@@ -52,9 +63,9 @@ def drop_tenant_policy_sql(table):
     ]
 
 
-def enable_tenant_rls(table):
-    """A migration operation that applies the standard isolation policy to `table`."""
-    return migrations.RunSQL(tenant_policy_sql(table), drop_tenant_policy_sql(table))
+def enable_tenant_rls(table, worker=False):
+    """A migration operation that applies the standard isolation policy to `table`; `worker=True` opens it to jobs."""
+    return migrations.RunSQL(tenant_policy_sql(table, worker), drop_tenant_policy_sql(table))
 
 
 def owner_policy_sql(table):

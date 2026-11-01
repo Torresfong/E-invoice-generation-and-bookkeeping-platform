@@ -1,6 +1,7 @@
 from django.db import migrations
 
 from core.rls import (
+    CLAIMING_SETTING,
     COMPANY_FUNCTION,
     COMPANY_SETTING,
     IDENTITY_FUNCTION,
@@ -24,20 +25,22 @@ from core.rls import (
 # with SKIP LOCKED. The worker's own policies cover only the job's company, so while a handler runs it cannot
 # see or change another company's jobs. It may update only the columns that record the outcome, never a job's
 # company, name or payload, and cannot delete jobs. The company context for a handler comes from the job's own
-# column, set by the runner as `app.company_id`; tenant tables show the worker only that company's rows
-# (core.rls.tenant_policy_sql), and with no company set it sees none. It reads no account, credential or
+# column, set by the runner as `app.company_id`; tenant tables opened to the worker (core.rls.tenant_policy_sql,
+# `worker=True`) show it only that company's rows, and with no company set it sees none. It reads no account, credential or
 # membership table. It may write the audit trail as the system for its company, only through the audit
-# trigger, and read its own company's row; it cannot read the trail.
+# trigger, and read its own company's row; it cannot read the trail. Nobody may create temporary tables: a
+# temporary trigger function would run at trigger depth and so get past that audit guard.
 
 SECURE_WORKER, VERIFY_WORKER = secure_role_sql(WORKER_ROLE)
 
-# One login role holding both web and worker could switch between them and so reach any company.
+# One login role holding both web and worker could switch between them and so reach any company. Membership
+# counts through any chain of group roles. A superuser is a member of everything and is not what this guards.
 NO_SHARED_LOGIN = f"""
 DO $$
 BEGIN
     IF EXISTS (
-        SELECT FROM pg_auth_members w JOIN pg_auth_members k ON k.member = w.member
-        WHERE w.roleid = '{WEB_ROLE}'::regrole AND k.roleid = '{WORKER_ROLE}'::regrole
+        SELECT FROM pg_roles r WHERE NOT r.rolsuper
+        AND pg_has_role(r.oid, '{WEB_ROLE}', 'MEMBER') AND pg_has_role(r.oid, '{WORKER_ROLE}', 'MEMBER')
     ) THEN
         RAISE EXCEPTION 'A role is a member of both {WEB_ROLE} and {WORKER_ROLE}; the web and worker processes need separate login roles';
     END IF;
@@ -50,12 +53,15 @@ CREATE FUNCTION {COMPANY_FUNCTION}() RETURNS bigint LANGUAGE sql STABLE AS
 $$ SELECT NULLIF(current_setting('{COMPANY_SETTING}', true), '')::bigint $$
 """
 
-CLAIM_JOB = """
+# It answers only while the runner is claiming (`app.claiming`), so a handler that calls it by accident or through
+# injected SQL gets nothing. A handler can set the flag itself, like `app.company_id`: it is a guard, not a barrier.
+CLAIM_JOB = f"""
 CREATE FUNCTION claim_job() RETURNS TABLE (id bigint, company_id bigint, name text, payload jsonb, attempts smallint)
 LANGUAGE sql VOLATILE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS
 $$
     SELECT j.id, j.company_id, j.name, j.payload, j.attempts FROM core_job j
-    WHERE j.status = 'pending' ORDER BY j.id LIMIT 1 FOR UPDATE SKIP LOCKED
+    WHERE j.status = 'pending' AND current_setting('{CLAIMING_SETTING}', true) = 'on'
+    ORDER BY j.id LIMIT 1 FOR UPDATE SKIP LOCKED
 $$
 """
 CLAIM_FORWARD, CLAIM_REVERSE = definer_function_sql({"claim_job()": CLAIM_JOB}, role=WORKER_ROLE)
@@ -115,11 +121,21 @@ AUDIT_ROW_CHANGE_BEFORE = AUDIT_ROW_CHANGE.replace(
     "    END IF;",
     f"    SELECT email INTO v_email FROM core_user WHERE id = {IDENTITY_FUNCTION}();",
 )
+assert AUDIT_ROW_CHANGE_BEFORE != AUDIT_ROW_CHANGE, "the text of 0015 has drifted: the reverse would not restore it"
+
+# A role that can create temporary tables can reach `pg_temp`, so none may.
+NO_TEMP_TABLES = """
+DO $$ BEGIN EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC', current_database()); END $$
+"""
+ALLOW_TEMP_TABLES = """
+DO $$ BEGIN EXECUTE format('GRANT TEMPORARY ON DATABASE %I TO PUBLIC', current_database()); END $$
+"""
 
 FORWARD = [
     SECURE_WORKER,
     VERIFY_WORKER,
     NO_SHARED_LOGIN,
+    NO_TEMP_TABLES,
     f"GRANT USAGE ON SCHEMA public TO {WORKER_ROLE}",
     COMPANY_CONTEXT,
     # --- web: the signed-in user's companies
@@ -150,6 +166,7 @@ FORWARD = [
 ]
 
 REVERSE = [
+    ALLOW_TEMP_TABLES,
     AUDIT_ROW_CHANGE_BEFORE,
     "DROP POLICY IF EXISTS worker_entries ON core_auditentry",
     f"REVOKE ALL ON core_auditentry FROM {WORKER_ROLE}",
