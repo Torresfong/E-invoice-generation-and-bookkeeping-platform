@@ -440,11 +440,12 @@ def test_a_handler_that_calls_claim_job_gets_nothing(registry, world):
 
     def handler(**payload):
         seen["rows"] = query("SELECT id, company_id, payload FROM claim_job()")
+        seen["flag"] = query("SELECT current_setting('app.claiming', true)")
 
     jobs.enqueue("theirs", company=world["beta"], ref="secret-ref")
     job = run_one(handler, company=world["acme"])
 
-    assert job.status == Job.DONE and seen["rows"] == []
+    assert job.status == Job.DONE and seen["rows"] == [] and seen["flag"] == [("off",)]
 
 
 def test_a_handler_cannot_create_a_temporary_table(registry, world):
@@ -477,13 +478,13 @@ def test_the_role_and_company_context_are_put_back_after_a_failing_handler(regis
     jobs.register("failing")(failing)
     jobs.register("next")(next_job)
     first = jobs.enqueue("failing", company=world["acme"])
-    jobs.enqueue("next", company=world["beta"])
+    jobs.enqueue("next")
 
     assert jobs.run_pending() == 2
 
     first.refresh_from_db()
     assert first.status == Job.FAILED and first.error == "RuntimeError"
-    assert seen == [("worker", str(world["beta"].pk))]
+    assert seen == [("worker", "")]
     assert query("SELECT current_user = session_user, coalesce(current_setting('app.company_id', true), '')") == [
         (True, "")
     ]
@@ -495,6 +496,8 @@ def test_the_job_migration_reverses_and_applies_again(db):
             cursor.execute(statement)
         assert query("SELECT relrowsecurity FROM pg_class WHERE relname = 'core_job'") == [(False,)]
         assert query("SELECT count(*) FROM pg_proc WHERE proname = 'claim_job'") == [(0,)]
+        assert query("SELECT has_database_privilege('web', current_database(), 'TEMPORARY')") == [(True,)]
+        assert "IS NOT NULL THEN" not in query("SELECT pg_get_functiondef('audit_row_change'::regproc)")[0][0]
         for statement in job_migration.FORWARD:
             cursor.execute(statement)
 

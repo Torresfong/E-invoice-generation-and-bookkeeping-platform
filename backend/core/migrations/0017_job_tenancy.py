@@ -127,6 +127,7 @@ assert AUDIT_ROW_CHANGE_BEFORE != AUDIT_ROW_CHANGE, "the text of 0015 has drifte
 NO_TEMP_TABLES = """
 DO $$ BEGIN EXECUTE format('REVOKE TEMPORARY ON DATABASE %I FROM PUBLIC', current_database()); END $$
 """
+# The reverse always opens it again, even if an operator had closed it before this migration.
 ALLOW_TEMP_TABLES = """
 DO $$ BEGIN EXECUTE format('GRANT TEMPORARY ON DATABASE %I TO PUBLIC', current_database()); END $$
 """
