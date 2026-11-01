@@ -4,6 +4,8 @@ from django.db import DatabaseError, IntegrityError, connection, transaction
 
 from core.models import Company, CompanyAccess
 
+from .factories import make_company
+
 User = get_user_model()
 
 
@@ -23,7 +25,7 @@ def test_two_users_cannot_share_an_email_address_in_any_letter_case(db):
 
 
 def make_company_with(*memberships):
-    company = Company.objects.create(name="Acme Sdn Bhd")
+    company = make_company("Acme Sdn Bhd")
     users = []
     for email, role in memberships:
         user = User.objects.create_user(email, password="correct horse battery")
@@ -102,7 +104,7 @@ def test_the_sign_in_lookup_returns_only_what_sign_in_needs_for_an_exact_match(a
 
 
 def test_the_database_rejects_a_role_that_is_not_one_of_the_three(db):
-    company = Company.objects.create(name="Acme Sdn Bhd")
+    company = make_company("Acme Sdn Bhd")
     user = User.objects.create_user("admin@example.com", password="correct horse battery")
 
     with pytest.raises(IntegrityError), transaction.atomic():

@@ -7,7 +7,7 @@ from django.utils import timezone
 from core import throttle
 from core.models import CompanyAccess, LoginFailure
 
-from .factories import PASSWORD, make_company, make_member
+from .factories import PASSWORD, default_firm, make_company, make_member
 
 
 @pytest.fixture
@@ -146,7 +146,7 @@ def test_the_sixth_attempt_for_an_address_is_refused_and_a_clear_resets_the_coun
 
 def test_an_accountant_who_has_not_chosen_a_password_cannot_sign_in(client, db, fake_ports, as_production_connection):
     make_company()
-    call_command("create_accountant", "accountant@firm.example")
+    call_command("create_accountant", "accountant@firm.example", default_firm().name)
 
     with as_production_connection():
         response = sign_in(client, "accountant@firm.example", "")

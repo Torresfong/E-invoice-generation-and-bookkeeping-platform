@@ -8,11 +8,13 @@ from django.db.utils import DataError
 from core.models import Company, CompanyAccess
 from core.rls import IDENTITY_SETTING, WEB_ROLE, WORKER_ROLE, tenant_policy_sql
 
+from .factories import make_company
+
 
 @pytest.fixture
 def two_companies(db):
-    acme = Company.objects.create(name="Acme Sdn Bhd")
-    beta = Company.objects.create(name="Beta Trading")
+    acme = make_company("Acme Sdn Bhd")
+    beta = make_company("Beta Trading")
     return acme, beta
 
 
@@ -23,6 +25,10 @@ def make_user(name):
 def member(name, company, role):
     """A new user with a membership row in `company`."""
     user = make_user(name)
+    if role == CompanyAccess.ACCOUNTANT:  # an accountant belongs to the company's firm (D49)
+        user.is_accountant = True
+        user.firm = company.firm
+        user.save()
     CompanyAccess.objects.create(user=user, company=company, role=role)
     return user
 
@@ -37,7 +43,7 @@ def test_a_user_sees_only_the_companies_they_have_access_to(as_user, two_compani
 
 def test_a_user_with_several_memberships_sees_exactly_those_companies(as_user, two_companies):
     acme, beta = two_companies
-    gamma = Company.objects.create(name="Gamma Holdings")
+    gamma = make_company("Gamma Holdings")
     accountant = member("firm-accountant", acme, CompanyAccess.ACCOUNTANT)
     CompanyAccess.objects.create(user=accountant, company=beta, role=CompanyAccess.ACCOUNTANT)
 
@@ -154,7 +160,7 @@ def test_a_tenant_table_cannot_update_or_delete_another_companys_rows(as_user, n
 
 def test_a_user_with_two_memberships_works_in_both_companies_and_no_other(as_user, notes_table):
     acme, beta = notes_table
-    gamma = Company.objects.create(name="Gamma Holdings")
+    gamma = make_company("Gamma Holdings")
     accountant = member("firm-accountant", acme, CompanyAccess.ACCOUNTANT)
     CompanyAccess.objects.create(user=accountant, company=beta, role=CompanyAccess.ACCOUNTANT)
 
@@ -223,7 +229,7 @@ def test_a_database_error_in_a_view_reaches_the_caller_unchanged_and_the_role_is
 @pytest.mark.django_db(transaction=True)
 def test_in_a_real_transaction_the_role_and_identity_are_gone_after_the_request(probe_client):
     owner = make_user("acme-owner")
-    acme = Company.objects.create(name="Acme Sdn Bhd")
+    acme = make_company("Acme Sdn Bhd")
     CompanyAccess.objects.create(user=owner, company=acme, role=CompanyAccess.OWNER)
     probe_client.force_login(owner)
 

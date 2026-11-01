@@ -46,6 +46,10 @@ _Avoid_: Admin, client
 A company user who drafts invoices and uploads documents but cannot approve or submit.
 _Avoid_: Employee, member
 
+**Firm**:
+An accounting firm. Every company belongs to exactly one firm, and a firm's accountants reach only that firm's companies. Created only by the platform operator.
+_Avoid_: Practice, agency, accounting company
+
 **Firm accountant**:
-A user of the accounting firm who reviews documents and exports batches across all companies.
+A user of an accounting firm who reviews documents and exports batches across all of that firm's companies.
 _Avoid_: Auditor, reviewer

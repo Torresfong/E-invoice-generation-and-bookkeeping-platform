@@ -1,6 +1,6 @@
 from django.contrib.auth import get_user_model
 
-from core.models import Company, CompanyAccess
+from core.models import Company, CompanyAccess, Firm
 
 PASSWORD = "correct horse battery"
 
@@ -10,21 +10,32 @@ def make_user(email, password=PASSWORD):
 
 
 def make_member(email, company, role, password=PASSWORD):
-    """A new user with a membership row in `company`."""
+    """A new user with a membership row in `company`. An accountant belongs to the company's firm (D49)."""
     user = make_user(email, password)
+    if role == CompanyAccess.ACCOUNTANT:
+        user.is_accountant = True
+        user.firm = company.firm
+        user.save()
     CompanyAccess.objects.create(user=user, company=company, role=role)
     return user
 
 
+def default_firm():
+    """The firm that tests use unless they say otherwise."""
+    firm, _ = Firm.objects.get_or_create(name="Test Firm")
+    return firm
+
+
 def make_accountant(email, *companies, password=PASSWORD):
-    """A firm accountant with a membership in each of `companies`."""
+    """A firm accountant with a membership in each of `companies`, in the firm of the first (or the default firm)."""
     user = make_user(email, password)
     user.is_accountant = True
+    user.firm = companies[0].firm if companies else default_firm()
     user.save()
     for company in companies:
         CompanyAccess.objects.create(user=user, company=company, role=CompanyAccess.ACCOUNTANT)
     return user
 
 
-def make_company(name="Acme Sdn Bhd"):
-    return Company.objects.create(name=name)
+def make_company(name="Acme Sdn Bhd", firm=None):
+    return Company.objects.create(name=name, firm=firm or default_firm())
