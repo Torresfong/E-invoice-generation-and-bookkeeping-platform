@@ -101,4 +101,4 @@ Decisions settled in the grilling session of 2026-10-27, on the MVP pilot propos
 - Whether our company is a registered Malaysian company LHDN will accept as an intermediary. This is assumed, not confirmed.
 - Whether AWS Malaysia offers the managed services we need. Checked 2026-10-29: RDS, Fargate, Secrets Manager, ACM, Systems Manager and STS are listed for ap-southeast-5. S3, KMS and SES are not yet confirmed from AWS documentation, and standard RDS for PostgreSQL 16 is inferred from the general RDS listing.
 - Which firms join the pilot and how many clients each brings (D32 aimed at 3 to 4 clients in total, with 5 shortlisted).
-
+- Whether the pilot clients, reported under RM3m annual turnover on 2026-11-01, are exempt from e-invoicing under LHDN's phase-in rules unless a related-company condition applies (no client's group structure has been checked), and what that means for the D29 target that every pilot client has an accepted production e-invoice. Ask in the paid MyInvois review (D14).

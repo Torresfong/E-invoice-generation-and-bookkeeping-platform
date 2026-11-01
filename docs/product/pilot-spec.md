@@ -20,9 +20,9 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 5. As a client owner, I want to be the only person who can approve and submit an invoice, so that nothing reaches LHDN without my decision.
 6. As a client owner, I want every approval recorded with who and when, so that there is a trustworthy audit trail.
 7. As a client owner, I want to see how many invoices are waiting for my approval on my dashboard and by email reminder, so that approvals do not stall when I am busy.
-8. As a client owner, I want live MyInvois status on every invoice (draft, waiting approval, submitted, validated, invalid, rejected by buyer, cancelled), so that I know where each stands.
+8. As a client owner, I want live MyInvois status on every invoice (draft, waiting approval, submitted, validated, invalid, cancelled, with a "rejection requested by buyer" marker on a validated invoice), so that I know where each stands.
 9. As a client owner, I want a clear explanation when LHDN marks an invoice invalid, and to correct and resubmit it, so that a validation failure does not cost me a day of work.
-10. As a client owner, I want to be notified when a buyer requests rejection, so that I can respond within the permitted window.
+10. As a client owner, I want to be notified when a buyer requests rejection, so that I can respond within the permitted window; the invoice stays validated until I cancel it.
 11. As a client owner, I want to cancel a validated invoice within LHDN's window, so that mistakes can be reversed correctly.
 12. As a client owner, I want each validated invoice emailed to my customer as an English PDF with the MyInvois QR code and validation link, so that the customer gets a proper document.
 13. As a client owner, I want the email to come from the platform's domain under my company's name with my address as reply-to, so that replies reach me.
@@ -97,7 +97,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 
 **External ports.** Four boundaries, each a single module with a fake for tests: MyInvois gateway (login on behalf of taxpayers as intermediary, TIN validation, document signing, submission, status polling, cancellation, rejection handling), AI provider, email, object storage.
 
-**MyInvois.** Direct submission to LHDN, JSON document format, signed with the intermediary's certificate. Invoice states: draft, waiting approval, submitted, validated, invalid, rejected by buyer, cancelled. Invalid invoices can be corrected and resubmitted. Submissions are queued if LHDN is unavailable and the owner sees a status banner. A two-week sandbox spike (login, sign, submit, poll, cancel) comes first; if no accepted sandbox submission exists by week 3, it is escalated as the main risk.
+**MyInvois.** Direct submission to LHDN, JSON document format, signed with the intermediary's certificate. Invoice states: draft, waiting approval, submitted, validated, invalid, cancelled. A buyer's rejection request is a marker on a validated invoice, not a state: LHDN shows it as "Requested for Rejection" and keeps the invoice valid until the owner cancels it inside LHDN's window (72 hours in LHDN's current guideline; confirm in the sandbox spike, D14). Delivery to the buyer (emailed, downloaded, failed) is its own attribute and never an invoice state. Invalid invoices can be corrected and resubmitted. Submissions are queued if LHDN is unavailable and the owner sees a status banner. A two-week sandbox spike (login, sign, submit, poll, cancel) comes first; if no accepted sandbox submission exists by week 3, it is escalated as the main risk.
 
 **Signing key custody.** The key lives in a managed key vault or secrets service, readable only by the signing module, never in the repository or the environment file, every signing operation logged. Sandbox and production use different certificates. The vault choice depends on the certificate type LHDN issues.
 
@@ -160,7 +160,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 
 Quality targets (agreed, with definitions): every pilot client has an e-invoice accepted by MyInvois production; the firm has imported one full month of exports into SQL Account; 95% or more of e-invoices accepted on first submission, counting real client invoices only; 80% or more of sales invoices, purchase invoices and receipts needing no field correction, measured per document type on actual uploads including phone photos; accountant time per document at least halved against a baseline of at least 40 documents timed by week 8 and re-timed on the same set. A miss on one target is reported as a partial result with the cause. Each pilot owner states the monthly price they would pay at go-live and again at the end.
 
-Pilot clients: shortlist 5, aim to sign 3 to 4, with a named owner contact for each by 2026-11-09. Criteria: local business-to-business sales only, no foreign supplier self-billing, existing SQL Account bookkeeping client, owner willing to approve personally.
+Pilot clients: shortlist 5, aim to sign 3 to 4, with a named owner contact for each by 2026-11-09. Criteria: local business-to-business sales only, no foreign supplier self-billing, existing SQL Account bookkeeping client, owner willing to approve personally. The product owner reports (2026-11-01) that the pilot clients are under RM3m annual turnover. LHDN's current guideline exempts taxpayers under RM3m unless a holding company, related company or non-individual shareholder has RM3m or more, so whether each client must e-invoice is open (see the open items and D29).
 
 Each pilot firm commits a lead accountant and a named backup, with weekly hours in writing (D49). A Malaysian lawyer reviews the service agreement, the AI and cross-border consent text and the AI data processing agreement by week 12; no client signs before that.
 
