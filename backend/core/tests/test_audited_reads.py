@@ -12,9 +12,10 @@ from .factories import PASSWORD, make_accountant, make_company
 
 CHINESE = {"accept-language": "zh-hans"}
 
-# Every company-scoped screen is either audited or listed here with the reason it shows no company data to an
+# Every company screen is either audited or listed here with the reason it shows no company data to an
 # accountant. A new screen under /companies/<id>/ must do one or the other.
 NOT_AUDITED = {
+    "companies/": "the accountant's own list of companies they may open, not any company's data (owner decision)",
     "companies/<int:pk>/invite/": "owner-only action: an accountant is refused before anything is shown",
     "companies/<int:pk>/activity/": "shows the signed-in user's own activity, not the company's data",
 }
@@ -29,12 +30,12 @@ def reads(company):
 
 
 def company_routes(patterns=None, prefix=""):
-    """Every route that carries a company id, as (route, view)."""
+    """Every company screen, as (route, view): the list and every route that carries a company id."""
     for pattern in patterns if patterns is not None else get_resolver("config.urls").url_patterns:
         route = prefix + str(pattern.pattern)
         if hasattr(pattern, "url_patterns"):
             yield from company_routes(pattern.url_patterns, route)
-        elif "<int:pk>" in route:
+        elif route.startswith("companies/"):
             yield route, pattern.callback
 
 
