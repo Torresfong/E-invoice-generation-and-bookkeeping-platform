@@ -13,6 +13,8 @@ class Command(BaseCommand):
     def handle(self, *args, name, **options):
         try:
             firm = services.create_firm(name)
+        except services.FirmNameRequired as error:
+            raise CommandError("A firm needs a name.") from error
         except IntegrityError as error:
             raise CommandError("A firm with that name already exists.") from error
         self.stdout.write(f"Created firm {firm.name}.")

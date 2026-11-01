@@ -18,7 +18,8 @@ def make_member(email, company, role, password=PASSWORD):
 
 def default_firm():
     """The firm that tests use unless they say otherwise."""
-    return Firm.objects.get_or_create(name="Test Firm")[0]
+    firm, _ = Firm.objects.get_or_create(name="Test Firm")
+    return firm
 
 
 def make_accountant(email, *companies, password=PASSWORD):

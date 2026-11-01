@@ -19,6 +19,10 @@ class FirmNotFound(Exception):
     pass
 
 
+class FirmNameRequired(ValueError):
+    pass
+
+
 class CompanyNotFound(Exception):
     pass
 
@@ -44,8 +48,21 @@ def _record_firm(company, action):
     audit.record_operator_event(action, company, "company", company.pk, changed_fields=["firm"])
 
 
+def _lock_firms(*firms):
+    """Lock the firms' rows, in a fixed order, until the transaction ends, and return them in the order given.
+
+    Creating a company or an accountant and moving a company all read one firm's people or companies and then write
+    access rows; locking the firm makes them take turns, so a move cannot leave a stale row for the old firm's
+    accountant behind.
+    """
+    locked = {firm.pk: firm for firm in Firm.objects.select_for_update().filter(pk__in=[f.pk for f in firms]).order_by("pk")}
+    return [locked[firm.pk] for firm in firms]
+
+
 def create_firm(name):
     """An accounting firm. Names are unique, ignoring case."""
+    if not name.strip():
+        raise FirmNameRequired
     return Firm.objects.create(name=name.strip())
 
 
@@ -67,6 +84,7 @@ def get_company(pk):
 def create_company_with_owner(name, owner_email, owner_password, firm):
     """A company of `firm` with its single owner. Only that firm's accountants get access to it."""
     _require_new_address(owner_email)
+    [firm] = _lock_firms(firm)
     company = Company.objects.create(name=name, firm=firm)
     owner = get_user_model().objects.create_user(owner_email, password=owner_password)
     CompanyAccess.objects.create(user=owner, company=company, role=CompanyAccess.OWNER)
@@ -79,6 +97,7 @@ def create_company_with_owner(name, owner_email, owner_password, firm):
 def create_accountant(email, firm):
     """An accountant of `firm`, with access to that firm's companies only and no usable password until they choose one."""
     _require_new_address(email)
+    [firm] = _lock_firms(firm)
     accountant = get_user_model().objects.create_user(email, password=None, is_accountant=True, firm=firm)
     CompanyAccess.objects.bulk_create(
         CompanyAccess(user=accountant, company=company, role=CompanyAccess.ACCOUNTANT) for company in firm.companies.all()
@@ -92,6 +111,8 @@ def move_company(company, firm):
 
     Owners and staff are untouched. Does nothing, and records nothing, if the company is already in that firm.
     """
+    company = Company.objects.select_for_update().get(pk=company.pk)  # the firm it is in now, not the one we were handed
+    _lock_firms(company.firm, firm)
     if company.firm_id == firm.pk:
         return company
     CompanyAccess.objects.filter(company=company, role=CompanyAccess.ACCOUNTANT).delete()

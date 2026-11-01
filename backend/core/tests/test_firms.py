@@ -4,7 +4,7 @@ import re
 
 import pytest
 from django.core.management import CommandError, call_command
-from django.db import DatabaseError, IntegrityError, connection, transaction
+from django.db import DatabaseError, IntegrityError, connection, models, transaction
 from django.urls import get_resolver
 
 from core import services
@@ -98,6 +98,12 @@ def test_an_accountant_cannot_be_created_without_a_firm_or_in_a_firm_that_does_n
     assert fake_ports.email.sent == []
 
 
+def test_a_firm_needs_a_name(db):
+    with pytest.raises(CommandError):
+        call_command("create_firm", "   ")
+    assert Firm.objects.count() == 0
+
+
 def test_two_firms_cannot_share_a_name_even_in_another_case(world):
     with pytest.raises(CommandError):
         call_command("create_firm", "ALPHA accounting")
@@ -147,6 +153,25 @@ def test_moving_to_a_firm_that_does_not_exist_is_refused_and_changes_nothing(wor
 
     world["acme"].refresh_from_db()
     assert world["acme"].firm == world["alpha"]
+
+
+def test_an_accountants_access_rows_always_match_their_firm_whatever_the_operator_does(world):
+    """The database does not tie the two together, so every service call must leave them consistent."""
+
+    def mismatched():
+        return CompanyAccess.objects.filter(role=CompanyAccess.ACCOUNTANT).exclude(user__firm=models.F("company__firm"))
+
+    assert not mismatched().exists()
+    services.create_accountant("second@alpha.example", world["alpha"])
+    services.create_company_with_owner("Delta Bhd", "owner@delta.example", PASSWORD, world["beta"])
+    services.move_company(world["acme"], world["beta"])
+    services.move_company(world["gamma"], world["alpha"])
+    services.create_accountant("third@beta.example", world["beta"])
+    services.move_company(world["acme"], world["alpha"])
+
+    assert not mismatched().exists()
+    # Alpha (two accountants) now has Acme and Gamma; Beta (two accountants) has Delta.
+    assert CompanyAccess.objects.filter(role=CompanyAccess.ACCOUNTANT).count() == 2 * 2 + 2 * 1
 
 
 # --- the audit trail ----------------------------------------------------------------------------------------
@@ -297,4 +322,12 @@ def test_companies_and_accountants_from_before_firms_existed_move_to_one_default
 
 @pytest.mark.django_db(transaction=True)
 def test_a_database_with_no_data_gets_no_default_firm():
-    assert Firm.objects.count() == 0
+    from django.db.migrations.executor import MigrationExecutor
+
+    latest = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
+    MigrationExecutor(connection).migrate([("core", "0019_firm")])
+    try:
+        MigrationExecutor(connection).migrate(latest)
+        assert Firm.objects.count() == 0
+    finally:
+        MigrationExecutor(connection).migrate(latest)
