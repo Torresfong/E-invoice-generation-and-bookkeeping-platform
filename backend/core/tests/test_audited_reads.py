@@ -195,6 +195,13 @@ def test_every_company_screen_is_audited_or_listed_as_showing_an_accountant_no_c
     assert {route for route, _ in routes} >= set(NOT_AUDITED)  # the exemptions are for routes that exist
 
 
+def test_every_audited_screen_takes_the_company_as_pk():
+    """The decorator reads the company from the view's `pk` argument, so a screen that names it otherwise would fail."""
+    routes = [(route, view) for route, view in company_routes() if getattr(view, "audited_read", False)]
+
+    assert routes and all("<int:pk>" in route for route, _ in routes)
+
+
 def test_the_guard_fails_for_a_screen_that_skips_the_mechanism():
     def skipped(request, pk):
         pass
