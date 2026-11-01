@@ -20,9 +20,9 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 5. As a client owner, I want to be the only person who can approve and submit an invoice, so that nothing reaches LHDN without my decision.
 6. As a client owner, I want every approval recorded with who and when, so that there is a trustworthy audit trail.
 7. As a client owner, I want to see how many invoices are waiting for my approval on my dashboard and by email reminder, so that approvals do not stall when I am busy.
-8. As a client owner, I want live MyInvois status on every invoice (draft, waiting approval, submitted, validated, invalid, rejected by buyer, cancelled), so that I know where each stands.
+8. As a client owner, I want live MyInvois status on every invoice (draft, waiting approval, submitted, validated, invalid, cancelled, with a "rejection requested by buyer" marker on a validated invoice), so that I know where each stands.
 9. As a client owner, I want a clear explanation when LHDN marks an invoice invalid, and to correct and resubmit it, so that a validation failure does not cost me a day of work.
-10. As a client owner, I want to be notified when a buyer requests rejection, so that I can respond within the permitted window.
+10. As a client owner, I want to be notified when a buyer requests rejection, so that I can respond within the permitted window; the invoice stays validated until I cancel it.
 11. As a client owner, I want to cancel a validated invoice within LHDN's window, so that mistakes can be reversed correctly.
 12. As a client owner, I want each validated invoice emailed to my customer as an English PDF with the MyInvois QR code and validation link, so that the customer gets a proper document.
 13. As a client owner, I want the email to come from the platform's domain under my company's name with my address as reply-to, so that replies reach me.
@@ -57,7 +57,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 38. As a client owner, I want text inside uploaded documents never to be able to instruct the assistant or extractor, so that a crafted document cannot alter my data.
 
 ### Firm accountant
-39. As an accountant, I want all clients' documents in one place organised per client and per month, so that the email inbox is no longer the system of record.
+39. As an accountant, I want all my firm's clients' documents in one place organised per client and per month, and no other firm's, so that the email inbox is no longer the system of record.
 40. As an accountant, I want every upload classified automatically, so that I do not sort by hand.
 41. As an accountant, I want supplier, date, amounts, tax and line items extracted from sales invoices, purchase invoices and receipts, so that I do not key them.
 42. As an accountant, I want a review queue showing the extracted fields beside the document image, so that I can check and correct quickly.
@@ -74,7 +74,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 53. As an accountant, I want bank statements, payment vouchers, payroll and loan documents stored and searchable, so that I can find them without email.
 54. As an accountant, I want original currency and amount stored on foreign purchase documents, so that I apply the rate in SQL Account.
 55. As a backup accountant, I want to use the same review queue when the lead is away, so that the pilot does not stall.
-56. As the firm lead, I want weekly time for the pilot commitment written down, so that capacity matches the targets.
+56. As a firm lead, I want weekly time for the pilot commitment written down, so that capacity matches the targets.
 
 ### Platform operator (our team)
 57. As an operator, I want each client company's data isolated by the database itself, so that a coding mistake cannot leak data across companies.
@@ -93,11 +93,11 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 
 **Tenancy.** Every business table carries a company identifier. Isolation is enforced by Postgres row-level security from the first migration, not only in application code. The database is designed so that per-accountant assignment, a firm administrator role and one login across several companies can be added later.
 
-**Roles.** Exactly three: client owner, client staff, firm accountant. Only the owner approves and submits invoices; there is no delegation. A company has one owner login. Staff may confirm creating a customer; only the owner may change a customer's TIN, legal name or registration number. Several accountants may use the firm portal from day one, with one `CompanyAccess` row per pilot company and no bypass role, and every read of a company's data audited (D40, D45). Staff and the assistant may propose a change to those identity fields; the owner approves, and every customer write validates the TIN with MyInvois (D46).
+**Roles.** Four: client owner, client staff, firm accountant, and firm administrator (firm-level, manages the firm's accountants, sees no client data, D49). Only the owner approves and submits invoices; there is no delegation. A company has one owner login. Staff may confirm creating a customer; only the owner may change a customer's TIN, legal name or registration number. Several firms, each with several accountants, use the firm portal from day one (D49). A company belongs to exactly one firm, and an accountant has one `CompanyAccess` row for each company of their own firm and none for any other firm, with no bypass role; every read of a company's data is audited (D40, D45). Only the platform operator creates firms, each with a first firm administrator. A firm administrator creates and deactivates the accountants of their own firm and sees no client data (D49). A client owner can sign up only through a link from their own firm. Staff and the assistant may propose a change to those identity fields; the owner approves, and every customer write validates the TIN with MyInvois (D46).
 
 **External ports.** Four boundaries, each a single module with a fake for tests: MyInvois gateway (login on behalf of taxpayers as intermediary, TIN validation, document signing, submission, status polling, cancellation, rejection handling), AI provider, email, object storage.
 
-**MyInvois.** Direct submission to LHDN, JSON document format, signed with the intermediary's certificate. Invoice states: draft, waiting approval, submitted, validated, invalid, rejected by buyer, cancelled. Invalid invoices can be corrected and resubmitted. Submissions are queued if LHDN is unavailable and the owner sees a status banner. A two-week sandbox spike (login, sign, submit, poll, cancel) comes first; if no accepted sandbox submission exists by week 3, it is escalated as the main risk.
+**MyInvois.** Direct submission to LHDN, JSON document format, signed with the intermediary's certificate. Invoice states: draft, waiting approval, submitted, validated, invalid, cancelled. A buyer's rejection request is a marker on a validated invoice, not a state: LHDN shows it as "Requested for Rejection" and keeps the invoice valid until the owner cancels it inside LHDN's window (72 hours in LHDN's current guideline; confirm in the sandbox spike, D14). Delivery to the buyer (emailed, downloaded, failed) is its own attribute and never an invoice state. Invalid invoices can be corrected and resubmitted. Submissions are queued if LHDN is unavailable and the owner sees a status banner. A two-week sandbox spike (login, sign, submit, poll, cancel) comes first; if no accepted sandbox submission exists by week 3, it is escalated as the main risk.
 
 **Signing key custody.** The key lives in a managed key vault or secrets service, readable only by the signing module, never in the repository or the environment file, every signing operation logged. Sandbox and production use different certificates. The vault choice depends on the certificate type LHDN issues.
 
@@ -152,7 +152,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 - Automatic detection of missing documents from bank statement gaps.
 - Assistant deleting customers, approving or submitting invoices, deciding uncertain tax, or answering general accounting questions.
 - Delivery by WhatsApp or WeChat; Malay interface and bilingual PDFs.
-- Per-accountant client assignment, firm administrator role, one login across several companies, and approval delegation.
+- Per-accountant client assignment inside a firm, a firm administrator who can see client data, one login across several companies, a company served by more than one firm, and approval delegation.
 - Foreign-currency conversion on uploaded purchase documents.
 - Offline use and a mobile app.
 
@@ -160,10 +160,10 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 
 Quality targets (agreed, with definitions): every pilot client has an e-invoice accepted by MyInvois production; the firm has imported one full month of exports into SQL Account; 95% or more of e-invoices accepted on first submission, counting real client invoices only; 80% or more of sales invoices, purchase invoices and receipts needing no field correction, measured per document type on actual uploads including phone photos; accountant time per document at least halved against a baseline of at least 40 documents timed by week 8 and re-timed on the same set. A miss on one target is reported as a partial result with the cause. Each pilot owner states the monthly price they would pay at go-live and again at the end.
 
-Pilot clients: shortlist 5, aim to sign 3 to 4, with a named owner contact for each by 2026-11-09. Criteria: local business-to-business sales only, no foreign supplier self-billing, existing SQL Account bookkeeping client, owner willing to approve personally.
+Pilot clients: shortlist 5, aim to sign 3 to 4, with a named owner contact for each by 2026-11-09. Criteria: local business-to-business sales only, no foreign supplier self-billing, existing SQL Account bookkeeping client, owner willing to approve personally. The product owner reports (2026-11-01) that the pilot clients are under RM3m annual turnover. LHDN's current guideline exempts taxpayers under RM3m unless a holding company, related company or non-individual shareholder has RM3m or more, so whether each client must e-invoice is open (see the open items and D29).
 
-The firm commits a lead accountant and a named backup, with weekly hours in writing. A Malaysian lawyer reviews the service agreement, the AI and cross-border consent text and the AI data processing agreement by week 12; no client signs before that.
+Each pilot firm commits a lead accountant and a named backup, with weekly hours in writing (D49). A Malaysian lawyer reviews the service agreement, the AI and cross-border consent text and the AI data processing agreement by week 12; no client signs before that.
 
-Still open and to be settled by dated work, not assumed: the AI provider (sample test, weeks 1 to 2); the exchange-rate source the firm uses; the SQL Account version and file format (the import method is manual, D43); the price after the pilot (signal only); a paid review session with someone who has integrated MyInvois, before Gate 1. Two assumptions are carried without confirmation: our company is a registered Malaysian company LHDN will accept as an intermediary, and the AWS Malaysia region offers the needed managed services.
+Still open and to be settled by dated work, not assumed: the AI provider (sample test, weeks 1 to 2); which firms join and how many clients each brings; the exchange-rate source each firm uses; the SQL Account version and file format (the import method is manual, D43); the price after the pilot (signal only); a paid review session with someone who has integrated MyInvois, before Gate 1. Two assumptions are carried without confirmation: our company is a registered Malaysian company LHDN will accept as an intermediary, and the AWS Malaysia region offers the needed managed services.
 
 Housekeeping before the first commit: add the environment file to the ignore list, add Dockerfiles, and replace the placeholder CI.
