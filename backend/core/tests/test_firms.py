@@ -440,3 +440,59 @@ def test_the_migration_reverses_and_applies_again(world):
             cursor.execute(statement)
 
     assert query("SELECT count(*) FROM pg_trigger WHERE tgname LIKE 'accountant_rows_match_firm_%%'") == [(3,)]
+
+
+def test_an_accountant_row_for_a_user_whose_firm_matches_but_who_is_not_an_accountant_is_refused(world):
+    colleague = User.objects.create_user("clerk@alpha.example", firm=world["alpha"])  # same firm, not an accountant
+    check_now()
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.create(user=colleague, company=world["acme"], role=CompanyAccess.ACCOUNTANT)
+
+
+def test_turning_a_staff_row_into_an_accountant_row_or_repointing_one_is_checked(world):
+    staff = User.objects.create_user("staff@x.example", firm=world["beta"])
+    row = CompanyAccess.objects.create(user=staff, company=world["acme"], role=CompanyAccess.STAFF)
+    check_now()
+
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.filter(pk=row.pk).update(role=CompanyAccess.ACCOUNTANT)
+    own = CompanyAccess.objects.get(user=world["alpha_accountant"], company=world["acme"])
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.filter(pk=own.pk).update(user=world["beta_accountant"])
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.filter(pk=own.pk).update(company=world["gamma"])
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_check_in_progress_holds_the_rows_so_a_concurrent_move_cannot_slip_past_it():
+    import psycopg
+
+    alpha, beta = services.create_firm("Alpha Accounting"), services.create_firm("Beta Books")
+    accountant = services.create_accountant("acc@alpha.example", alpha)
+    company = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, beta)
+    services.move_company(company, alpha)  # a valid row now exists, so remove it to write it again below
+    CompanyAccess.objects.filter(user=accountant, company=company).delete()
+    settings = connection.settings_dict
+    dsn = f"dbname={settings['NAME']} user={settings['USER']} password={settings['PASSWORD']} host={settings['HOST']} port={settings['PORT'] or 5432}"
+
+    writer, mover = psycopg.connect(dsn), psycopg.connect(dsn)
+    try:
+        writer.execute("SET CONSTRAINTS ALL IMMEDIATE")  # the check runs as the row is written, and holds what it read
+        writer.execute(
+            "INSERT INTO core_companyaccess (user_id, company_id, role, created_at) VALUES (%s, %s, 'accountant', now())",
+            [accountant.pk, company.pk],
+        )
+        mover.execute("SET lock_timeout = '500ms'")
+        with pytest.raises(psycopg.errors.LockNotAvailable):
+            mover.execute("UPDATE core_company SET firm_id = %s WHERE id = %s", [beta.pk, company.pk])
+        mover.rollback()
+        writer.commit()
+
+        # Once the row is committed, the same move is refused by the check instead of slipping past it.
+        mover.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        with pytest.raises(psycopg.errors.RaiseException, match="firm"):
+            mover.execute("UPDATE core_company SET firm_id = %s WHERE id = %s", [beta.pk, company.pk])
+    finally:
+        writer.close()
+        mover.close()

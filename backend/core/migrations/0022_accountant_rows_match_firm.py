@@ -29,17 +29,28 @@ FUNCTION = """
 CREATE FUNCTION accountant_rows_match_firm() RETURNS trigger
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS
 $$
+DECLARE
+    v_rows bigint[];
 BEGIN
+    -- the access rows this change could have made wrong
+    IF TG_TABLE_NAME = 'core_companyaccess' THEN
+        SELECT array_agg(a.id) INTO v_rows FROM core_companyaccess a WHERE a.id = NEW.id;
+    ELSIF TG_TABLE_NAME = 'core_company' THEN
+        SELECT array_agg(a.id) INTO v_rows FROM core_companyaccess a WHERE a.company_id = NEW.id;
+    ELSE
+        SELECT array_agg(a.id) INTO v_rows FROM core_companyaccess a WHERE a.user_id = NEW.id;
+    END IF;
+    -- Hold the companies and users involved, always in this order, until the transaction ends: a change to one of
+    -- them in another transaction then waits for this one and is checked against it, instead of both passing.
+    PERFORM 1 FROM core_company c
+        WHERE c.id IN (SELECT a.company_id FROM core_companyaccess a WHERE a.id = ANY (v_rows)) ORDER BY c.id FOR SHARE;
+    PERFORM 1 FROM core_user u
+        WHERE u.id IN (SELECT a.user_id FROM core_companyaccess a WHERE a.id = ANY (v_rows)) ORDER BY u.id FOR SHARE;
     IF EXISTS (
         SELECT 1 FROM core_companyaccess a
         JOIN core_user u ON u.id = a.user_id
         JOIN core_company c ON c.id = a.company_id
-        WHERE a.role = 'accountant'
-          AND CASE TG_TABLE_NAME
-                WHEN 'core_companyaccess' THEN a.id = NEW.id
-                WHEN 'core_company' THEN a.company_id = NEW.id
-                ELSE a.user_id = NEW.id
-              END
+        WHERE a.id = ANY (v_rows) AND a.role = 'accountant'
           AND (NOT u.is_accountant OR u.firm_id IS DISTINCT FROM c.firm_id)
     ) THEN
         RAISE EXCEPTION 'An accountant access row must be for a company of the accountant''s own firm';
