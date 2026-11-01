@@ -16,5 +16,15 @@ def make_member(email, company, role, password=PASSWORD):
     return user
 
 
+def make_accountant(email, *companies, password=PASSWORD):
+    """A firm accountant with a membership in each of `companies`."""
+    user = make_user(email, password)
+    user.is_accountant = True
+    user.save()
+    for company in companies:
+        CompanyAccess.objects.create(user=user, company=company, role=CompanyAccess.ACCOUNTANT)
+    return user
+
+
 def make_company(name="Acme Sdn Bhd"):
     return Company.objects.create(name=name)

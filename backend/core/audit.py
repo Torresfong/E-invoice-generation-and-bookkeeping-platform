@@ -78,15 +78,18 @@ def audited_read(target_type, id_arg=None):
 
     The company is the view's `pk` argument. `target_type` names what is shown ("company", "document"); `id_arg`
     names the view argument that holds the record's id, and is left out for a list. Nothing is recorded for a
-    client, for a request that is refused or not found, or for an anonymous visitor.
+    client, for a request that is refused or not found, for an anonymous visitor, or for a request that is not a
+    read (a POST is not a view).
     """
 
     def decorator(view):
         @wraps(view)
         def wrapper(request, *args, **kwargs):
             response = view(request, *args, **kwargs)
-            if response.status_code == 200 and permissions.role_in(request.user, kwargs["pk"]) == CompanyAccess.ACCOUNTANT:
-                record_read(request.user, kwargs["pk"], target_type, kwargs[id_arg] if id_arg else "")
+            company_id = kwargs["pk"]
+            is_read = request.method in ("GET", "HEAD") and response.status_code == 200
+            if is_read and permissions.role_in(request.user, company_id) == CompanyAccess.ACCOUNTANT:
+                record_read(request.user, company_id, target_type, kwargs[id_arg] if id_arg else "")
             return response
 
         wrapper.audited_read = True  # what the guard test looks for

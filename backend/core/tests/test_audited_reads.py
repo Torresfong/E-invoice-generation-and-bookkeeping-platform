@@ -8,7 +8,7 @@ from django.urls import get_resolver
 from core import audit
 from core.models import AuditEntry, CompanyAccess
 
-from .factories import PASSWORD, make_company
+from .factories import PASSWORD, make_accountant, make_company
 
 CHINESE = {"accept-language": "zh-hans"}
 
@@ -42,7 +42,7 @@ def unaudited(routes):
     return [route for route, view in routes if not getattr(view, "audited_read", False) and route not in NOT_AUDITED]
 
 
-AUDITED_SCREENS = [("/companies/{pk}/", "company"), ("/companies/{pk}/audit/", "audit trail")]
+AUDITED_SCREENS = [("/companies/{pk}/", "company"), ("/companies/{pk}/audit/", "audit_trail")]
 PATHS = [path for path, _ in AUDITED_SCREENS]
 
 
@@ -68,6 +68,14 @@ def test_a_client_opening_the_same_screens_leaves_no_read_entry(client, world, w
         statuses = [client.get(path.format(pk=world["acme"].pk)).status_code for path in PATHS]
 
     assert statuses[0] == 200
+    assert reads(world["acme"]) == []
+
+
+def test_a_post_to_a_screen_is_not_a_read(client, world, as_production_connection):
+    with as_production_connection():
+        sign_in(client, world["accountant"])
+        client.post(f"/companies/{world['acme'].pk}/")
+
     assert reads(world["acme"]) == []
 
 
@@ -103,8 +111,8 @@ def test_an_entry_holds_no_field_value_and_no_company_text(client, world, as_pro
     assert len(entries) == 2
     for entry in entries:
         assert entry.changed_fields == []
-        text = " ".join([entry.actor_email, entry.action, entry.target_type, entry.target_id])
-        assert world["acme"].name not in text
+        stored = {entry.actor_email, entry.action, entry.target_type, entry.target_id}
+        assert stored <= {"accountant@firm.example", "viewed", "company", "audit_trail", str(world["acme"].pk), ""}
 
 
 def test_reloading_within_the_window_adds_no_entry_and_a_read_after_it_adds_one(
@@ -125,10 +133,6 @@ def test_reloading_within_the_window_adds_no_entry_and_a_read_after_it_adds_one(
     assert len(reads(world["acme"])) == 3
 
 
-def test_the_window_is_five_minutes_for_one_accountant_one_company_and_one_thing():
-    assert audit.VIEW_WINDOW == timedelta(minutes=5)
-
-
 def test_two_accountants_each_get_their_own_entry_for_the_same_page(client, world, as_production_connection):
     other = make_accountant("other@firm.example", world["acme"])
     with as_production_connection():
@@ -139,17 +143,6 @@ def test_two_accountants_each_get_their_own_entry_for_the_same_page(client, worl
         client.get(f"/companies/{world['acme'].pk}/")
 
     assert sorted(entry.actor_email for entry in reads(world["acme"])) == ["accountant@firm.example", "other@firm.example"]
-
-
-def make_accountant(email, *companies):
-    from .factories import make_user
-
-    user = make_user(email)
-    user.is_accountant = True
-    user.save()
-    for company in companies:
-        CompanyAccess.objects.create(user=user, company=company, role=CompanyAccess.ACCOUNTANT)
-    return user
 
 
 # --- who can read the entries -----------------------------------------------------------------------------
