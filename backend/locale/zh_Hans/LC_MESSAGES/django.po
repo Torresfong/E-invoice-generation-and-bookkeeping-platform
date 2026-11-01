@@ -54,6 +54,10 @@ msgstr "已更新"
 msgid "Deleted"
 msgstr "已删除"
 
+#: .\core\models.py:167
+msgid "Viewed"
+msgstr "已查看"
+
 #: .\core\templates\audit.html:14
 msgid "When"
 msgstr "时间"
