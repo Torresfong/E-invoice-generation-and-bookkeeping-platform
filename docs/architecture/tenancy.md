@@ -47,7 +47,7 @@ This is not built in ticket 02a and is mandatory before any real client data is 
 
 Implements D40 (2), (4), (5), (7) and D48 for staff and accountants. Owner self-registration is #67.
 
-**Users and roles.** `core.User` signs in with an email address (stored lowercase, unique ignoring case) and an Argon2 password. The role is on the `CompanyAccess` row, and a partial unique index allows one `owner` row per company. Owners and staff have one row; a firm accountant has one row per pilot company, added when the company is created (`core.services.create_company_with_owner`) or when the accountant is created (`manage.py create_accountant`). Accountants are never created or invited by a client (D48).
+**Users and roles.** `core.User` signs in with an email address (stored lowercase, unique ignoring case) and an Argon2 password. The role is on the `CompanyAccess` row, and a partial unique index allows one `owner` row per company. Owners and staff have one row; a firm accountant has one row per company of their own firm, added when the company is created (`core.services.create_company_with_owner`) or when the accountant is created (`manage.py create_accountant`). Accountants are never created or invited by a client (D48); in a firm they are created by its firm administrator (D49, ticket 02i, #74). Several firms are supported (D49): the code that grants every accountant every company is replaced by one that grants only the company's own firm's accountants, in ticket 02h (#72); until then there is one firm.
 
 **Who may do what.** `core.permissions` holds the action-level rules (D40 (4)): `ACTIONS` maps an action to the roles that may perform it, `require` raises 403 in a view, and `{% can "action" company as allowed %}` offers the same check in templates. Register a new protected action in `ACTIONS`. A company the user cannot reach is a 404, so its existence is not revealed.
 
@@ -79,7 +79,7 @@ The web role has no direct access to `core_authtoken` or `core_loginfailure`, an
 
 **Firm portal language.** The firm portal is English only (CLAUDE.md), but the sign-in and company pages are shared and follow the browser's language. Fixing an accountant's language belongs with the firm portal screens.
 
-**Firm accountants.** `User.is_accountant` marks a firm accountant for good. Only the operator command sets it. Access rows follow it: an accountant created before any company still receives every company created later, because company creation looks for the marker and not for existing access rows.
+**Firm accountants.** `User.is_accountant` marks a firm accountant for good. Only the operator command sets it. Access rows follow it: an accountant created before any company still receives every company of their firm created later, because company creation looks for the marker and the firm, not for existing access rows. Today the marker is global, so every accountant receives every company; D49 changes that to the accountant's own firm (ticket 02h, #72).
 
 ## Threat model for the pre-sign-in functions (independent review of PR #68)
 
@@ -111,7 +111,7 @@ Implements D40 (6). Entries are in `core_auditentry`: company, who (account id a
 
 **What is never stored.** Only the *names* of changed fields, never their values, so an entry cannot hold a password, a token, a TIN or an amount. `core.audit.record` must not be given content either.
 
-**Sign-in events.** One entry for each company the account belongs to, written by the `record_auth_event` definer function because nobody is identified at a failed sign-in. An accountant's sign-in therefore appears in every company's trail. Not recorded: attempts for an address with no account (there is nothing to attach them to, and they would let anyone grow the table) and attempts refused by the lock (they do not test a password). Both still count towards the throttle.
+**Sign-in events.** One entry for each company the account belongs to, written by the `record_auth_event` definer function because nobody is identified at a failed sign-in. An accountant's sign-in therefore appears in every company's trail today; with firms (D50) accountant and administrator sign-ins go to the firm trail instead (ticket 02j, #75). Not recorded: attempts for an address with no account (there is nothing to attach them to, and they would let anyone grow the table) and attempts refused by the lock (they do not test a password). Both still count towards the throttle.
 
 **Append-only.** The web role has `SELECT` and `INSERT` only. A trigger also refuses `UPDATE` and `DELETE` from every other role, the table owner included. `TRUNCATE` is not trapped: the web role has no right to it, and Django's test runner needs it. There is no page that changes an entry. Retention and export (7 years, D-retention) will need a controlled path for the operator; it does not exist yet.
 
@@ -124,6 +124,8 @@ Implements D40 (6). Entries are in `core_auditentry`: company, who (account id a
 - An attacker with SQL as `web` can still add entries of their own for the companies they reach, as themselves, and `record_auth_event` can be called without a session for any address; the sign-in page is limited per address only, so entries for one account can be created at that rate. The trail shows the newest 200 entries and has no paging, so a flood could push older ones off the page; paging and search are not built.
 - A write by a role that has no right to `core_auditentry` fails and blocks the business write. The job worker may write the trail, only through the audit trigger and only as the system (see "Background jobs"); any other new role needs its own grant and policy.
 - D45 says every read of a company's data by a firm accountant goes to the audit trail. Reads are not recorded here: no company-data screens exist yet, and the criteria of #33 do not include it. It needs a decision on how reads are recorded (a helper each screen calls, or a middleware) when the first such screen is built.
+
+**Firm trail (D50, ticket 02j, #75).** Events with no company, such as a firm created, an accountant or administrator added or deactivated, or a firm account's sign-in, go to a second append-only trail, `core_firmauditentry`, keyed by firm. It uses the same append-only and time-stamp trigger functions and the same read-and-insert-as-the-caller rule; a user reads an entry only for their own firm, and only firm administrators read it. It is never mixed with a company's trail or its export. A company moved between firms writes entries in the company trail and in both firms' trails with one correlation id. The correlation id reaches the company trail in ticket 02k (#76). Firm events are written with `record_firm_event`, because the user table has no company or firm column for a trigger to use.
 
 ## Background jobs (02d, #34)
 
