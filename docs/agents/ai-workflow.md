@@ -4,9 +4,9 @@
 1. Select an unblocked `ready-for-agent` issue, except #19/#23 without permission; read issue, acceptance criteria, relevant decisions, specs and code.
 2. Either Claude Code or Codex can be the implementing developer. Create `ticket-NN-<slug>` from current `main`; do not push directly to `main`.
 3. If working simultaneously on separate tasks, use separate branches and worktrees. Do not let two agents edit the same checkout or push to one branch at the same time.
-4. Test first; implement surgically; run relevant checks and the full suite when feasible. Missing external credentials: use the port fake and disclose limitations.
+4. Test first; implement surgically; run the **full** test suite before claiming completion (`python manage.py check`, migration drift check, `pytest` from `backend/`). Every acceptance-criteria checkbox must be satisfied and backed by evidence. If an external prerequisite or environment blocker prevents a required check, use the fake port when appropriate, record the blocked command and reason in the PR, and do not claim completed verification.
 5. For tenancy, MyInvois, signing, or money changes, retain the pre-PR independent review required by the project rules.
-6. Open a PR against `main` with `Closes #N`, acceptance-criteria evidence, D-number decisions, test commands/results, deployment/migration risks and any missing external validation. Do not merge.
+6. Open a PR against `main` with `Closes #N`, evidence for **every** acceptance criterion, D-number decisions, test commands/results, deployment/migration risks and any missing external validation. Under D37, `main` is protected for administrators too; both `backend` and `image` checks must pass before merge. Do not merge, force-push or delete the protected branch.
 
 ## Shared TDD test boundaries
 Claude Code using Matt Pocock's TDD skill and Codex using its own TDD workflow **must follow the same project-defined test seams**. Tool- or skill-specific preferences do not override the repository's testing contract:
