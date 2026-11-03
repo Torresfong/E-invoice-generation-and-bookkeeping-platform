@@ -15,8 +15,11 @@ from core.views import (
     my_activity,
     password_reset_confirm,
     password_reset_request,
+    register,
     sign_in,
     sign_out,
+    sign_up,
+    signup_links,
 )
 
 urlpatterns = [
@@ -33,6 +36,9 @@ urlpatterns = [
     path("firm/add/", add_firm_person),
     path("firm/audit/", firm_audit_trail),
     path("firm/<int:pk>/deactivate/", deactivate_firm_person),
+    path("signup-links/", signup_links),
+    path("signup/<str:token>/", sign_up),
+    path("register/<str:token>/", register),
     path("accept/<str:token>/", accept_invitation),
     path("password-reset/", password_reset_request),
     path("reset/<str:token>/", password_reset_confirm),
