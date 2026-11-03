@@ -23,5 +23,5 @@ class Command(BaseCommand):
             raise CommandError("That address already has an account.") from error
         except IntegrityError as error:
             raise CommandError("A firm with that name already exists.") from error
-        tokens.request_password_reset(administrator.email)
+        tokens.issue_setup_link(administrator)
         self.stdout.write(f"Created firm {administrator.firm.name} and its administrator {administrator.email}; emailed a password link.")

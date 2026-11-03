@@ -17,6 +17,7 @@ from django.utils.translation import gettext as _
 
 from . import ports
 from .db import scalar
+from .models import AuthToken
 
 
 class InvalidLink(Exception):
@@ -101,3 +102,21 @@ def accept_invitation(raw, password):
             return scalar("SELECT accept_invitation(%s, %s)", [hash_token(raw), make_password(password)])
     except DatabaseError as error:
         raise InvalidLink from error
+
+
+def send_setup_link(email, raw):
+    """Email the link for choosing a first password. The firm portal is English only (D49)."""
+    ports.get().email.send(
+        email,
+        "Choose your password",
+        "An account has been created for you. Use this link to choose a password. "
+        f"It works once and expires in {settings.SETUP_LINK_HOURS} hours:\n\n{link('reset', raw)}\n",
+    )
+
+
+def issue_setup_link(user):
+    """Create and email a first-password link for `user`. For operator commands, which run as the table owner."""
+    raw, hashed = new_token()
+    expires = timezone.now() + timedelta(hours=settings.SETUP_LINK_HOURS)
+    AuthToken.objects.create(purpose=AuthToken.RESET, token_hash=hashed, email=user.email, user=user, expires_at=expires)
+    send_setup_link(user.email, raw)

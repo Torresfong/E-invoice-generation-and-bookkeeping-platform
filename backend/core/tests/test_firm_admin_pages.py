@@ -3,10 +3,12 @@
 import re
 
 import pytest
+from django.core.management import call_command
 from django.db import DatabaseError, transaction
+from django.utils import timezone
 
 from core import services
-from core.models import AuditEntry, CompanyAccess, FirmAuditEntry, User
+from core.models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, User
 
 from .factories import PASSWORD, make_member
 from .test_firms import world  # noqa: F401  (two firms, each with an accountant and a company)
@@ -283,7 +285,7 @@ def test_an_administrators_sign_in_and_sign_out_are_in_the_firm_trail_and_in_no_
 @pytest.mark.parametrize("who", ["alpha_accountant", "acme_staff", "acme_owner"])
 def test_the_database_refuses_the_firm_functions_to_anyone_who_is_not_an_active_firm_administrator(firms, as_user, who):
     for statement in [
-        "SELECT create_firm_person('x@alpha.example', 'accountant')",
+        "SELECT create_firm_person('x@alpha.example', 'accountant', 'hash', now() + interval '1 day')",
         "SELECT deactivate_firm_person(1)",
         "SELECT * FROM firm_people()",
     ]:
@@ -296,3 +298,80 @@ def test_a_deactivated_administrator_is_refused_by_the_database_too(firms, as_us
 
     with as_user(firms["alpha_admin"]), pytest.raises(DatabaseError), transaction.atomic():
         query("SELECT * FROM firm_people()")
+
+
+# --- the setup link -----------------------------------------------------------------------------------------------
+
+
+def hours_left(email):
+    token = AuthToken.objects.get(email=email, purpose=AuthToken.RESET, used_at__isnull=True)
+    return (token.expires_at - timezone.now()).total_seconds() / 3600
+
+
+def test_the_setup_link_for_a_person_an_administrator_adds_lasts_24_hours(client, firms, fake_ports, as_production_connection):
+    with as_production_connection():
+        sign_in(client, firms["alpha_admin"])
+        add(client, "new@alpha.example")
+
+    assert 23.9 < hours_left("new@alpha.example") <= 24
+    assert "24 hours" in fake_ports.email.sent[-1]["body"]
+
+
+def test_the_setup_link_for_a_firms_first_administrator_lasts_24_hours(db, fake_ports):
+    call_command("create_firm", "Gamma Group", "boss@gamma.example")
+
+    assert 23.9 < hours_left("boss@gamma.example") <= 24
+    assert "24 hours" in fake_ports.email.sent[-1]["body"]
+
+
+def test_an_ordinary_password_reset_link_still_lasts_an_hour(client, firms, fake_ports, as_production_connection):
+    with as_production_connection():
+        client.post("/password-reset/", {"email": "admin@alpha.example"})
+
+    assert 0.9 < hours_left("admin@alpha.example") <= 1
+
+
+# --- an administrator deactivated while waiting cannot go on to act -----------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+def test_an_administrator_deactivated_while_waiting_for_the_firm_lock_cannot_go_on_to_act():
+    import threading
+    import time
+
+    import psycopg
+    from django.db import connection
+
+    alpha = services.create_firm("Alpha Accounting")
+    first = services.create_firm_administrator("a@alpha.example", alpha)
+    second = services.create_firm_administrator("b@alpha.example", alpha)
+    settings = connection.settings_dict
+    dsn = f"dbname={settings['NAME']} user={settings['USER']} password={settings['PASSWORD']} host={settings['HOST']} port={settings['PORT'] or 5432}"
+    first_session, second_session = psycopg.connect(dsn), psycopg.connect(dsn)
+    outcome = {}
+
+    def second_tries_to_add():
+        try:
+            second_session.execute("SELECT set_config('app.user_id', %s, false)", [str(second.pk)])
+            second_session.execute("SELECT create_firm_person('late@alpha.example', 'accountant', 'hash', now() + interval '1 day')")
+            second_session.commit()
+        except psycopg.Error as error:
+            outcome["error"] = error
+
+    try:
+        first_session.execute("SELECT set_config('app.user_id', %s, false)", [str(first.pk)])
+        first_session.execute("SELECT deactivate_firm_person(%s)", [second.pk])  # holds the firm until the commit below
+        waiting = threading.Thread(target=second_tries_to_add)
+        waiting.start()
+        for _ in range(50):  # wait until the second administrator is queued behind the first
+            if first_session.execute("SELECT count(*) FROM pg_locks WHERE NOT granted").fetchone()[0]:
+                break
+            time.sleep(0.1)
+        first_session.commit()
+        waiting.join(timeout=10)
+    finally:
+        first_session.close()
+        second_session.close()
+
+    assert isinstance(outcome.get("error"), psycopg.errors.InsufficientPrivilege)
+    assert not User.objects.filter(email="late@alpha.example").exists()

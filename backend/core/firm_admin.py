@@ -4,10 +4,19 @@ The web role cannot write users, so each step is a database function that checks
 administrator and acts on the caller's own firm only (migration 0026). Its firm-trail entry is written there too.
 """
 
+from datetime import timedelta
+
+from django.conf import settings
 from django.db import DatabaseError, connection, transaction
+from django.utils import timezone
 
 from . import tokens
 from .db import scalar
+
+
+# The SQLSTATEs that `deactivate_firm_person` raises (migration 0026).
+NO_SUCH_PERSON = "P0002"
+LAST_ADMINISTRATOR = "55000"
 
 
 class PersonNotFound(Exception):
@@ -34,10 +43,12 @@ def add(email, kind):
     An address that already has an account is silently skipped, so the caller learns nothing about who is registered.
     """
     email = email.strip().lower()
+    raw, hashed = tokens.new_token()
+    expires = timezone.now() + timedelta(hours=settings.SETUP_LINK_HOURS)
     with transaction.atomic():
-        created = scalar("SELECT create_firm_person(%s, %s)", [email, kind])
+        created = scalar("SELECT create_firm_person(%s, %s, %s, %s)", [email, kind, hashed, expires])
     if created:
-        tokens.request_password_reset(email)
+        tokens.send_setup_link(email, raw)
 
 
 def deactivate(person_id):
@@ -45,8 +56,9 @@ def deactivate(person_id):
         with transaction.atomic():
             scalar("SELECT deactivate_firm_person(%s)", [person_id])
     except DatabaseError as error:
-        if "no such person" in str(error):
+        state = getattr(error.__cause__, "sqlstate", None)
+        if state == NO_SUCH_PERSON:
             raise PersonNotFound from error
-        if "last active administrator" in str(error):
+        if state == LAST_ADMINISTRATOR:
             raise LastAdministrator from error
         raise
