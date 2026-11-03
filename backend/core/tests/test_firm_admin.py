@@ -118,3 +118,20 @@ def test_the_same_command_can_be_run_again_once_the_email_works(db, fake_ports):
     call_command("create_firm", "Gamma Group", "boss@gamma.example")
 
     assert [mail["to"] for mail in fake_ports.email.sent] == ["boss@gamma.example"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_firm_administrator_with_company_access_is_refused_when_the_transaction_commits():
+    alpha = services.create_firm("Alpha Accounting")
+    administrator = services.create_firm_administrator("admin@alpha.example", alpha)
+    company = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, alpha)
+    owner = User.objects.get(email="owner@acme.example")
+
+    # No early check is asked for: the refusal comes from the commit itself.
+    with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
+        CompanyAccess.objects.create(user=administrator, company=company, role=CompanyAccess.STAFF)
+    with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
+        User.objects.filter(pk=owner.pk).update(is_firm_admin=True, firm=alpha)
+
+    assert not CompanyAccess.objects.filter(user=administrator).exists()
+    assert not User.objects.get(pk=owner.pk).is_firm_admin
