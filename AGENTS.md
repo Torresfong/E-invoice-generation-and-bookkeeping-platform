@@ -16,7 +16,7 @@ This file is the single entry point for Codex and Claude Code. Keep it concise; 
 - Money uses Decimal/NUMERIC, never floats. Preserve gapless invoice numbering, approval locking, document state transitions, and export rules.
 - Preserve firm/client role boundaries and no-bypass membership rules. 2FA is a required go-live gate, but its current absence alone is not a development PR merge blocker; document related session/credential risks.
 - Respect worker company context from the job row, not payload, and payload identifier-only requirements.
-- Test external behavior first, then implement the smallest relevant change. Run `python manage.py check`, migration drift check, and `pytest` where applicable; report exact evidence and unavailable tests.
+- Test external behavior first, then implement the smallest relevant change. Run the full test suite before claiming completion, including `python manage.py check`, migration drift check, and `pytest` from `backend/`; each acceptance criterion must be met and evidenced. If a required check cannot run, record the exact blocker/result and do not claim completion.
 - Never silently change product scope, RLS migrations, production settings, signing keys, or real client data. Stop and ask on those matters.
 
 ## Shared test and architecture contract
@@ -27,6 +27,6 @@ This file is the single entry point for Codex and Claude Code. Keep it concise; 
 ## AI collaboration boundaries
 - Claude Code and Codex may both implement issues. Use one feature branch per issue and separate worktrees/working directories when working concurrently; never independently push competing changes to the same branch.
 - One developer owns the active branch at a time. Handoff through GitHub issue/PR notes and commits, not the prior agent's chat history.
-- Never commit directly to `main`, auto-merge a PR, or claim review approval. Torres decides merges.
+- D37: `main` is protected for everyone, including administrators. Changes arrive only by PR; both `backend` and `image` CI checks must pass before merge. No force-push or branch deletion; do not relax protections. Never commit directly to `main`, auto-merge a PR, or claim review approval. Torres decides merges.
 - Development self-checks are not the final fresh review. The final reviewer starts in a new Codex task/session, reviews the current PR commit and diff without development chat context, and reports findings without editing code.
 - A fresh session is context-independent, but it is not a different model; CI and human merge approval remain essential.
