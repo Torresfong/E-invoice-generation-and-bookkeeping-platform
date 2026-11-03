@@ -208,6 +208,10 @@ class AuditEntry(models.Model):
     target_id = models.CharField(max_length=40, blank=True)
     changed_fields = models.JSONField(default=list)
     occurred_at = models.DateTimeField(db_default=Now())
+    # Set once per request or job (D50 (6)); null only for entries written before 02k.
+    correlation_id = models.UUIDField(
+        null=True, blank=True, db_default=models.Func(function="audit_correlation_id", output_field=models.UUIDField())
+    )
 
     class Meta:
         indexes = [models.Index(fields=["company", "-occurred_at"], name="audit_company_time")]
