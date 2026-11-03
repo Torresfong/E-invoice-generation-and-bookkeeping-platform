@@ -46,6 +46,13 @@ def note_create(request):
     return JsonResponse({"id": row[0]})
 
 
+def note_list(request):
+    """What the signed-in user can read of the business table."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT body FROM probe_note ORDER BY id")
+        return JsonResponse({"bodies": [body for (body,) in cursor.fetchall()]})
+
+
 def note_update(request, pk):
     _run("UPDATE probe_note SET body = %s WHERE id = %s RETURNING id", [request.POST["body"], pk])
     return JsonResponse({"id": pk})
@@ -75,6 +82,7 @@ urlpatterns = [
     path("boom/", boom),
     path("firm-events/", firm_events),
     path("notes/", note_create),
+    path("notes/all/", note_list),
     path("notes/<int:pk>/update/", note_update),
     path("notes/<int:pk>/delete/", note_delete),
     path("", include("config.urls")),
