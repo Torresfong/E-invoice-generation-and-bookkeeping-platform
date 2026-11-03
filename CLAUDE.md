@@ -48,26 +48,9 @@ Stop and ask when: a decision conflicts; scope would change; a migration alters 
 
 ## Coding principles
 
-Think before coding:
-- State important assumptions before implementation.
-- If requirements have multiple plausible interpretations,
-  explain the options and ask when the choice matters.
-- Prefer the simplest solution that satisfies the ticket.
-
-Simplicity:
-- Do not add unrequested features, abstractions or configurability.
-- Avoid speculative future-proofing and unrelated refactoring.
-
-Surgical changes:
-- Modify only what the ticket requires.
-- Preserve existing conventions and patterns.
-- Remove unused code introduced by your changes.
+- State the assumption you proceed on. When a requirement has more than one plausible reading and the choice matters, set out the options and ask.
+- Modify only what the ticket requires: no unrequested features, abstractions or configurability, no unrelated refactoring.
 - Report unrelated issues without fixing them.
-
-Goal-driven execution:
-- Define how each acceptance criterion will be verified.
-- Claim completion only with test evidence.
-
 
 ## Testing
 
