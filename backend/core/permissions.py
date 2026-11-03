@@ -43,6 +43,16 @@ def is_firm_admin(user):
     return user.is_authenticated and user.is_active and user.is_firm_admin and user.firm_id is not None
 
 
+def is_accountant(user):
+    """A signed-in, active firm accountant (D49)."""
+    return user.is_authenticated and user.is_active and user.is_accountant and user.firm_id is not None
+
+
+def require_accountant(user):
+    if not is_accountant(user):
+        raise PermissionDenied
+
+
 def require_firm_admin(user):
     if not is_firm_admin(user):
         raise PermissionDenied

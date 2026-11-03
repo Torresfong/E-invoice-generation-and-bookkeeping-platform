@@ -21,5 +21,18 @@ def allow_attempt(email):
     return scalar("SELECT start_login_attempt(%s, %s, %s)", [email, window, settings.LOGIN_MAX_FAILURES])
 
 
+def allow_signup(email, client):
+    """Count a sign-up submission against its email address and its client address (D48). False when either is over its limit.
+
+    Both are counted every time, in the same table as sign-in failures under a prefix that no email address can
+    carry, so one refused limit does not hide the other. `client` is the connection's address: behind a proxy it is the
+    proxy's until the deployment's proxy settings are in place (see above).
+    """
+    window = timedelta(seconds=settings.SIGNUP_WINDOW_SECONDS)
+    by_email = scalar("SELECT start_login_attempt(%s, %s, %s)", [f"signup-email:{email}", window, settings.SIGNUP_MAX_PER_EMAIL])
+    by_client = scalar("SELECT start_login_attempt(%s, %s, %s)", [f"signup-client:{client}", window, settings.SIGNUP_MAX_PER_CLIENT])
+    return by_email and by_client
+
+
 def clear(email):
     scalar("SELECT clear_login_failures(%s)", [email])

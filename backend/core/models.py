@@ -152,7 +152,7 @@ class LoginFailure(models.Model):
 
 
 class AuthToken(models.Model):
-    """A single-use, expiring link: a password reset or an invitation (D40 (5)).
+    """A single-use, expiring link: a password reset, an invitation, a firm's sign-up link or a pending registration (D40 (5), D48, D49).
 
     Only the SHA-256 hash of the token is stored, so a database reader cannot use a link. The web role has
     no direct access to this table; it goes through the functions in migrations 0009 and 0010.
@@ -160,8 +160,15 @@ class AuthToken(models.Model):
 
     RESET = "reset"
     INVITE = "invite"
+    SIGNUP = "signup"
+    REGISTER = "register"
 
-    PURPOSES = [(RESET, "Password reset"), (INVITE, "Invitation")]
+    PURPOSES = [
+        (RESET, "Password reset"),
+        (INVITE, "Invitation"),
+        (SIGNUP, "Firm sign-up link"),
+        (REGISTER, "Pending registration"),
+    ]
 
     purpose = models.CharField(max_length=10, choices=PURPOSES)
     token_hash = models.CharField(max_length=64, unique=True)
@@ -169,6 +176,10 @@ class AuthToken(models.Model):
     company = models.ForeignKey(Company, null=True, blank=True, on_delete=models.CASCADE)
     role = models.CharField(max_length=20, blank=True)
     user = models.ForeignKey("core.User", null=True, blank=True, on_delete=models.CASCADE, related_name="+")
+    # A firm's sign-up link and the pending registration made through it carry the firm (D49 (4)); the pending
+    # registration also holds the company name until the owner opens the emailed link.
+    firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.CASCADE, related_name="+")
+    company_name = models.CharField(max_length=200, blank=True, db_default="")
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

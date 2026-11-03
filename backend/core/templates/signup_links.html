@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Client sign-up links</title>
+</head>
+<body>
+  <h1>Client sign-up links</h1>
+  {% if url %}
+    <p role="status">Send this link to your client. It works once and expires in 7 days. It is shown only now.</p>
+    <p><code>{{ url }}</code></p>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    <button type="submit">Create a sign-up link</button>
+  </form>
+</body>
+</html>
