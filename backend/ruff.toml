@@ -1,0 +1,9 @@
+# Mechanical correctness checks, run in CI. Style is not enforced here.
+[lint]
+# F: unused imports and variables, undefined names. W605: invalid escape sequence. PLE: pylint errors, including
+# a backspace character typed where "\b" was meant (PLE2510), which once left a test unable to fail.
+select = ["F", "W605", "PLE"]
+
+[lint.per-file-ignores]
+# A test module imports a fixture and names it as a parameter: the pytest idiom, which F811 reads as a redefinition.
+"**/tests/**" = ["F811"]

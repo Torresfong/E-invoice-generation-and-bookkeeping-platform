@@ -94,7 +94,7 @@ $$
 """
 
 # The caller's firm's accountants and administrators. Never the password hash, and never a client.
-FIRM_PEOPLE = f"""
+FIRM_PEOPLE = """
 CREATE FUNCTION firm_people() RETURNS TABLE (person_id bigint, person_email text, person_is_admin boolean, person_is_active boolean)
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS
 $$

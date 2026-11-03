@@ -2,7 +2,7 @@ import django.db.models.deletion
 import django.db.models.functions.datetime
 from django.db import migrations, models
 
-from core.rls import IDENTITY_FUNCTION, WEB_ROLE, definer_function_sql, owner_policy_sql
+from core.rls import IDENTITY_FUNCTION, WEB_ROLE, owner_policy_sql
 
 # The firm audit trail (D50): the company trail's counterpart for events that belong to a firm, not a company.
 # The rules are the company trail's (0014): the web role may only read and insert, as the caller; the same two
