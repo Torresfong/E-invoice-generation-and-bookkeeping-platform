@@ -43,7 +43,7 @@ def note_create(request):
         "INSERT INTO probe_note (company_id, body) VALUES (%s, %s) RETURNING id",
         [int(request.POST["company"]), request.POST["body"]],
     )
-    return JsonResponse({"id": row[0]})
+    return JsonResponse({"id": row[0], "correlation_id": str(audit.current_correlation_id())})
 
 
 def note_list(request):

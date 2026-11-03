@@ -6,7 +6,7 @@ from django.db import connection
 
 from core import audit, jobs
 from core.audit import audit_trigger_sql
-from core.models import AuditEntry, FirmAuditEntry, User
+from core.models import AuditEntry, CompanyAccess, FirmAuditEntry, User
 from core.rls import tenant_policy_sql
 
 from .factories import PASSWORD
@@ -35,11 +35,11 @@ def test_a_company_entry_made_in_a_request_carries_that_requests_correlation_id(
     owner = User.objects.get(email="owner@acme.example")
     with as_production_connection():
         sign_in(client, owner)
-        client.post("/notes/", {"company": acme.pk, "body": "one"})
-        client.post("/notes/", {"company": acme.pk, "body": "two"})
+        requests = [client.post("/notes/", {"company": acme.pk, "body": body}).json() for body in ("one", "two")]
 
-    ids = [e.correlation_id for e in AuditEntry.objects.filter(target_type="probe_note").order_by("id")]
-    assert len(ids) == 2 and all(ids) and ids[0] != ids[1]
+    entries = AuditEntry.objects.filter(target_type="probe_note").order_by("id")
+    assert [str(e.correlation_id) for e in entries] == [r["correlation_id"] for r in requests]
+    assert requests[0]["correlation_id"] != requests[1]["correlation_id"]
 
 
 def test_a_company_move_shows_one_id_on_the_company_entry_and_both_firm_entries(firms_world):
@@ -88,3 +88,14 @@ def test_rows_written_before_the_column_existed_stay_null(firms_world):
 
     entry.refresh_from_db()
     assert entry.correlation_id is None
+
+
+def test_one_sign_in_event_has_one_correlation_id_across_all_the_users_companies(firms_world):
+    owner = User.objects.get(email="owner@acme.example")
+    CompanyAccess.objects.create(user=owner, company=firms_world["gamma"], role=CompanyAccess.STAFF)
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT record_auth_event('login', %s)", [owner.email])
+
+    entries = AuditEntry.objects.filter(action=AuditEntry.LOGIN)
+    assert entries.count() == 2 and len({e.correlation_id for e in entries}) == 1
