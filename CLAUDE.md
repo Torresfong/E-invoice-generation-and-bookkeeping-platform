@@ -2,7 +2,7 @@
 
 ## Project state
 
-Pilot platform, two portals. Malaysian clients issue LHDN MyInvois e-invoices and upload bookkeeping documents; the accounting firm reviews them and exports a monthly batch to SQL Account. Early build: ticket 01 (#2) foundation is in progress; most features do not exist yet.
+Pilot platform, two portals. Malaysian clients issue LHDN MyInvois e-invoices and upload bookkeeping documents; the accounting firm reviews them and exports a monthly batch to SQL Account. Early build: tenancy, sign-in and firms are in place; the business features (invoices, documents, export) do not exist yet. `gh issue list` shows what is built and what is open.
 
 ## Source of truth 
 
@@ -16,14 +16,14 @@ Commands (run from `backend/`; `DATABASE_URL` must be set, there is no default b
 - Check the project: `python manage.py check`
 - All tests: `pytest`
 - One test: `pytest core/tests/test_health.py::test_health_page_reports_app_and_database_up`
-- Tests run inside the stack too: `docker compose exec backend pytest`.
+- Tests run inside the stack too: `docker compose exec backend pytest`. On a Windows host that is the only place they run; see `docs/agents/dev-environment.md` for that and the shell gotchas.
 - Translations: edit `backend/locale/zh_Hans/LC_MESSAGES/django.po`, then run `python manage.py compilemessages` (needs gettext). The compiled `.mo` files are committed, so recompile before committing.
 - External services are reached only through `core.ports.get()`; tests get fakes from the autouse `fake_ports` fixture. Queued work runs in tests with `core.jobs.run_pending()`.
 - CI runs `check`, a migration drift check and `pytest` against a Postgres 16 service (job `backend`), and builds the Docker image (job `image`). Both are required to merge.
 
 ## Workflow
 
-1. Pick: gh issue list --repo Torresfong/acounting-saas --state open --label ready-for-agent. Take a ticket only if it has no open blockers: gh api repos/Torresfong/acounting-saas/issues/<n> --jq .issue_dependencies_summary (native dependencies, not body text). Never pick #19 or #23 without asking.
+1. Pick: gh issue list --repo Torresfong/acounting-saas --state open --label ready-for-agent. Take a ticket only if it has no open blockers: gh api repos/Torresfong/acounting-saas/issues/<n> --jq .issue_dependencies_summary (native dependencies, not body text). Ask before picking issue #19 (SQL Account monthly export) or issue #23 (onboarding and production switch); these are issue numbers, not ticket numbers.
 2. Read: the ticket, every decision it cites, and the matching spec section.
 3. Branch: ticket-NN-<slug> from main. Never push to main: it is protected (D37), so changes arrive by pull request with the `backend` and `image` checks passing, and the rule applies to admins too.
 4. Test first: write a failing test at the right seam (below), then the code.
@@ -66,7 +66,7 @@ Surgical changes:
 
 Goal-driven execution:
 - Define how each acceptance criterion will be verified.
-- Do not claim completion without test evide.
+- Claim completion only with test evidence.
 
 
 ## Testing
