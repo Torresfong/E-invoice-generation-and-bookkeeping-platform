@@ -57,10 +57,10 @@ OUTSIDERS = [
 ]
 
 
-@pytest.mark.parametrize("method, path, route", ENDPOINTS)
+@pytest.mark.parametrize("method, path", [(method, path) for method, path, _ in ENDPOINTS])
 @pytest.mark.parametrize("who, target", OUTSIDERS)
 def test_a_company_the_role_has_no_access_to_cannot_be_read_or_written_through_any_company_endpoint(
-    people, fake_ports, as_production_connection, who, target, method, path, route
+    people, fake_ports, as_production_connection, who, target, method, path
 ):
     company, outsider = people[target], people[who]
     tokens_before = AuthToken.objects.count()
@@ -90,9 +90,10 @@ def missing_from(endpoints, routes):
     return sorted(set(routes) - {route for _, _, route in endpoints})
 
 
-def test_every_route_that_carries_a_company_id_is_in_the_isolation_matrix():
-    assert missing_from(ENDPOINTS, company_routes()) == []
-    assert sorted(route for _, _, route in ENDPOINTS) == sorted(company_routes())  # and nothing in it is stale
+def test_every_company_route_is_in_the_isolation_matrix_and_nothing_in_it_is_stale():
+    """A company id in the path under /companies/. A company id passed in a body is not visible to this walk; those
+    are covered where they are written (the job queue in test_job_tenancy.py, the probe table below)."""
+    assert sorted(route for _, _, route in ENDPOINTS) == sorted(company_routes())
 
 
 def test_the_route_guard_fails_when_a_screen_is_left_out_of_the_matrix():
@@ -128,22 +129,25 @@ def note_bodies():
 @pytest.mark.parametrize("who, target", OUTSIDERS)
 def test_a_role_cannot_create_update_or_delete_another_companys_records(people, notes, as_production_connection, who, target):
     outsider, other = people[who], people[target]
-    mine = "acme" if target == "gamma" else "gamma"
+    own = "acme" if target == "gamma" else "gamma"
     client = Client()
 
     with as_production_connection():
         sign_in(client, outsider)
+        # The same two calls on the outsider's own company's note succeed, so the URLs do work and the refusals below
+        # are the database's, not a broken route.
+        assert client.post(f"/notes/{notes[own]}/update/", {"body": "mine, rewritten"}).status_code == 200
         with pytest.raises(DatabaseError):
             client.post("/notes/", {"company": other.pk, "body": "planted"})
         client.post(f"/notes/{notes[target]}/update/", {"body": "rewritten"})
         client.post(f"/notes/{notes[target]}/delete/")
 
-    assert note_bodies() == ["acme note", "gamma note"]
-    assert notes[mine]  # the outsider's own company's note is untouched too
+    # Read as the table owner (outside the production connection), so every row is visible.
+    assert note_bodies() == sorted([f"{target} note", "mine, rewritten"])
 
 
-@pytest.mark.parametrize("who, own, other", [("acme_owner", "acme", "gamma"), ("acme_staff", "acme", "gamma"), ("beta_accountant", "gamma", "acme")])
-def test_a_role_reads_its_own_companys_records_and_not_another_companys(people, notes, as_production_connection, who, own, other):
+@pytest.mark.parametrize("who, own", [("acme_owner", "acme"), ("acme_staff", "acme"), ("beta_accountant", "gamma")])
+def test_a_role_reads_its_own_companys_records_and_not_another_companys(people, notes, as_production_connection, who, own):
     client = Client()
     with as_production_connection():
         sign_in(client, people[who])
@@ -178,21 +182,16 @@ def business_table_problems():
         "(SELECT count(*) FROM pg_policy p WHERE p.polrelid = c.oid), "
         "EXISTS (SELECT 1 FROM information_schema.columns k WHERE k.table_schema = 'public' "
         "AND k.table_name = c.relname AND k.column_name = 'company_id') "
-        "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace WHERE n.nspname = 'public' AND c.relkind = 'r'"
+        "FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+        "WHERE n.nspname = 'public' AND c.relkind IN ('r', 'p')"
     )
     for table, enabled, forced, policies, has_company in rows:
-        if table in DJANGO_OWN or table in PLATFORM:
+        if table in DJANGO_OWN:
             continue
-        missing = [
-            what
-            for what, ok in [
-                ("a company_id column", has_company),
-                ("row-level security", enabled),
-                ("FORCE row-level security", forced),
-                ("a policy", policies > 0),
-            ]
-            if not ok
-        ]
+        checks = [("row-level security", enabled), ("FORCE row-level security", forced), ("a policy", policies > 0)]
+        if table not in PLATFORM:  # a platform table has no company id but keeps the rest
+            checks.insert(0, ("a company_id column", has_company))
+        missing = [what for what, ok in checks if not ok]
         if missing:
             problems[table] = missing
     return problems
