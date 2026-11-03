@@ -1,8 +1,10 @@
+import uuid
+
 from django.contrib.auth import SESSION_KEY
 from django.db import connection, transaction
 from psycopg.pq import TransactionStatus
 
-from .rls import IDENTITY_SETTING, WEB_ROLE
+from .rls import CORRELATION_SETTING, IDENTITY_SETTING, WEB_ROLE
 
 
 class TenantContextMiddleware:
@@ -36,6 +38,8 @@ class TenantContextMiddleware:
             with connection.cursor() as cursor:
                 cursor.execute(f"SET LOCAL ROLE {WEB_ROLE}")
                 cursor.execute("SELECT set_config(%s, %s, true)", [IDENTITY_SETTING, user_id])
+                # One id for every audit entry this request writes (D50 (6)).
+                cursor.execute("SELECT set_config(%s, %s, true)", [CORRELATION_SETTING, str(uuid.uuid4())])
             if user_id and not request.user.is_authenticated:
                 # Django rejects a session after a password change or a deactivation only when the user is
                 # loaded, which happens here under the session's own identity. Drop the identity if it was
@@ -49,4 +53,5 @@ class TenantContextMiddleware:
                 with connection.cursor() as cursor:
                     cursor.execute("RESET ROLE")
                     cursor.execute("SELECT set_config(%s, '', true)", [IDENTITY_SETTING])
+                    cursor.execute("SELECT set_config(%s, '', true)", [CORRELATION_SETTING])
             return response

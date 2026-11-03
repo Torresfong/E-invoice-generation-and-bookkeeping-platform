@@ -20,6 +20,8 @@ IDENTITY_SETTING = "app.user_id"
 IDENTITY_FUNCTION = "app_user_id"
 COMPANY_SETTING = "app.company_id"
 COMPANY_FUNCTION = "app_company_id"
+# One id per request or job, shared by every audit entry written in it (D50 (6)).
+CORRELATION_SETTING = "app.correlation_id"
 # Set by the runner for the one call that claims a job; `claim_job()` returns nothing without it.
 CLAIMING_SETTING = "app.claiming"
 
