@@ -4,8 +4,12 @@ Everything goes over HTTP with the email port faked. The sign-up setting is off 
 the flow turn it on with the `signup_open` fixture.
 """
 
+import os
 import re
+import subprocess
+import sys
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from django.test import Client
@@ -444,3 +448,34 @@ def test_an_address_too_long_to_store_asks_again_instead_of_failing(firms_world,
         response = submit(Client(), path, email=long_address)
 
     assert response.status_code == 200 and b'role="alert"' in response.content and fake_ports.email.sent == []
+
+
+# --- the switch cannot be turned on outside development until two-factor authentication is done (D40 (7)) ---------------
+
+
+def load_settings(**env):
+    """Import config.settings in a fresh interpreter with the given environment; returns the finished process."""
+    base = {k: v for k, v in os.environ.items() if k not in ("ENVIRONMENT", "SECRET_KEY", "SIGNUP_ENABLED")}
+    return subprocess.run(
+        [sys.executable, "-c", "import config.settings"],
+        cwd=Path(__file__).resolve().parents[2], env={**base, **env}, capture_output=True, text=True,
+    )
+
+
+@pytest.mark.parametrize("environment", ["production", "staging"])
+def test_the_app_will_not_start_with_sign_up_on_outside_development(environment):
+    result = load_settings(ENVIRONMENT=environment, SECRET_KEY="x", SIGNUP_ENABLED="true")
+
+    assert result.returncode != 0 and "SIGNUP_ENABLED" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "env",
+    [
+        {"ENVIRONMENT": "production", "SECRET_KEY": "x"},
+        {"ENVIRONMENT": "production", "SECRET_KEY": "x", "SIGNUP_ENABLED": "false"},
+        {"ENVIRONMENT": "development", "SIGNUP_ENABLED": "true"},
+    ],
+)
+def test_the_app_starts_with_sign_up_off_anywhere_and_on_in_development(env):
+    assert load_settings(**env).returncode == 0

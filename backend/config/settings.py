@@ -84,12 +84,15 @@ INVITE_LINK_DAYS = 7
 # Owner self-registration (D48, D49). A firm's sign-up link lasts a week, the emailed verification link a day.
 SIGNUP_LINK_DAYS = 7
 REGISTRATION_LINK_HOURS = 24
-# Off unless switched on. Do not switch it on in production before two-factor authentication is done (D40 (7)).
 # Sign-up submissions allowed per email address and per client address in the window below.
 SIGNUP_MAX_PER_EMAIL = 3
 SIGNUP_MAX_PER_CLIENT = 10
 SIGNUP_WINDOW_SECONDS = 60 * 60
+# Off unless switched on, and refused outside development until two-factor authentication is done (D40 (7)). Remove the
+# refusal in the change that finishes 2FA, not before.
 SIGNUP_ENABLED = os.environ.get("SIGNUP_ENABLED", "").lower() == "true"
+if SIGNUP_ENABLED and not DEBUG:
+    raise RuntimeError("SIGNUP_ENABLED cannot be on outside development until two-factor authentication is done")
 
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
