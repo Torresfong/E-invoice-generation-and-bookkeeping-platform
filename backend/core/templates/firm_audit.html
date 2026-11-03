@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ firm.name }}: audit trail</title>
+</head>
+<body>
+  <h1>Audit trail</h1>
+  <p>{{ firm.name }}</p>
+  <table>
+    <thead>
+      <tr><th>When</th><th>Who</th><th>What</th><th>Record</th><th>Fields changed</th></tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+        <tr>
+          <td>{{ entry.occurred_at|date:"Y-m-d H:i:s" }}</td>
+          <td>{{ entry.actor_email|default:"-" }}</td>
+          <td>{{ entry.get_action_display }}</td>
+          <td>{% if entry.target_type %}{{ entry.target_type }} {{ entry.target_id }}{% endif %}</td>
+          <td>{{ entry.changed_fields|join:", " }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5">Nothing has been recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p><a href="/firm/">Accountants</a></p>
+</body>
+</html>

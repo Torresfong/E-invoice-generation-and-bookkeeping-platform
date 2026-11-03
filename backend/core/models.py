@@ -47,7 +47,11 @@ class User(AbstractBaseUser, PermissionsMixin):
     # Marks a firm accountant for good, so one created before any company still gets access to later ones.
     # Set only by the operator command; the database default lets the SQL functions create users without it.
     is_accountant = models.BooleanField(default=False, db_default=False)
-    # The firm of a firm accountant (D49); empty for clients. Set only by the operator commands.
+    # A firm administrator (D49) manages the firm's accountants and sees no client data. Held here, not on a
+    # `CompanyAccess` row, and never together with `is_accountant`. Set only by the operator commands and the
+    # firm administrator's own functions.
+    is_firm_admin = models.BooleanField(default=False, db_default=False)
+    # The firm of a firm accountant or administrator (D49); empty for clients. Set only by the operator commands.
     firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="users")
     date_joined = models.DateTimeField(auto_now_add=True)
 
@@ -58,6 +62,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         constraints = [
             models.UniqueConstraint(Lower("email"), name="user_email_unique_ignoring_case"),
             models.CheckConstraint(condition=~models.Q(is_accountant=True) | models.Q(firm__isnull=False), name="accountant_has_firm"),
+            models.CheckConstraint(condition=~models.Q(is_firm_admin=True) | models.Q(firm__isnull=False), name="firm_admin_has_firm"),
+            models.CheckConstraint(condition=~(models.Q(is_firm_admin=True) & models.Q(is_accountant=True)), name="not_accountant_and_firm_admin"),
         ]
 
     def __str__(self):

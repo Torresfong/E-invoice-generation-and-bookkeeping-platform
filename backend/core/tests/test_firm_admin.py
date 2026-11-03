@@ -1,0 +1,69 @@
+"""The firm administrator (D49): manages the accountants of their own firm and sees no client data."""
+
+import re
+
+import pytest
+from django.core.management import CommandError, call_command
+from django.db import IntegrityError, transaction
+
+from core import services
+from core.models import AuditEntry, CompanyAccess, Firm, FirmAuditEntry, User
+
+from .factories import PASSWORD
+from .test_firms import world  # noqa: F401  (two firms, each with an accountant and a company)
+
+NEW_PASSWORD = "a brand new passphrase"
+
+
+def setup_link(fake_ports):
+    return re.search(r"(/reset/[\w-]+/)", fake_ports.email.sent[-1]["body"]).group(1)
+
+
+# --- the operator creates a firm with its first administrator -----------------------------------------------
+
+
+def test_the_operator_command_creates_a_firm_with_its_first_administrator_who_sets_a_password_from_the_emailed_link(
+    client, db, fake_ports, as_production_connection
+):
+    call_command("create_firm", "Gamma Group", "Boss@Gamma.example")
+
+    admin = User.objects.get(email="boss@gamma.example")
+    assert (admin.firm.name, admin.is_firm_admin, admin.is_accountant, admin.has_usable_password()) == (
+        "Gamma Group", True, False, False,
+    )
+    assert [mail["to"] for mail in fake_ports.email.sent] == ["boss@gamma.example"]
+    assert not CompanyAccess.objects.filter(user=admin).exists()
+
+    with as_production_connection():
+        link = setup_link(fake_ports)
+        assert client.post(link, {"password": NEW_PASSWORD, "confirm": NEW_PASSWORD}).status_code == 302
+        assert client.post("/login/", {"email": "boss@gamma.example", "password": NEW_PASSWORD}).status_code == 302
+
+
+def test_the_command_refuses_an_address_that_already_has_an_account_and_creates_no_firm(world, fake_ports):  # noqa: F811
+    with pytest.raises(CommandError, match="already has an account"):
+        call_command("create_firm", "Gamma Group", "owner@acme.example")
+
+    assert not Firm.objects.filter(name="Gamma Group").exists()
+
+
+def test_the_operator_command_records_the_firm_and_its_administrator_in_the_firms_trail(db, fake_ports):
+    call_command("create_firm", "Gamma Group", "boss@gamma.example")
+
+    entries = FirmAuditEntry.objects.filter(firm__name="Gamma Group").order_by("id")
+    assert [(e.action, e.target_type, e.actor_email) for e in entries] == [
+        (AuditEntry.CREATE, "firm", "operator"),
+        (AuditEntry.CREATE, "user", "operator"),
+    ]
+
+
+# --- a person is an administrator or an accountant, never both -----------------------------------------------
+
+
+def test_the_database_refuses_a_user_who_is_both_an_accountant_and_an_administrator_or_an_administrator_with_no_firm(
+    world,  # noqa: F811
+):
+    with pytest.raises(IntegrityError), transaction.atomic():
+        User.objects.filter(pk=world["alpha_accountant"].pk).update(is_firm_admin=True)
+    with pytest.raises(IntegrityError), transaction.atomic():
+        User.objects.create_user("nofirm@x.example", is_firm_admin=True)

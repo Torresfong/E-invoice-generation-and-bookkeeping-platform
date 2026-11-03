@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ firm.name }}: accountants</title>
+</head>
+<body>
+  <h1>{{ firm.name }}</h1>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  <h2>Accountants and administrators</h2>
+  <table>
+    <thead>
+      <tr><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for person in people %}
+        <tr>
+          <td>{{ person.email }}</td>
+          <td>{% if person.is_admin %}Administrator{% else %}Accountant{% endif %}</td>
+          <td>{% if person.is_active %}Active{% else %}Deactivated{% endif %}</td>
+          <td>
+            {% if person.is_active %}
+              <form method="post" action="/firm/{{ person.id }}/deactivate/">
+                {% csrf_token %}
+                <button type="submit">Deactivate</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <h2>Add a person</h2>
+  <form method="post" action="/firm/add/">
+    {% csrf_token %}
+    <p><label>Email address <input type="email" name="email" required></label></p>
+    <p>
+      <label><input type="radio" name="kind" value="accountant" checked> Accountant</label>
+      <label><input type="radio" name="kind" value="firm_admin"> Administrator</label>
+    </p>
+    <button type="submit">Add and email a link</button>
+  </form>
+  <p><a href="/firm/audit/">Audit trail</a></p>
+</body>
+</html>

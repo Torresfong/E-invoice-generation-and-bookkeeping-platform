@@ -36,3 +36,13 @@ def can(user, action, company):
 def require(user, action, company):
     if not can(user, action, company):
         raise PermissionDenied
+
+
+def is_firm_admin(user):
+    """A signed-in, active firm administrator (D49). A firm-level role: it is on the user, not on a membership row."""
+    return user.is_authenticated and user.is_active and user.is_firm_admin and user.firm_id is not None
+
+
+def require_firm_admin(user):
+    if not is_firm_admin(user):
+        raise PermissionDenied
