@@ -15,11 +15,14 @@ AS_CALLER = (
 )
 
 # The correlation id of the request or job (`app.correlation_id`, set once and transaction-local), or a new one for
-# an entry written outside both.
+# an entry written outside both. The web role can set any setting, so a value that is not a UUID is ignored rather
+# than allowed to make the caller's own inserts fail.
 CORRELATION_FUNCTION = """
 CREATE FUNCTION audit_correlation_id() RETURNS uuid LANGUAGE sql VOLATILE
 SET search_path = pg_catalog, pg_temp AS
-$$ SELECT coalesce(nullif(current_setting('app.correlation_id', true), '')::uuid, gen_random_uuid()) $$
+$$ SELECT CASE WHEN current_setting('app.correlation_id', true)
+        ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+    THEN current_setting('app.correlation_id', true)::uuid ELSE gen_random_uuid() END $$
 """
 
 # A firm account's sign-in goes to its firm's trail; anyone else's still goes into the trail of each company they

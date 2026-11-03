@@ -257,3 +257,11 @@ def test_enable_firm_audit_refuses_a_table_without_a_firm_column(db):
         cursor.execute("CREATE TABLE no_firm (id bigint PRIMARY KEY, body text)")
         with pytest.raises(DatabaseError, match="needs id and firm_id"), transaction.atomic():
             cursor.execute(audit.firm_audit_trigger_sql("no_firm")[0])
+
+
+def test_a_user_who_sets_a_bad_correlation_id_can_still_write_their_entries(world, as_user):  # noqa: F811
+    accountant = world["alpha_accountant"]
+    with as_user(accountant):
+        query("SELECT set_config('app.correlation_id', 'not-a-uuid', false)")
+        assert query(ADD_ENTRY, [world["alpha"].pk, accountant.pk, accountant.email])
+        query("SELECT set_config('app.correlation_id', '', false)")

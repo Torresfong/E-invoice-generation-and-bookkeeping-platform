@@ -186,6 +186,10 @@ def drop_audit_trigger_sql(table):
     return [f"DROP TRIGGER IF EXISTS audit_changes ON {table}"]
 
 
+def drop_firm_audit_trigger_sql(table):
+    return [f"DROP TRIGGER IF EXISTS firm_audit_changes ON {table}"]
+
+
 def enable_audit(table):
     """A migration operation that audits every insert, update and delete on `table`.
 
@@ -196,4 +200,4 @@ def enable_audit(table):
 
 def enable_firm_audit(table):
     """Like `enable_audit`, into the firm trail, for a table that carries `id` and `firm_id`."""
-    return migrations.RunSQL(firm_audit_trigger_sql(table), [f"DROP TRIGGER IF EXISTS firm_audit_changes ON {table}"])
+    return migrations.RunSQL(firm_audit_trigger_sql(table), drop_firm_audit_trigger_sql(table))

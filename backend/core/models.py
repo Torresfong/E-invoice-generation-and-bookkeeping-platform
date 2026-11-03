@@ -211,8 +211,9 @@ class AuditEntry(models.Model):
 class FirmAuditEntry(models.Model):
     """One line of the firm audit trail: a firm-level event, kept apart from every company's trail (D50).
 
-    Append-only and time-stamped by the database like `AuditEntry`, with the same field-names-only rule. Read only
-    for the user's own firm. `actor_email` is "operator" for an operator command.
+    Append-only and time-stamped by the database like `AuditEntry`, with the same field-names-only rule. The database
+    lets a user read only their own firm's entries; limiting the page to firm administrators (D50 (2)) is the job of
+    whatever screen shows them (#74). `actor_email` is "operator" for an operator command.
     """
 
     firm = models.ForeignKey(Firm, on_delete=models.PROTECT, related_name="+")
