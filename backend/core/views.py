@@ -1,3 +1,6 @@
+import logging
+
+from django.conf import settings
 from django.contrib.auth import authenticate, logout, password_validation
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
@@ -7,9 +10,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, firm_admin, permissions, throttle, tokens
+from . import audit, firm_admin, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry
 from .signin import complete_sign_in
+
+logger = logging.getLogger(__name__)
 
 
 def health(request):
@@ -60,6 +65,18 @@ def sign_out(request):
     return redirect("/login/")
 
 
+def _password_errors(request):
+    """What is wrong with the password and its repeat in a POST, as messages; empty when it is acceptable."""
+    password = request.POST.get("password", "")
+    if password != request.POST.get("confirm", ""):
+        return [_("The two passwords do not match.")]
+    try:
+        password_validation.validate_password(password)
+    except ValidationError as error:
+        return list(error.messages)
+    return []
+
+
 def _choose_password(request, token, purpose, heading, finish):
     """Choose a password through a single-use link. `finish(token, password)` consumes the link."""
     if not tokens.link_is_valid(token, purpose):
@@ -68,14 +85,7 @@ def _choose_password(request, token, purpose, heading, finish):
         return render(request, "password_set.html", {"heading": heading})
 
     password = request.POST.get("password", "")
-    errors = []
-    if password != request.POST.get("confirm", ""):
-        errors.append(_("The two passwords do not match."))
-    else:
-        try:
-            password_validation.validate_password(password)
-        except ValidationError as error:
-            errors.extend(error.messages)
+    errors = _password_errors(request)
     if errors:
         return render(request, "password_set.html", {"heading": heading, "errors": errors})
 
@@ -242,3 +252,78 @@ def firm_audit_trail(request):
     permissions.require_firm_admin(request.user)
     entries = FirmAuditEntry.objects.filter(firm=request.user.firm)[:ENTRIES_SHOWN]
     return render(request, "firm_audit.html", {"firm": request.user.firm, "entries": entries})
+
+
+# --- a firm accountant's sign-up links (D49 (4)): English only ---------------------------------------------------
+
+
+def signup_links(request):
+    """An accountant makes a single-use sign-up link for their own firm. The link is shown once and only its hash is kept."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    permissions.require_accountant(request.user)
+    if request.method != "POST":
+        return render(request, "signup_links.html")
+    return render(request, "signup_links.html", {"url": registration.create_signup_link()})
+
+
+# --- owner self-registration (D48, D49 (4)) ---------------------------------------------------------------------
+
+
+def _registration_closed(request):
+    return render(request, "signup_closed.html", status=403)
+
+
+def sign_up(request, token):
+    """The public form behind a firm's sign-up link: an address and a company name. It creates nothing by itself."""
+    if not settings.SIGNUP_ENABLED:
+        return _registration_closed(request)
+    if request.method == "POST":
+        # Counted before anything else is checked, so guessing links is limited as well as sending mail.
+        email = request.POST.get("email", "").strip()
+        if not throttle.allow_signup(email, request.META.get("REMOTE_ADDR", "")):
+            logger.info("signup refused: throttled")
+            return render(request, "signup.html", {"error": _("Too many attempts. Try again later.")}, status=429)
+    if not tokens.link_is_valid(token, AuthToken.SIGNUP):
+        logger.info("signup refused: link not valid")
+        return render(request, "link_invalid.html", status=410)
+    if request.method != "POST":
+        return render(request, "signup.html")
+
+    company_name = request.POST.get("company_name", "").strip()
+    context = {"email": email, "company_name": company_name}
+    try:
+        validate_email(email)
+    except ValidationError:
+        return render(request, "signup.html", {**context, "error": _("Enter a valid email address.")})
+    if not company_name or len(company_name) > 200:
+        return render(request, "signup.html", {**context, "error": _("Enter your company name (up to 200 characters).")})
+    try:
+        # Answers "sent" even when the address already has an account and nothing was sent.
+        registration.start(token, email, company_name)
+    except tokens.InvalidLink:
+        logger.info("signup refused: link not valid")
+        return render(request, "link_invalid.html", status=410)
+    return render(request, "signup.html", {"sent": True})
+
+
+def register(request, token):
+    """The emailed verification link: the owner chooses a password, and only then do the company and the owner exist."""
+    if not settings.SIGNUP_ENABLED:
+        return _registration_closed(request)
+    if not tokens.link_is_valid(token, AuthToken.REGISTER):
+        return render(request, "link_invalid.html", status=410)
+    heading = _("Choose your password")
+    if request.method != "POST":
+        return render(request, "password_set.html", {"heading": heading})
+
+    errors = _password_errors(request)
+    if errors:
+        return render(request, "password_set.html", {"heading": heading, "errors": errors})
+    try:
+        user = registration.complete(token, request.POST["password"])
+    except tokens.InvalidLink:
+        return render(request, "link_invalid.html", status=410)
+    complete_sign_in(request, user)
+    audit.record_auth_event(AuditEntry.LOGIN, user.email)
+    return redirect("/")

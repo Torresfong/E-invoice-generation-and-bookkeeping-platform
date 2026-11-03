@@ -1,0 +1,13 @@
+{% load i18n %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "Registration is closed" %}</title>
+</head>
+<body>
+  <h1>{% trans "Registration is closed" %}</h1>
+  <p>{% trans "New accounts cannot be created right now. Please contact your accounting firm." %}</p>
+  <p><a href="/login/">{% trans "Back to sign in" %}</a></p>
+</body>
+</html>

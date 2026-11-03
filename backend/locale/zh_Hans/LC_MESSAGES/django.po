@@ -244,3 +244,55 @@ msgstr "今天发送的邀请过多，请明天再试。"
 #: .\core\views.py:151
 msgid "Choose your password"
 msgstr "设置您的密码"
+
+#: .\core\views.py
+msgid "Too many attempts. Try again later."
+msgstr "尝试次数过多，请稍后再试。"
+
+#: .\core\views.py
+msgid "Enter your company name (up to 200 characters)."
+msgstr "请输入公司名称（最多 200 个字符）。"
+
+#: .\core\registration.py
+msgid "Confirm your registration"
+msgstr "确认您的注册"
+
+#: .\core\registration.py
+#, python-format
+msgid ""
+"Use this link to choose a password and finish creating %(company)s. It works "
+"once and expires in %(hours)s hours:\n"
+"\n"
+"%(url)s\n"
+msgstr ""
+"请使用此链接设置密码并完成 %(company)s 的创建。链接只能使用一次，%(hours)s 小时后失效：\n"
+"\n"
+"%(url)s\n"
+
+#: .\core\templates\signup.html
+msgid "Create your account"
+msgstr "创建您的账户"
+
+#: .\core\templates\signup.html
+msgid ""
+"If this address can be registered, we have sent a link to confirm it and "
+"choose a password."
+msgstr "如果此地址可以注册，我们已发送一个链接，用于确认地址并设置密码。"
+
+#: .\core\templates\signup.html
+msgid "Company name"
+msgstr "公司名称"
+
+#: .\core\templates\signup.html
+msgid "Continue"
+msgstr "继续"
+
+#: .\core\templates\signup_closed.html
+msgid "Registration is closed"
+msgstr "注册已关闭"
+
+#: .\core\templates\signup_closed.html
+msgid ""
+"New accounts cannot be created right now. Please contact your accounting "
+"firm."
+msgstr "目前无法创建新账户，请联系您的会计师事务所。"
