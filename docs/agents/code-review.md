@@ -13,6 +13,11 @@
 4. MyInvois/signing and data protection: sandbox versus production credentials, no secret/client content in code/logs/jobs, external ports and fakes.
 5. Regressions and operations: migration/RLS effects, idempotency, worker tenant context, API behavior, translations, missing tests, CI, compatibility with D-number decisions.
 
+## Cross-agent consistency checks
+- Compare newly added tests to existing coverage at the shared HTTP, Jobs and External Ports seams. Flag genuinely redundant behavior coverage or implementation-coupled tests, but do not treat distinct security/edge-case scenarios as duplicates.
+- Check for unrequested abstractions, unrelated refactors, style-only replacement of existing services, and conflicts with the referenced ADRs. Require concrete evidence for architecture changes.
+- Compare PR acceptance criteria, commit history, handoff notes and test evidence against actual diff/HEAD. Flag missing or misleading handoff evidence when it could cause rework or hide an incomplete requirement; do not trust the handoff as a source of truth.
+
 ## Review report
 - List findings first, ranked `Critical`, `High`, `Medium`, `Low`, with file/path and line, trigger scenario, consequence, and smallest safe fix.
 - Distinguish verified bug from plausible risk or missing evidence; do not report stylistic nits as bugs.
