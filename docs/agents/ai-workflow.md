@@ -16,6 +16,12 @@ Claude Code using Matt Pocock's TDD skill and Codex using its own TDD workflow *
 
 Both developers write a failing behavior test before the minimal implementation and verify red → green. Do not introduce private-method tests, internal-mock coupling, or a new test seam merely because a skill suggests it. The seams above are already agreed; ask Torres only when a requirement needs a materially new or changed test boundary. Relevant ADRs and acceptance criteria determine expected behavior, not the implementation itself.
 
+## Test coverage and architecture consistency
+- Before writing a new test, search the existing test suite for the same externally observable scenario. Extend or reuse an existing test where appropriate; add a distinct test only for a new behavior, failure mode, security boundary or meaningful regression.
+- Derive expected results from acceptance criteria, worked financial examples and ADRs, not from the implementation. Preserve deliberate cross-company negative tests even if similar-looking positive tests exist.
+- Existing ADRs and documented domain patterns take precedence over Claude Code or Codex skill preferences. Implement only the current issue; no speculative abstractions, unrelated refactors, or replacing a sound service merely because another agent prefers a different style.
+- If a proposed architecture change is necessary, record the defect, affected ADR, migration/compatibility consequences and tests; stop for Torres's approval if it contradicts an ADR or changes scope.
+
 ## Token-limited handoff
 When switching from Claude Code to Codex or the reverse, update the issue or PR with a short factual handoff:
 - Issue, branch, and current HEAD commit SHA
