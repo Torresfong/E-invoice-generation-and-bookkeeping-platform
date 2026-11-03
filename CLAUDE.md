@@ -77,6 +77,8 @@ Test external behaviour only, at three seams, preferring the first:
 2. MyInvois contract tests against the real sandbox, skipped cleanly without credentials.
 3. Extraction regression harness scoring the firm's samples per document type (samples stay outside the repo).
 
+The isolation guards in `backend/core/tests/test_isolation.py` go red on purpose: every new table carries a company id and FORCE row-level security (or joins `DJANGO_OWN` / `PLATFORM` there, with a reason), every new `/companies/<id>/` route joins `ENDPOINTS`, and every new business endpoint ships an HTTP test that a request for another company fails.
+
 ## Conventions worth knowing
 
 - Client screens: English and Chinese strings from the start. Firm portal and invoice PDFs: English.
