@@ -375,3 +375,29 @@ def test_an_administrator_deactivated_while_waiting_for_the_firm_lock_cannot_go_
 
     assert isinstance(outcome.get("error"), psycopg.errors.InsufficientPrivilege)
     assert not User.objects.filter(email="late@alpha.example").exists()
+
+
+# --- a setup email that cannot be sent leaves nobody half-created ---------------------------------------------
+
+
+def test_a_person_whose_setup_email_cannot_be_sent_is_not_created_and_the_address_can_be_added_again(
+    client, firms, fake_ports, as_production_connection
+):
+    client.raise_request_exception = False
+    good_send = fake_ports.email.send
+
+    def refuse(to, subject, body):
+        raise RuntimeError("the mail server is down")
+
+    with as_production_connection():
+        sign_in(client, firms["alpha_admin"])
+        fake_ports.email.send = refuse
+        assert add(client, "new@alpha.example").status_code == 500
+        fake_ports.email.send = good_send
+        assert add(client, "new@alpha.example").status_code == 302
+
+    assert User.objects.filter(email="new@alpha.example").count() == 1
+    assert AuthToken.objects.filter(email="new@alpha.example").count() == 1
+    assert [mail["to"] for mail in fake_ports.email.sent] == ["new@alpha.example"]
+    created = FirmAuditEntry.objects.filter(firm=firms["alpha"], action=AuditEntry.CREATE, target_type="user")
+    assert created.filter(actor_id=firms["alpha_admin"].pk).count() == 1

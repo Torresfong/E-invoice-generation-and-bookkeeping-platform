@@ -92,3 +92,29 @@ def test_clients_and_accountants_keep_their_company_access(world):  # noqa: F811
 
     CompanyAccess.objects.create(user=User.objects.create_user("staff@x.example"), company=world["acme"], role=CompanyAccess.STAFF)
     assert CompanyAccess.objects.filter(user=world["alpha_accountant"]).exists()
+
+
+# --- a setup email that cannot be sent leaves nobody half-created ---------------------------------------------
+
+
+@pytest.fixture
+def broken_email(fake_ports):
+    def refuse(to, subject, body):
+        raise RuntimeError("the mail server is down")
+
+    fake_ports.email.send = refuse
+
+
+def test_a_firm_whose_first_administrators_email_cannot_be_sent_is_not_created(db, broken_email):
+    with pytest.raises(RuntimeError):
+        call_command("create_firm", "Gamma Group", "boss@gamma.example")
+
+    assert not Firm.objects.filter(name="Gamma Group").exists()
+    assert not User.objects.filter(email="boss@gamma.example").exists()
+    assert not FirmAuditEntry.objects.filter(firm__name="Gamma Group").exists()
+
+
+def test_the_same_command_can_be_run_again_once_the_email_works(db, fake_ports):
+    call_command("create_firm", "Gamma Group", "boss@gamma.example")
+
+    assert [mail["to"] for mail in fake_ports.email.sent] == ["boss@gamma.example"]

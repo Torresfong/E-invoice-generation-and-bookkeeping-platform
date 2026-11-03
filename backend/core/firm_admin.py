@@ -41,14 +41,17 @@ def add(email, kind):
     """Create an accountant or administrator of the caller's firm and email them a link to choose a password.
 
     An address that already has an account is silently skipped, so the caller learns nothing about who is registered.
+    The email is sent inside the transaction: if it cannot be sent the person is not created, so the same address can
+    be added again. (A view's exception becomes a 500 response before the request's own transaction sees it, so that
+    transaction would commit.)
     """
     email = email.strip().lower()
     raw, hashed = tokens.new_token()
     expires = timezone.now() + timedelta(hours=settings.SETUP_LINK_HOURS)
     with transaction.atomic():
         created = scalar("SELECT create_firm_person(%s, %s, %s, %s)", [email, kind, hashed, expires])
-    if created:
-        tokens.send_setup_link(email, raw)
+        if created:
+            tokens.send_setup_link(email, raw)
 
 
 def deactivate(person_id):
