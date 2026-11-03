@@ -113,3 +113,20 @@ def as_worker_connection(db):
                 cursor.execute("RESET SESSION AUTHORIZATION")
 
     return switch
+
+
+@pytest.fixture
+def firms_world(db):
+    """Two firms, each with an accountant and a company. Passwords are `factories.PASSWORD`."""
+    from core import services
+    from core.tests.factories import PASSWORD
+
+    alpha, beta = services.create_firm("Alpha Accounting"), services.create_firm("Beta Books")
+    people = {"alpha_accountant": services.create_accountant("acc@alpha.example", alpha)}
+    people["beta_accountant"] = services.create_accountant("acc@beta.example", beta)
+    for user in people.values():
+        user.set_password(PASSWORD)
+        user.save()
+    acme = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, alpha)
+    gamma = services.create_company_with_owner("Gamma Holdings", "owner@gamma.example", PASSWORD, beta)
+    return {"alpha": alpha, "beta": beta, "acme": acme, "gamma": gamma, **people}

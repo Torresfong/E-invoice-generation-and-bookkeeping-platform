@@ -11,23 +11,22 @@ from core import services
 from core.models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, User
 
 from .factories import PASSWORD, make_member
-from .test_firms import world  # noqa: F401  (two firms, each with an accountant and a company)
 from .test_tenancy import query
 
 NEW_PASSWORD = "a brand new passphrase"
 
 
 @pytest.fixture
-def firms(world):  # noqa: F811
-    """`world` plus a firm administrator in each firm and a staff member at Acme. Passwords are `factories.PASSWORD`."""
-    world["alpha_admin"] = services.create_firm_administrator("admin@alpha.example", world["alpha"])
-    world["beta_admin"] = services.create_firm_administrator("admin@beta.example", world["beta"])
-    world["acme_owner"] = User.objects.get(email="owner@acme.example")
-    world["acme_staff"] = make_member("staff@acme.example", world["acme"], CompanyAccess.STAFF)
+def firms(firms_world):
+    """`firms_world` plus a firm administrator in each firm and a staff member at Acme. Passwords are `factories.PASSWORD`."""
+    firms_world["alpha_admin"] = services.create_firm_administrator("admin@alpha.example", firms_world["alpha"])
+    firms_world["beta_admin"] = services.create_firm_administrator("admin@beta.example", firms_world["beta"])
+    firms_world["acme_owner"] = User.objects.get(email="owner@acme.example")
+    firms_world["acme_staff"] = make_member("staff@acme.example", firms_world["acme"], CompanyAccess.STAFF)
     for key in ("alpha_admin", "beta_admin"):
-        world[key].set_password(PASSWORD)
-        world[key].save()
-    return world
+        firms_world[key].set_password(PASSWORD)
+        firms_world[key].save()
+    return firms_world
 
 
 def setup_link(fake_ports):

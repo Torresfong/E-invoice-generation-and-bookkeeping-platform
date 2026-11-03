@@ -10,7 +10,7 @@ from core import services
 from core.models import AuditEntry, CompanyAccess, Firm, FirmAuditEntry, User
 
 from .factories import PASSWORD
-from .test_firms import check_now, world  # noqa: F401  (two firms, each with an accountant and a company)
+from .test_firms import check_now
 
 NEW_PASSWORD = "a brand new passphrase"
 
@@ -40,7 +40,7 @@ def test_the_operator_command_creates_a_firm_with_its_first_administrator_who_se
         assert client.post("/login/", {"email": "boss@gamma.example", "password": NEW_PASSWORD}).status_code == 302
 
 
-def test_the_command_refuses_an_address_that_already_has_an_account_and_creates_no_firm(world, fake_ports):  # noqa: F811
+def test_the_command_refuses_an_address_that_already_has_an_account_and_creates_no_firm(firms_world, fake_ports):
     with pytest.raises(CommandError, match="already has an account"):
         call_command("create_firm", "Gamma Group", "owner@acme.example")
 
@@ -61,25 +61,25 @@ def test_the_operator_command_records_the_firm_and_its_administrator_in_the_firm
 
 
 def test_the_database_refuses_a_user_who_is_both_an_accountant_and_an_administrator_or_an_administrator_with_no_firm(
-    world,  # noqa: F811
+    firms_world,
 ):
     with pytest.raises(IntegrityError), transaction.atomic():
-        User.objects.filter(pk=world["alpha_accountant"].pk).update(is_firm_admin=True)
+        User.objects.filter(pk=firms_world["alpha_accountant"].pk).update(is_firm_admin=True)
     with pytest.raises(IntegrityError), transaction.atomic():
         User.objects.create_user("nofirm@x.example", is_firm_admin=True)
 
 
-def test_the_database_refuses_company_access_for_a_firm_administrator_however_it_is_written(world):  # noqa: F811
-    administrator = services.create_firm_administrator("admin@alpha.example", world["alpha"])
+def test_the_database_refuses_company_access_for_a_firm_administrator_however_it_is_written(firms_world):
+    administrator = services.create_firm_administrator("admin@alpha.example", firms_world["alpha"])
     owner = User.objects.get(email="owner@acme.example")
     check_now()
 
     with pytest.raises(DatabaseError), transaction.atomic():  # also refused by 02h's check, with its own message
-        CompanyAccess.objects.create(user=administrator, company=world["acme"], role=CompanyAccess.ACCOUNTANT)
+        CompanyAccess.objects.create(user=administrator, company=firms_world["acme"], role=CompanyAccess.ACCOUNTANT)
     with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
-        CompanyAccess.objects.create(user=administrator, company=world["acme"], role=CompanyAccess.STAFF)
+        CompanyAccess.objects.create(user=administrator, company=firms_world["acme"], role=CompanyAccess.STAFF)
     with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
-        User.objects.filter(pk=owner.pk).update(is_firm_admin=True, firm=world["alpha"])  # a client made an administrator
+        User.objects.filter(pk=owner.pk).update(is_firm_admin=True, firm=firms_world["alpha"])  # a client made an administrator
     with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
         CompanyAccess.objects.filter(user=owner).update(user=administrator)
 
@@ -87,11 +87,11 @@ def test_the_database_refuses_company_access_for_a_firm_administrator_however_it
     assert not User.objects.get(pk=owner.pk).is_firm_admin
 
 
-def test_clients_and_accountants_keep_their_company_access(world):  # noqa: F811
+def test_clients_and_accountants_keep_their_company_access(firms_world):
     check_now()
 
-    CompanyAccess.objects.create(user=User.objects.create_user("staff@x.example"), company=world["acme"], role=CompanyAccess.STAFF)
-    assert CompanyAccess.objects.filter(user=world["alpha_accountant"]).exists()
+    CompanyAccess.objects.create(user=User.objects.create_user("staff@x.example"), company=firms_world["acme"], role=CompanyAccess.STAFF)
+    assert CompanyAccess.objects.filter(user=firms_world["alpha_accountant"]).exists()
 
 
 # --- a setup email that cannot be sent leaves nobody half-created ---------------------------------------------
