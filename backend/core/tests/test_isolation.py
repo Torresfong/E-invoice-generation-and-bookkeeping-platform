@@ -16,7 +16,6 @@ from core.models import AuditEntry, AuthToken, CompanyAccess, User
 
 from .factories import PASSWORD, make_member
 from .probe import create_probe_note
-from .test_firms import world  # noqa: F401  (Alpha: Acme + accountant; Beta: Gamma + accountant)
 from .test_tenancy import query
 
 
@@ -25,14 +24,14 @@ def sign_in(client, user):
 
 
 @pytest.fixture
-def people(world):  # noqa: F811
-    """`world` plus a staff member in each company. Returns every actor by name."""
+def people(firms_world):
+    """`firms_world` plus a staff member in each company. Returns every actor by name."""
     return {
-        **world,
+        **firms_world,
         "acme_owner": User.objects.get(email="owner@acme.example"),
         "gamma_owner": User.objects.get(email="owner@gamma.example"),
-        "acme_staff": make_member("staff@acme.example", world["acme"], CompanyAccess.STAFF),
-        "gamma_staff": make_member("staff@gamma.example", world["gamma"], CompanyAccess.STAFF),
+        "acme_staff": make_member("staff@acme.example", firms_world["acme"], CompanyAccess.STAFF),
+        "gamma_staff": make_member("staff@gamma.example", firms_world["gamma"], CompanyAccess.STAFF),
     }
 
 
