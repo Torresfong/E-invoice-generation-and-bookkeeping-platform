@@ -8,6 +8,14 @@
 5. For tenancy, MyInvois, signing, or money changes, retain the pre-PR independent review required by the project rules.
 6. Open a PR against `main` with `Closes #N`, acceptance-criteria evidence, D-number decisions, test commands/results, deployment/migration risks and any missing external validation. Do not merge.
 
+## Shared TDD test boundaries
+Claude Code using Matt Pocock's TDD skill and Codex using its own TDD workflow **must follow the same project-defined test seams**. Tool- or skill-specific preferences do not override the repository's testing contract:
+1. Prefer HTTP-level behavior tests and in-process job-runner tests with all four external ports faked; test denied cross-company access.
+2. Use real MyInvois sandbox contract tests only when credentials are available; otherwise skip cleanly and report the gap.
+3. Use the extraction regression harness with firm samples stored outside the repository.
+
+Both developers write a failing behavior test before the minimal implementation and verify red → green. Do not introduce private-method tests, internal-mock coupling, or a new test seam merely because a skill suggests it. The seams above are already agreed; ask Torres only when a requirement needs a materially new or changed test boundary. Relevant ADRs and acceptance criteria determine expected behavior, not the implementation itself.
+
 ## Token-limited handoff
 When switching from Claude Code to Codex or the reverse, update the issue or PR with a short factual handoff:
 - Issue, branch, and current HEAD commit SHA
