@@ -433,3 +433,14 @@ def test_the_sign_up_screens_and_the_verification_email_are_in_chinese(
     assert "我们已发送" in sent.content.decode()
     assert "设置您的密码" in password_form
     assert "注册已关闭" in closed
+
+
+def test_an_address_too_long_to_store_asks_again_instead_of_failing(firms_world, signup_open, fake_ports, as_production_connection):
+    path = new_link(firms_world["alpha_accountant"])
+    long_address = "a" * 60 + "@" + ".".join(["b" * 60] * 4) + ".example"  # valid in form, over 254 characters
+    assert len(long_address) > 254
+
+    with as_production_connection():
+        response = submit(Client(), path, email=long_address)
+
+    assert response.status_code == 200 and b'role="alert"' in response.content and fake_ports.email.sent == []

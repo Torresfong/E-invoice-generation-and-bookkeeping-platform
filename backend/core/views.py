@@ -294,6 +294,8 @@ def sign_up(request, token):
     context = {"email": email, "company_name": company_name}
     try:
         validate_email(email)
+        if len(email) > 254:  # the column's width
+            raise ValidationError("too long")
     except ValidationError:
         return render(request, "signup.html", {**context, "error": _("Enter a valid email address.")})
     if not company_name or len(company_name) > 200:
