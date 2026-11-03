@@ -63,11 +63,18 @@ def _lock_firms(*firms):
     return [locked[firm.pk] for firm in firms]
 
 
+def _record_firm_event(firm, action, target_type, target_id, changed_fields):
+    audit.record_firm_event(action, firm, target_type=target_type, target_id=target_id, changed_fields=changed_fields)
+
+
+@transaction.atomic
 def create_firm(name):
     """An accounting firm. Names are unique, ignoring case."""
     if not name.strip():
         raise FirmNameRequired
-    return Firm.objects.create(name=name.strip())
+    firm = Firm.objects.create(name=name.strip())
+    _record_firm_event(firm, AuditEntry.CREATE, "firm", firm.pk, ["name"])
+    return firm
 
 
 def get_firm(name):
@@ -106,6 +113,7 @@ def create_accountant(email, firm):
     CompanyAccess.objects.bulk_create(
         CompanyAccess(user=accountant, company=company, role=CompanyAccess.ACCOUNTANT) for company in firm.companies.all()
     )
+    _record_firm_event(firm, AuditEntry.CREATE, "user", accountant.pk, ["email", "firm"])
     return accountant
 
 
@@ -130,5 +138,9 @@ def move_company(company, firm):
     company.firm = firm
     company.save(update_fields=["firm"])
     _open_to_accountants(company)
-    _record_firm(company, AuditEntry.UPDATE)
+    # The company's trail and both firms' trails, tied together by one correlation id (D50 (5)).
+    with audit.correlated():
+        _record_firm(company, AuditEntry.UPDATE)
+        for side in (current.firm, firm):
+            _record_firm_event(side, AuditEntry.UPDATE, "company", company.pk, ["firm"])
     return company

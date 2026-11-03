@@ -13,7 +13,7 @@ from django.utils import timezone
 from psycopg.pq import TransactionStatus
 
 from .models import Company, Job
-from .rls import CLAIMING_SETTING, COMPANY_SETTING, WORKER_ROLE
+from .rls import CLAIMING_SETTING, COMPANY_SETTING, CORRELATION_SETTING, WORKER_ROLE
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +67,12 @@ def _set_company(company_id):
         cursor.execute("SELECT set_config(%s, %s, true)", [COMPANY_SETTING, "" if company_id is None else str(company_id)])
 
 
+def _set_correlation(value):
+    """One id per job for the audit entries it writes (D50 (6)); empty clears it."""
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT set_config(%s, %s, true)", [CORRELATION_SETTING, value])
+
+
 def _become_worker():
     """Switch this transaction to the worker role and return the roles to put back afterwards."""
     with connection.cursor() as cursor:
@@ -88,6 +94,7 @@ def _stop_being_worker(before):
         transaction.set_rollback(True)
         return
     _set_company(None)
+    _set_correlation("")
     current, session = before
     with connection.cursor() as cursor:
         if current == session:
@@ -132,6 +139,7 @@ def run_pending(limit=100):
                 _stop_being_worker(before)
                 break
             _set_company(job.company_id)
+            _set_correlation(str(uuid.uuid4()))
             try:
                 handler = HANDLERS.get(job.name)
                 if handler is None:

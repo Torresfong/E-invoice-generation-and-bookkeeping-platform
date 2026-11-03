@@ -4,7 +4,7 @@ import pytest
 from django.db import DatabaseError, connection, transaction
 
 from core.audit import audit_trigger_sql
-from core.models import AuditEntry
+from core.models import AuditEntry, FirmAuditEntry
 from core.rls import tenant_policy_sql
 
 from .factories import make_user
@@ -127,10 +127,17 @@ def test_only_sign_in_events_can_be_recorded_through_the_sign_in_function(as_use
         query("SELECT record_auth_event('create', NULL)")
 
 
-def test_the_sign_in_function_writes_one_entry_per_company_for_an_accountant(world):
+def test_the_sign_in_function_writes_an_accountants_event_once_into_the_firm_trail_and_into_no_company(world):
     query("SELECT record_auth_event('login', %s)", [world["accountant"].email])
 
-    assert sorted(AuditEntry.objects.values_list("company_id", flat=True)) == sorted([world["acme"].pk, world["beta"].pk])
+    assert AuditEntry.objects.count() == 0
+    assert list(FirmAuditEntry.objects.values_list("firm_id", flat=True)) == [world["accountant"].firm_id]
+
+
+def test_the_sign_in_function_writes_one_entry_per_company_for_a_client(world):
+    query("SELECT record_auth_event('login', %s)", [world["acme_owner"].email])
+
+    assert list(AuditEntry.objects.values_list("company_id", flat=True)) == [world["acme"].pk]
 
 
 def test_an_unknown_address_writes_nothing(world):

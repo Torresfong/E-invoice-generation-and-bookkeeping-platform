@@ -206,3 +206,26 @@ class AuditEntry(models.Model):
     class Meta:
         indexes = [models.Index(fields=["company", "-occurred_at"], name="audit_company_time")]
         ordering = ["-occurred_at", "-id"]
+
+
+class FirmAuditEntry(models.Model):
+    """One line of the firm audit trail: a firm-level event, kept apart from every company's trail (D50).
+
+    Append-only and time-stamped by the database like `AuditEntry`, with the same field-names-only rule. Read only
+    for the user's own firm. `actor_email` is "operator" for an operator command.
+    """
+
+    firm = models.ForeignKey(Firm, on_delete=models.PROTECT, related_name="+")
+    actor_id = models.BigIntegerField(null=True, blank=True)
+    actor_email = models.CharField(max_length=254, blank=True)
+    action = models.CharField(max_length=20, choices=AuditEntry.ACTIONS)
+    target_type = models.CharField(max_length=100, blank=True)
+    target_id = models.CharField(max_length=40, blank=True)
+    changed_fields = models.JSONField(default=list)
+    occurred_at = models.DateTimeField(db_default=Now())
+    # Set once per request or job (D50 (6)); the database supplies one when nothing has set it.
+    correlation_id = models.UUIDField(db_default=models.Func(function="audit_correlation_id", output_field=models.UUIDField()))
+
+    class Meta:
+        indexes = [models.Index(fields=["firm", "-occurred_at"], name="firm_audit_firm_time")]
+        ordering = ["-occurred_at", "-id"]

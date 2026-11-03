@@ -6,10 +6,16 @@ cannot forget or bypass them (`enable_audit` in a table's migration). Sign-in ev
 Entries hold the names of changed fields and never their values; nothing here may be given a credential,
 a token or a customer's details.
 
+Events that belong to a firm, not a company (an accountant's sign-in, an operator command), go to the separate firm
+trail (D50) with `record_firm_event`; `enable_firm_audit` does for a table with a `firm_id` what `enable_audit` does for
+one with a `company_id`. A firm event is never written into a company's trail.
+
 A firm accountant's reads of company data are recorded too (D45): put `audited_read` on every screen that shows
 company data to an accountant. See "Audited reads" in docs/architecture/tenancy.md.
 """
 
+import uuid
+from contextlib import contextmanager
 from datetime import timedelta
 from functools import wraps
 
@@ -18,7 +24,8 @@ from django.db.models.functions import Now
 
 from . import permissions
 from .db import scalar
-from .models import AuditEntry, CompanyAccess
+from .models import AuditEntry, CompanyAccess, FirmAuditEntry
+from .rls import CORRELATION_SETTING
 
 # Reading the same thing again within this window is one entry, so a reload does not flood the trail.
 VIEW_WINDOW = timedelta(minutes=5)
@@ -61,6 +68,44 @@ def record_operator_event(action, company, target_type, target_id, changed_field
         target_id=str(target_id),
         changed_fields=list(changed_fields),
     )
+
+
+def record_firm_event(action, firm, actor=None, target_type="", target_id="", changed_fields=()):
+    """Write a firm-level event (D50). `actor` is the signed-in user; leave it out for an operator command.
+
+    Like every entry it names fields and never their values. Its correlation id is the request's or job's, or the one
+    of the enclosing `correlated()` block.
+    """
+    return FirmAuditEntry.objects.create(
+        firm=firm,
+        actor_id=actor.pk if actor else None,
+        actor_email=actor.email if actor else OPERATOR,
+        action=action,
+        target_type=target_type,
+        target_id=str(target_id),
+        changed_fields=list(changed_fields),
+    )
+
+
+def current_correlation_id():
+    """The correlation id an entry written now would carry (a fresh one, not kept, if nothing has set it)."""
+    return scalar("SELECT audit_correlation_id()")
+
+
+@contextmanager
+def correlated():
+    """Give the entries written in this block one correlation id, for work that is neither a request nor a job.
+
+    Inside a request or job its id is kept. Use it inside a transaction: the id is transaction-local.
+    """
+    if scalar("SELECT nullif(current_setting(%s, true), '')", [CORRELATION_SETTING]):
+        yield
+        return
+    scalar("SELECT set_config(%s, %s, true)", [CORRELATION_SETTING, str(uuid.uuid4())])
+    try:
+        yield
+    finally:
+        scalar("SELECT set_config(%s, '', true)", [CORRELATION_SETTING])
 
 
 def record_read(user, company_id, target_type, target_id=""):
@@ -116,17 +161,25 @@ def audited_read(target_type, id_arg=None):
     return decorator
 
 
-def audit_trigger_sql(table):
-    """SQL that puts `table` under the audit trigger. The table needs `id` and `company_id` columns.
-
-    The first statement refuses a table without them: the trigger would otherwise fail on the first write
-    and block it.
-    """
+def _trigger_sql(table, column, trigger, function):
+    """The first statement refuses a table without `id` and `column`: the trigger would otherwise fail on the first
+    write and block it."""
     return [
         "DO $$ BEGIN IF (SELECT count(*) FROM information_schema.columns WHERE table_schema = current_schema() "
-        f"AND table_name = '{table}' AND column_name IN ('id', 'company_id')) < 2 THEN "
-        f"RAISE EXCEPTION 'cannot audit {table}: it needs id and company_id columns'; END IF; END $$",
-        f"CREATE TRIGGER audit_changes AFTER INSERT OR UPDATE OR DELETE ON {table} FOR EACH ROW EXECUTE FUNCTION audit_row_change()"]
+        f"AND table_name = '{table}' AND column_name IN ('id', '{column}')) < 2 THEN "
+        f"RAISE EXCEPTION 'cannot audit {table}: it needs id and {column} columns'; END IF; END $$",
+        f"CREATE TRIGGER {trigger} AFTER INSERT OR UPDATE OR DELETE ON {table} FOR EACH ROW EXECUTE FUNCTION {function}()",
+    ]
+
+
+def audit_trigger_sql(table):
+    """SQL that puts `table` under the audit trigger. The table needs `id` and `company_id` columns."""
+    return _trigger_sql(table, "company_id", "audit_changes", "audit_row_change")
+
+
+def firm_audit_trigger_sql(table):
+    """SQL that puts `table` under the firm audit trigger. The table needs `id` and `firm_id` columns."""
+    return _trigger_sql(table, "firm_id", "firm_audit_changes", "firm_audit_row_change")
 
 
 def drop_audit_trigger_sql(table):
@@ -139,3 +192,8 @@ def enable_audit(table):
     Add it after `enable_tenant_rls` in the migration that creates a business table.
     """
     return migrations.RunSQL(audit_trigger_sql(table), drop_audit_trigger_sql(table))
+
+
+def enable_firm_audit(table):
+    """Like `enable_audit`, into the firm trail, for a table that carries `id` and `firm_id`."""
+    return migrations.RunSQL(firm_audit_trigger_sql(table), [f"DROP TRIGGER IF EXISTS firm_audit_changes ON {table}"])

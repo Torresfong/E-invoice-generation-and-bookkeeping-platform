@@ -4,8 +4,8 @@ from django.db import connection
 from django.http import JsonResponse
 from django.urls import include, path
 
-from core import jobs
-from core.models import Company
+from core import audit, jobs
+from core.models import AuditEntry, Company
 
 
 def probe(request):
@@ -62,10 +62,18 @@ def job_enqueue(request):
     return JsonResponse({"queued": True})
 
 
+def firm_events(request):
+    """Writes two firm-trail entries for the signed-in user's own firm, the way a firm screen will."""
+    for target in ("one", "two"):
+        audit.record_firm_event(AuditEntry.UPDATE, request.user.firm, request.user, target_type="probe", target_id=target)
+    return JsonResponse({"written": 2})
+
+
 urlpatterns = [
     path("probe/", probe),
     path("jobs/", job_enqueue),
     path("boom/", boom),
+    path("firm-events/", firm_events),
     path("notes/", note_create),
     path("notes/<int:pk>/update/", note_update),
     path("notes/<int:pk>/delete/", note_delete),
