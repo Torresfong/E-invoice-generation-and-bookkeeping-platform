@@ -13,7 +13,7 @@ REVERSE = ["ALTER TABLE core_auditentry DROP COLUMN correlation_id"]
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0027_firm_admin_no_company_access")]
+    dependencies = [("core", "0029_owner_signup")]
     operations = [
         migrations.SeparateDatabaseAndState(
             database_operations=[migrations.RunSQL(FORWARD, REVERSE)],

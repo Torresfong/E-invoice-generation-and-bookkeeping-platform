@@ -23,5 +23,5 @@ assert RECORD_AUTH_EVENT.count("v_correlation") == 3, "the text of 0026 has drif
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0028_audit_entry_correlation_id")]
+    dependencies = [("core", "0030_audit_entry_correlation_id")]
     operations = [migrations.RunSQL(RECORD_AUTH_EVENT, PREVIOUS)]
