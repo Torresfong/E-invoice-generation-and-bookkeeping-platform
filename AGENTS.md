@@ -19,6 +19,11 @@ This file is the single entry point for Codex and Claude Code. Keep it concise; 
 - Test external behavior first, then implement the smallest relevant change. Run `python manage.py check`, migration drift check, and `pytest` where applicable; report exact evidence and unavailable tests.
 - Never silently change product scope, RLS migrations, production settings, signing keys, or real client data. Stop and ask on those matters.
 
+## Shared test and architecture contract
+- Before adding tests, inspect existing coverage and reuse the established HTTP, in-process Jobs, and External Ports seams. Avoid duplicate scenarios, private-method tests, and implementation-coupled mocks; follow red → green with expectations derived from the issue/spec/ADR.
+- Existing ADRs outrank agent and skill preferences. Make the smallest change satisfying the issue; do not add speculative abstractions or refactor unrelated code. Never replace a sound abstraction merely for style. Record evidence and seek approval for changes that contradict an ADR.
+- Before continuing another agent's task, verify Issue, PR, current HEAD/commits, diff, tests and acceptance criteria against actual repository state. Read handoff notes as pointers, not proof.
+
 ## AI collaboration boundaries
 - Claude Code and Codex may both implement issues. Use one feature branch per issue and separate worktrees/working directories when working concurrently; never independently push competing changes to the same branch.
 - One developer owns the active branch at a time. Handoff through GitHub issue/PR notes and commits, not the prior agent's chat history.
