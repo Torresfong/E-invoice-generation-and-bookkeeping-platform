@@ -4,13 +4,13 @@ import re
 
 import pytest
 from django.core.management import CommandError, call_command
-from django.db import IntegrityError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 
 from core import services
 from core.models import AuditEntry, CompanyAccess, Firm, FirmAuditEntry, User
 
 from .factories import PASSWORD
-from .test_firms import world  # noqa: F401  (two firms, each with an accountant and a company)
+from .test_firms import check_now, world  # noqa: F401  (two firms, each with an accountant and a company)
 
 NEW_PASSWORD = "a brand new passphrase"
 
@@ -67,3 +67,28 @@ def test_the_database_refuses_a_user_who_is_both_an_accountant_and_an_administra
         User.objects.filter(pk=world["alpha_accountant"].pk).update(is_firm_admin=True)
     with pytest.raises(IntegrityError), transaction.atomic():
         User.objects.create_user("nofirm@x.example", is_firm_admin=True)
+
+
+def test_the_database_refuses_company_access_for_a_firm_administrator_however_it_is_written(world):  # noqa: F811
+    administrator = services.create_firm_administrator("admin@alpha.example", world["alpha"])
+    owner = User.objects.get(email="owner@acme.example")
+    check_now()
+
+    with pytest.raises(DatabaseError), transaction.atomic():  # also refused by 02h's check, with its own message
+        CompanyAccess.objects.create(user=administrator, company=world["acme"], role=CompanyAccess.ACCOUNTANT)
+    with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
+        CompanyAccess.objects.create(user=administrator, company=world["acme"], role=CompanyAccess.STAFF)
+    with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
+        User.objects.filter(pk=owner.pk).update(is_firm_admin=True, firm=world["alpha"])  # a client made an administrator
+    with pytest.raises(DatabaseError, match="administrator"), transaction.atomic():
+        CompanyAccess.objects.filter(user=owner).update(user=administrator)
+
+    assert not CompanyAccess.objects.filter(user=administrator).exists()
+    assert not User.objects.get(pk=owner.pk).is_firm_admin
+
+
+def test_clients_and_accountants_keep_their_company_access(world):  # noqa: F811
+    check_now()
+
+    CompanyAccess.objects.create(user=User.objects.create_user("staff@x.example"), company=world["acme"], role=CompanyAccess.STAFF)
+    assert CompanyAccess.objects.filter(user=world["alpha_accountant"]).exists()
