@@ -4,3 +4,4 @@ dj-database-url>=2.3,<3
 argon2-cffi>=23.1,<26
 pytest>=8,<9
 pytest-django>=4.9,<5
+ruff>=0.8,<1

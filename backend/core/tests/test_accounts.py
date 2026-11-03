@@ -2,7 +2,7 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.db import DatabaseError, IntegrityError, connection, transaction
 
-from core.models import Company, CompanyAccess
+from core.models import CompanyAccess
 
 from .factories import make_company
 

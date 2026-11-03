@@ -69,7 +69,7 @@ def test_a_firm_with_no_accountant_yet_gets_them_their_access_when_they_are_crea
     firm = services.create_firm("New Firm")
     company = services.create_company_with_owner("Delta Bhd", "owner@delta.example", PASSWORD, firm)
 
-    accountant = services.create_accountant("late@newfirm.example", firm)
+    services.create_accountant("late@newfirm.example", firm)
 
     assert accountant_rows(company) == {"late@newfirm.example"}
 

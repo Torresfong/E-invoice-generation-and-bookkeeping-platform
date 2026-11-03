@@ -6,7 +6,7 @@ import pytest
 from django.urls import get_resolver
 
 from core import audit
-from core.models import AuditEntry, CompanyAccess
+from core.models import AuditEntry
 
 from .factories import PASSWORD, make_accountant, make_company
 
