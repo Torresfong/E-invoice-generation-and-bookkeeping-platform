@@ -78,6 +78,8 @@ BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 
 # Password reset links last an hour, invitations a week (D40 (5)).
 RESET_LINK_HOURS = 1
+# The link a new firm administrator or accountant gets to choose a first password (D49).
+SETUP_LINK_HOURS = 24
 INVITE_LINK_DAYS = 7
 
 SESSION_COOKIE_SECURE = not DEBUG

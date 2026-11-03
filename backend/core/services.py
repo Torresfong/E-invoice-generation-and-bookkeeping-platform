@@ -92,6 +92,23 @@ def get_company(pk):
 
 
 @transaction.atomic
+def create_firm_administrator(email, firm):
+    """A firm administrator of `firm`, with no usable password until they choose one (D49). They get no company access."""
+    _require_new_address(email)
+    [firm] = _lock_firms(firm)
+    administrator = get_user_model().objects.create_user(email, password=None, is_firm_admin=True, firm=firm)
+    _record_firm_event(firm, AuditEntry.CREATE, "user", administrator.pk, ["email", "firm"])
+    return administrator
+
+
+@transaction.atomic
+def create_firm_with_administrator(name, administrator_email):
+    """A firm and its first firm administrator."""
+    _require_new_address(administrator_email)
+    return create_firm_administrator(administrator_email, create_firm(name))
+
+
+@transaction.atomic
 def create_company_with_owner(name, owner_email, owner_password, firm):
     """A company of `firm` with its single owner. Only that firm's accountants get access to it."""
     _require_new_address(owner_email)

@@ -2,13 +2,13 @@ from django.contrib.auth import authenticate, logout, password_validation
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.db import connection
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, permissions, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess
+from . import audit, firm_admin, permissions, throttle, tokens
+from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry
 from .signin import complete_sign_in
 
 
@@ -180,3 +180,65 @@ def audit_trail(request, pk):
 def my_activity(request, pk):
     """What the signed-in user themself has done in the company."""
     return _trail_page(request, pk, "view_own_activity", _("My activity"), actor_id=request.user.pk)
+
+
+# --- the firm administrator's pages (D49, D50): English only, and no client data ---------------------------------
+
+
+def _firm_page(request, **extra):
+    context = {"firm": request.user.firm, "people": firm_admin.people(), **extra}
+    if request.GET.get("added"):
+        context["message"] = "Added. They have been emailed a link to choose a password."
+    if request.GET.get("deactivated"):
+        context["message"] = "Deactivated."
+    return render(request, "firm.html", context)
+
+
+def firm(request):
+    """The firm administrator's page: their firm's accountants and administrators, and a form to add one."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    permissions.require_firm_admin(request.user)
+    return _firm_page(request)
+
+
+@require_POST
+def add_firm_person(request):
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    permissions.require_firm_admin(request.user)
+
+    email, kind = request.POST.get("email", "").strip(), request.POST.get("kind", "")
+    try:
+        validate_email(email)
+    except ValidationError:
+        return _firm_page(request, error="Enter a valid email address.")
+    if kind not in ("accountant", "firm_admin"):
+        return _firm_page(request, error="Choose accountant or administrator.")
+    # Answers "added" even when the address already has an account and nothing was created.
+    firm_admin.add(email, kind)
+    return redirect("/firm/?added=1")
+
+
+@require_POST
+def deactivate_firm_person(request, pk):
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    permissions.require_firm_admin(request.user)
+    try:
+        firm_admin.deactivate(pk)
+    except firm_admin.PersonNotFound as error:
+        raise Http404 from error
+    except firm_admin.LastAdministrator:
+        return _firm_page(request, error="The last active administrator of the firm cannot be deactivated.")
+    return redirect("/firm/?deactivated=1")
+
+
+@require_safe
+def firm_audit_trail(request):
+    """The firm's own trail (D50). Only its administrators read it; row-level security limits it to their firm."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    permissions.require_firm_admin(request.user)
+    entries = FirmAuditEntry.objects.filter(firm=request.user.firm)[:ENTRIES_SHOWN]
+    return render(request, "firm_audit.html", {"firm": request.user.firm, "entries": entries})

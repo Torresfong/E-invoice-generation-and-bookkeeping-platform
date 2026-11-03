@@ -132,17 +132,18 @@ def test_the_time_of_an_entry_is_the_databases_not_the_callers(world, as_user): 
 
 
 def test_creating_a_firm_and_an_accountant_from_the_operator_commands_writes_firm_entries_by_the_operator(db, fake_ports):
-    call_command("create_firm", "Gamma Group")
+    call_command("create_firm", "Gamma Group", "boss@gamma.example")
     call_command("create_accountant", "new@gamma.example", "Gamma Group")
 
     entries = list(FirmAuditEntry.objects.order_by("id"))
     assert [(e.action, e.target_type, e.actor_id, e.actor_email, e.changed_fields) for e in entries] == [
         (AuditEntry.CREATE, "firm", None, "operator", ["name"]),
+        (AuditEntry.CREATE, "user", None, "operator", ["email", "firm"]),  # the first firm administrator
         (AuditEntry.CREATE, "user", None, "operator", ["email", "firm"]),
     ]
     assert {e.firm.name for e in entries} == {"Gamma Group"}
     assert entries[0].target_id == str(entries[0].firm_id)
-    assert entries[1].target_id == str(User.objects.get(email="new@gamma.example").pk)
+    assert entries[2].target_id == str(User.objects.get(email="new@gamma.example").pk)
 
 
 def test_moving_a_company_writes_the_company_trail_and_both_firms_trails_with_one_correlation_id(world):  # noqa: F811

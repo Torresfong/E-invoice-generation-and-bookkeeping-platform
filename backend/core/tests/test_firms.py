@@ -78,7 +78,7 @@ def test_a_firm_with_no_accountant_yet_gets_them_their_access_when_they_are_crea
 
 
 def test_the_operator_creates_a_firm_and_then_an_accountant_in_it(db, fake_ports):
-    call_command("create_firm", "Alpha Accounting")
+    call_command("create_firm", "Alpha Accounting", "boss@alpha.example")
     company = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, Firm.objects.get())
 
     call_command("create_accountant", "Acc@Alpha.example", "alpha accounting")
@@ -86,7 +86,7 @@ def test_the_operator_creates_a_firm_and_then_an_accountant_in_it(db, fake_ports
     accountant = User.objects.get(email="acc@alpha.example")
     assert accountant.firm.name == "Alpha Accounting" and not accountant.has_usable_password()
     assert accountant_rows(company) == {"acc@alpha.example"}
-    assert [mail["to"] for mail in fake_ports.email.sent] == ["acc@alpha.example"]
+    assert [mail["to"] for mail in fake_ports.email.sent] == ["boss@alpha.example", "acc@alpha.example"]
 
 
 def test_an_accountant_cannot_be_created_without_a_firm_or_in_a_firm_that_does_not_exist(world, fake_ports):
@@ -101,13 +101,13 @@ def test_an_accountant_cannot_be_created_without_a_firm_or_in_a_firm_that_does_n
 
 def test_a_firm_needs_a_name(db):
     with pytest.raises(CommandError):
-        call_command("create_firm", "   ")
+        call_command("create_firm", "   ", "boss@x.example")
     assert Firm.objects.count() == 0
 
 
 def test_two_firms_cannot_share_a_name_even_in_another_case(world):
     with pytest.raises(CommandError):
-        call_command("create_firm", "ALPHA accounting")
+        call_command("create_firm", "ALPHA accounting", "boss@x.example")
 
 
 # --- moving a company ---------------------------------------------------------------------------------------
@@ -276,7 +276,9 @@ def test_the_web_role_cannot_create_or_change_firms_firm_links_or_accountants(wo
         query(statement)
 
 
-def test_no_web_route_creates_a_firm_or_an_accountant():
+def test_the_only_web_routes_about_firms_or_accountants_are_the_firm_administrators_pages():
+    """Firms are created only by the operator and accountants only by a firm administrator (D49): no other route may."""
+
     def routes(patterns, prefix=""):
         for pattern in patterns:
             text = prefix + str(pattern.pattern)
@@ -285,8 +287,15 @@ def test_no_web_route_creates_a_firm_or_an_accountant():
             else:
                 yield f"{text} {getattr(pattern.callback, '__name__', '')}"
 
-    named = re.compile(r"(firms?|accountants?)")
-    assert not [route for route in routes(get_resolver("config.urls").url_patterns) if named.search(route.lower().replace("_", " "))]
+    named = re.compile(r"\b(firms?|accountants?)\b")
+    found = sorted(route for route in routes(get_resolver("config.urls").url_patterns) if named.search(route.lower().replace("_", " ")))
+
+    assert found == [
+        "firm/ firm",
+        "firm/<int:pk>/deactivate/ deactivate_firm_person",
+        "firm/add/ add_firm_person",
+        "firm/audit/ firm_audit_trail",
+    ]
 
 
 def test_the_worker_role_cannot_read_firms(world):
