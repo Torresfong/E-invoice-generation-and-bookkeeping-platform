@@ -34,7 +34,9 @@ VIEW_WINDOW = timedelta(minutes=5)
 def record_auth_event(action, email=None):
     """Write a sign-in event for each company the account belongs to. Nothing is written for an unknown address.
 
-    Pass the address for a sign-in (the person is not identified yet); leave it out for a sign-out.
+    A signed-in user records their own events (a sign-in after `complete_sign_in`, a sign-out): leave the address out.
+    Pass the address only for a failed sign-in, where nobody is identified; the database writes it only against a
+    sign-in attempt the throttle has counted, once per attempt (D54).
     """
     scalar("SELECT record_auth_event(%s, %s)", [action, email])
 

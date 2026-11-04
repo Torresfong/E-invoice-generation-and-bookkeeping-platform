@@ -216,6 +216,7 @@ def test_opening_the_link_with_a_valid_password_creates_the_company_and_the_owne
     assert CompanyAccess.objects.get(user=owner, company=company).role == CompanyAccess.OWNER
     assert owner.check_password(OWNER_PASSWORD) and not owner.is_accountant and owner.firm is None
     assert listing.status_code == 200 and "Client Sdn Bhd" in listing.content.decode()  # signed in by the same step as sign-in
+    assert AuditEntry.objects.filter(company=company, action=AuditEntry.LOGIN, actor_id=owner.pk).count() == 1
 
 
 def test_only_the_links_firm_gets_access_to_the_new_company(firms_world, signup_open, fake_ports, as_production_connection):
