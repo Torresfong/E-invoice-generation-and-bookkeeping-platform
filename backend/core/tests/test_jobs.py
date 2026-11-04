@@ -7,14 +7,6 @@ from core import jobs
 from core.models import Job
 
 
-@pytest.fixture
-def registry():
-    saved = dict(jobs.HANDLERS)
-    yield jobs.HANDLERS
-    jobs.HANDLERS.clear()
-    jobs.HANDLERS.update(saved)
-
-
 @pytest.mark.django_db
 def test_queued_job_runs_in_process_with_its_payload(registry):
     seen = []
@@ -43,7 +35,7 @@ def test_a_failing_job_is_recorded_and_does_not_block_the_next_one(registry):
     jobs.run_pending()
 
     failed = Job.objects.get(name="boom")
-    assert failed.status == Job.FAILED
+    assert failed.status == Job.PENDING  # an unclassified error is retried later (ticket #27)
     assert failed.error == "ValueError"
     assert seen == ["ok"]
 
@@ -62,7 +54,7 @@ def test_a_failed_job_never_stores_or_logs_the_content_that_made_it_fail(registr
         jobs.run_pending()
 
     failed = Job.objects.get()
-    assert failed.status == Job.FAILED
+    assert failed.status == Job.PENDING  # an unclassified error is retried later (ticket #27)
     assert "ACME" not in failed.error and "C2345678901" not in failed.error
     assert "ACME" not in caplog.text and "C2345678901" not in caplog.text
     assert "ValueError" in caplog.text  # still enough to debug from: which job, which error class

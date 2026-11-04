@@ -108,6 +108,10 @@ MYINVOIS_CERTIFICATES = {
 if MYINVOIS_CERTIFICATES["sandbox"] and MYINVOIS_CERTIFICATES["sandbox"] == MYINVOIS_CERTIFICATES["production"]:
     raise RuntimeError("Sandbox and production must use different MyInvois certificates")
 
+# Finished background jobs (done or failed) are purged this many days after they finish (ticket #27). A failed job's
+# count is what the alert watches, so keep this longer than the time it takes someone to look.
+JOB_RETENTION_DAYS = int(os.environ.get("JOB_RETENTION_DAYS", "30"))
+
 # Every signing is logged (D13); Django's defaults would drop this line in production.
 LOGGING = {
     "version": 1,
