@@ -265,13 +265,14 @@ def _execute(job):
                     _running.reset(token)
             except Exception as exc:
                 outcome = _after_failure(job, exc)
-                _record(job, **outcome)
-                # No message and no payload: either may hold tenant content. The class and the frame that raised are
-                # enough to find the cause (ADR 0001 rule 5).
+                # Logged before the outcome is recorded: if the lease was lost, recording raises LeaseLost and this
+                # would otherwise be the only trace of what went wrong. No message and no payload, either may hold
+                # tenant content; the class and the frame that raised are enough to find the cause (ADR 0001 rule 5).
                 logger.error(
-                    "Job %s (%s) failed with %s at %s (attempt %s, now %s)",
+                    "Job %s (%s) failed with %s at %s (attempt %s, outcome %s)",
                     job.pk, job.name, outcome["error"], _failing_frame(exc), job.attempts, outcome["status"],
                 )
+                _record(job, **outcome)
             else:
                 _record(job, status=Job.DONE, error="", finished_at=clock())
             _stop_being_worker(before)

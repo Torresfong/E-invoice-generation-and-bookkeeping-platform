@@ -5,10 +5,14 @@ outcome. Time comes from `jobs.clock`, which these tests replace with a clock th
 """
 
 import inspect
+import os
+import subprocess
+import sys
 import threading
 from datetime import datetime, timedelta, timezone
 from importlib import import_module
 from io import StringIO
+from pathlib import Path
 
 import pytest
 from django.core.management import call_command
@@ -509,3 +513,80 @@ def test_the_fake_gateway_refuses_a_replay_from_another_companys_session(fake_po
 
     with pytest.raises(WrongCompany):
         gateway.submit(gateway.login_as_taxpayer(2, "C9999999999"), signed, idempotency_key="k")
+
+
+# --- review follow-ups (PR #109) ---------------------------------------------------------------------------
+
+
+def test_reversing_the_migration_is_refused_while_a_job_is_running(db, clock):
+    migration = import_module("core.migrations.0033_job_execution")
+    Job.objects.create(name="x", status=Job.RUNNING, lease_expires_at=clock.now + timedelta(minutes=5))
+
+    with connection.cursor() as cursor, pytest.raises(DatabaseError, match="running"), transaction.atomic():
+        for statement in migration.REVERSE:
+            cursor.execute(statement)
+
+    assert query("SELECT count(*) FROM pg_proc WHERE proname = 'claim_next_job'") == [(1,)]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_a_failure_after_the_lease_was_lost_is_still_logged_with_its_class_and_frame(registry, clock, caplog):
+    raised_on = []
+    second_worker = {}
+
+    def second_worker_run():
+        try:
+            clock.advance(seconds=jobs.LEASE_SECONDS + 1)
+            jobs.run_pending()
+            clock.advance(seconds=30)
+            second_worker["ran"] = jobs.run_pending()
+        except Exception as error:  # reported on the main thread
+            second_worker["error"] = error
+        finally:
+            connection.close()
+
+    runs = []
+
+    def handler(**payload):
+        runs.append(clock.now)
+        if len(runs) > 1:
+            return
+        thread = threading.Thread(target=second_worker_run)
+        thread.start()
+        thread.join(timeout=20)
+        raised_on.append(inspect.currentframe().f_lineno + 1)
+        raise ValueError("cannot parse total in: Supplier ACME Sdn Bhd")
+
+    jobs.register("slow")(handler)
+    jobs.enqueue("slow")
+
+    with caplog.at_level("DEBUG"):
+        jobs.run_pending()
+
+    assert second_worker == {"ran": 1}
+    assert Job.objects.get().status == Job.DONE
+    first_attempt = [r.getMessage() for r in caplog.records if "ValueError" in r.getMessage()]
+    assert len(first_attempt) == 1 and f"test_job_execution.py:{raised_on[0]}" in first_attempt[0]
+    assert "ACME" not in caplog.text
+
+
+def _load_settings(**env):
+    base = {k: v for k, v in os.environ.items() if k not in ("ENVIRONMENT", "SECRET_KEY", "JOB_RETENTION_DAYS")}
+    return subprocess.run(
+        [sys.executable, "-c", "import config.settings"],
+        cwd=Path(__file__).resolve().parents[2], env={**base, **env}, capture_output=True, text=True,
+    )
+
+
+@pytest.mark.parametrize("days", ["0", "-1", "soon"])
+def test_the_app_will_not_start_with_a_retention_that_would_purge_current_jobs(days):
+    result = _load_settings(JOB_RETENTION_DAYS=days)
+
+    assert result.returncode != 0 and "JOB_RETENTION_DAYS" in result.stderr
+
+
+@pytest.mark.parametrize("days", ["1", "30"])
+def test_the_app_starts_with_a_positive_retention(days):
+    result = _load_settings(JOB_RETENTION_DAYS=days)
+
+    assert result.returncode == 0, result.stderr

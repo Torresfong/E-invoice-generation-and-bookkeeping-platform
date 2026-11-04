@@ -91,10 +91,24 @@ FORWARD = [
 ]
 
 
+# The old runner claims only pending jobs and knows nothing of leases, so a job left running would never be taken
+# again. Reversing is refused until the workers are stopped and their running jobs have finished or been swept.
+NO_RUNNING_JOBS = """
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM core_job WHERE status = 'running') THEN
+        RAISE EXCEPTION 'Jobs are running; stop the workers and let them finish or expire before reversing the job execution migration';
+    END IF;
+END
+$$
+"""
+
+
 def reverse():
     # What 0017 created, put back by its own statements.
     before = import_module("core.migrations.0017_job_tenancy")
     return [
+        NO_RUNNING_JOBS,
         *FUNCTIONS_REVERSE,
         *before.CLAIM_FORWARD,
         f"REVOKE UPDATE (run_after, lease_expires_at) ON core_job FROM {WORKER_ROLE}",
