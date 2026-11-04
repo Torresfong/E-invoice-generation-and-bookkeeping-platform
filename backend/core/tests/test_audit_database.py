@@ -119,6 +119,14 @@ def test_one_counted_attempt_yields_one_failed_sign_in_entry(world):
     assert AuditEntry.objects.filter(action=AuditEntry.LOGIN_FAILED).count() == 1
 
 
+def test_a_counted_attempt_is_proof_only_for_a_minute(world):
+    query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", ["staff@acme.example"])
+    query("UPDATE core_loginfailure SET at = now() - interval '2 minutes'")
+    query("SELECT record_auth_event('login_failed', 'staff@acme.example')")
+
+    assert AuditEntry.objects.count() == 0
+
+
 def test_a_counted_attempt_for_one_address_is_no_proof_for_another(world):
     query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", ["staff@acme.example"])
     query("SELECT record_auth_event('login_failed', 'owner@acme.example')")

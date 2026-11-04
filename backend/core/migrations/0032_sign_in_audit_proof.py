@@ -7,7 +7,8 @@ from django.db import migrations, models
 #
 # - with no signed-in user it writes only `login_failed`, and only by using up one counted sign-in attempt for that
 #   address (`core_loginfailure.audited`), so one counted attempt gives at most one entry and a call with no unused
-#   attempt writes nothing;
+#   attempt writes nothing. The attempt counts as proof for one minute: the sign-in view records the failure in the
+#   request that counted it, and a short life stops attempts being banked and spent in a burst;
 # - a signed-in user can still record only their own events, as before.
 #
 # Only the function is replaced and one column is added: the policies and the append-only and time-stamp triggers of both
@@ -36,15 +37,15 @@ BEGIN
             RAISE EXCEPTION 'a signed-in user can record only their own sign-in events' USING ERRCODE = '42501';
         END IF;
         IF v_caller IS NULL THEN
-            -- Nobody is signed in: only a failed sign-in, and only against an attempt the throttle has counted and
-            -- no entry has used yet (the key is worked out as in start_login_attempt).
+            -- Nobody is signed in: only a failed sign-in, and only against an attempt the throttle has counted in the
+            -- last minute and no entry has used yet (the key is worked out as in start_login_attempt).
             IF p_action <> 'login_failed' OR v_user IS NULL THEN
                 RETURN;
             END IF;
             UPDATE core_loginfailure SET audited = true
             WHERE id = (
                 SELECT id FROM core_loginfailure
-                WHERE email_hash = encode(sha256(convert_to(lower(btrim(p_email)), 'UTF8')), 'hex') AND NOT audited
+                WHERE email_hash = encode(sha256(convert_to(lower(btrim(p_email)), 'UTF8')), 'hex') AND NOT audited AND at > now() - interval '1 minute'
                 ORDER BY at, id LIMIT 1 FOR UPDATE SKIP LOCKED
             );
             IF NOT FOUND THEN
