@@ -78,6 +78,42 @@ def test_a_signed_in_user_cannot_record_a_sign_in_event_in_another_accounts_name
     assert AuditEntry.objects.count() == 0
 
 
+# A sign-in event is written without a signed-in user only for a failed sign-in, and only against a counted attempt (D54).
+
+SIGN_IN_ADDRESSES = ["owner@acme.example", "staff@acme.example", "accountant@firm.example"]
+
+
+@pytest.mark.parametrize("email", SIGN_IN_ADDRESSES)
+def test_a_bare_call_cannot_record_a_failed_sign_in_for_an_address(world, email):
+    query("SELECT record_auth_event('login_failed', %s)", [email])
+
+    assert AuditEntry.objects.count() == 0 and FirmAuditEntry.objects.count() == 0
+
+
+@pytest.mark.parametrize("action", ["login", "logout"])
+@pytest.mark.parametrize("email", SIGN_IN_ADDRESSES)
+def test_a_bare_call_cannot_record_a_sign_in_or_sign_out_for_an_address(world, action, email):
+    query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", [email])
+    query("SELECT record_auth_event(%s, %s)", [action, email])
+
+    assert AuditEntry.objects.count() == 0 and FirmAuditEntry.objects.count() == 0
+
+
+def test_one_counted_attempt_yields_one_failed_sign_in_entry(world):
+    query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", ["staff@acme.example"])
+    query("SELECT record_auth_event('login_failed', 'staff@acme.example')")
+    query("SELECT record_auth_event('login_failed', 'staff@acme.example')")
+
+    assert AuditEntry.objects.filter(action=AuditEntry.LOGIN_FAILED).count() == 1
+
+
+def test_a_counted_attempt_for_one_address_is_no_proof_for_another(world):
+    query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", ["staff@acme.example"])
+    query("SELECT record_auth_event('login_failed', 'owner@acme.example')")
+
+    assert AuditEntry.objects.count() == 0
+
+
 def test_a_signed_in_user_can_still_record_their_own_sign_out(as_user, world):
     with as_user(world["acme_staff"]):
         query("SELECT record_auth_event('logout', NULL)")
@@ -127,15 +163,17 @@ def test_only_sign_in_events_can_be_recorded_through_the_sign_in_function(as_use
         query("SELECT record_auth_event('create', NULL)")
 
 
-def test_the_sign_in_function_writes_an_accountants_event_once_into_the_firm_trail_and_into_no_company(world):
-    query("SELECT record_auth_event('login', %s)", [world["accountant"].email])
+def test_the_sign_in_function_writes_an_accountants_event_once_into_the_firm_trail_and_into_no_company(as_user, world):
+    with as_user(world["accountant"]):
+        query("SELECT record_auth_event('login', NULL)")
 
     assert AuditEntry.objects.count() == 0
     assert list(FirmAuditEntry.objects.values_list("firm_id", flat=True)) == [world["accountant"].firm_id]
 
 
-def test_the_sign_in_function_writes_one_entry_per_company_for_a_client(world):
-    query("SELECT record_auth_event('login', %s)", [world["acme_owner"].email])
+def test_the_sign_in_function_writes_one_entry_per_company_for_a_client(as_user, world):
+    with as_user(world["acme_owner"]):
+        query("SELECT record_auth_event('login', NULL)")
 
     assert list(AuditEntry.objects.values_list("company_id", flat=True)) == [world["acme"].pk]
 

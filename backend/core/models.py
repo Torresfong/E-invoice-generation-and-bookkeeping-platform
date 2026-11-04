@@ -149,6 +149,8 @@ class LoginFailure(models.Model):
 
     email_hash = models.CharField(max_length=64, db_index=True)
     at = models.DateTimeField(auto_now_add=True, db_index=True)
+    # Set when a failed-sign-in audit entry has used this attempt as its proof: one attempt, at most one entry (D54).
+    audited = models.BooleanField(default=False, db_default=False)
 
 
 class AuthToken(models.Model):

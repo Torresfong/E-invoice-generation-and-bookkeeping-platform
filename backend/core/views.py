@@ -53,7 +53,7 @@ def sign_in(request):
 
     throttle.clear(email)
     complete_sign_in(request, user)
-    audit.record_auth_event(AuditEntry.LOGIN, email)
+    audit.record_auth_event(AuditEntry.LOGIN)
     return redirect("/")
 
 
@@ -327,5 +327,5 @@ def register(request, token):
     except tokens.InvalidLink:
         return render(request, "link_invalid.html", status=410)
     complete_sign_in(request, user)
-    audit.record_auth_event(AuditEntry.LOGIN, user.email)
+    audit.record_auth_event(AuditEntry.LOGIN)
     return redirect("/")

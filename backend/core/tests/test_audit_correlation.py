@@ -90,12 +90,12 @@ def test_rows_written_before_the_column_existed_stay_null(firms_world):
     assert entry.correlation_id is None
 
 
-def test_one_sign_in_event_has_one_correlation_id_across_all_the_users_companies(firms_world):
+def test_one_sign_in_event_has_one_correlation_id_across_all_the_users_companies(firms_world, as_user):
     owner = User.objects.get(email="owner@acme.example")
     CompanyAccess.objects.create(user=owner, company=firms_world["gamma"], role=CompanyAccess.STAFF)
 
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT record_auth_event('login', %s)", [owner.email])
+    with as_user(owner), connection.cursor() as cursor:
+        cursor.execute("SELECT record_auth_event('login', NULL)")
 
     entries = AuditEntry.objects.filter(action=AuditEntry.LOGIN)
     assert entries.count() == 2 and len({e.correlation_id for e in entries}) == 1
