@@ -127,6 +127,32 @@ def test_a_counted_attempt_is_proof_only_for_a_minute(world):
     assert AuditEntry.objects.count() == 0
 
 
+def test_a_counted_attempt_stops_being_proof_as_the_clock_runs_even_inside_one_transaction(world):
+    """`now()` is the start of the transaction, so the minute is measured with `clock_timestamp()`."""
+    query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", ["staff@acme.example"])
+    query("UPDATE core_loginfailure SET at = now() - interval '59 seconds'")
+    query("SELECT pg_sleep(2)")
+    query("SELECT record_auth_event('login_failed', 'staff@acme.example')")
+
+    assert AuditEntry.objects.count() == 0
+
+
+def test_known_limit_sql_as_the_web_role_can_forge_failed_sign_ins_without_a_ceiling(world):
+    """Pinned on purpose (D54 (4)). The throttle's window and limit come from its caller, so SQL run as `web` can count
+    as many attempts as it likes, and each one is proof for one entry. If this ever fails, the limit has been closed:
+    update D54 and docs/architecture/tenancy.md."""
+    with connection.cursor() as cursor:
+        cursor.execute("SET ROLE web")
+        try:
+            for _ in range(8):
+                cursor.execute("SELECT start_login_attempt(%s, interval '0 seconds', 2147483647)", ["staff@acme.example"])
+                cursor.execute("SELECT record_auth_event('login_failed', 'staff@acme.example')")
+        finally:
+            cursor.execute("RESET ROLE")
+
+    assert AuditEntry.objects.filter(action=AuditEntry.LOGIN_FAILED).count() == 8
+
+
 def test_a_counted_attempt_for_one_address_is_no_proof_for_another(world):
     query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", ["staff@acme.example"])
     query("SELECT record_auth_event('login_failed', 'owner@acme.example')")

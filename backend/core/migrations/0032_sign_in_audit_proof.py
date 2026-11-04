@@ -8,7 +8,9 @@ from django.db import migrations, models
 # - with no signed-in user it writes only `login_failed`, and only by using up one counted sign-in attempt for that
 #   address (`core_loginfailure.audited`), so one counted attempt gives at most one entry and a call with no unused
 #   attempt writes nothing. The attempt counts as proof for one minute: the sign-in view records the failure in the
-#   request that counted it, and a short life stops attempts being banked and spent in a burst;
+#   request that counted it, and a short life stops a stored attempt being spent later (measured with clock_timestamp(),
+#   because now() is the start of the transaction and would never age inside one). This guards against stray and
+#   accidental calls, not against SQL run as the web role, which sets its own throttle limits (see D54 (4));
 # - a signed-in user can still record only their own events, as before.
 #
 # Only the function is replaced and one column is added: the policies and the append-only and time-stamp triggers of both
@@ -45,7 +47,7 @@ BEGIN
             UPDATE core_loginfailure SET audited = true
             WHERE id = (
                 SELECT id FROM core_loginfailure
-                WHERE email_hash = encode(sha256(convert_to(lower(btrim(p_email)), 'UTF8')), 'hex') AND NOT audited AND at > now() - interval '1 minute'
+                WHERE email_hash = encode(sha256(convert_to(lower(btrim(p_email)), 'UTF8')), 'hex') AND NOT audited AND at > clock_timestamp() - interval '1 minute'
                 ORDER BY at, id LIMIT 1 FOR UPDATE SKIP LOCKED
             );
             IF NOT FOUND THEN
