@@ -13,8 +13,8 @@ def probe_job():
         p = ports.get()
         p.storage.put(f"probe/{user_id}", b"payload")
         p.gateway.validate_tin("C1234567890")
-        p.ai.extract(p.storage.get(f"probe/{user_id}"), {"type": "object"})
-        p.email.send("owner@example.com", "Probe", "done")
+        p.ai.extract(p.storage.get(f"probe/{user_id}"), {"type": "object"}, idempotency_key=jobs.idempotency_key("ai"))
+        p.email.send("owner@example.com", "Probe", "done", idempotency_key=jobs.idempotency_key("email"))
 
     yield
     jobs.HANDLERS.pop("probe", None)

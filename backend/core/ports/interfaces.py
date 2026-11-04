@@ -1,4 +1,10 @@
-"""The four external boundaries. Later tickets widen these; callers depend only on these shapes."""
+"""The four external boundaries. Later tickets widen these; callers depend only on these shapes.
+
+A call with an external effect that a job makes carries the job's idempotency key (`core.jobs.idempotency_key`). A
+job is run again after a crash, so the call may arrive twice; an implementation that sees a key twice does the
+effect once and answers the second call as it answered the first (ticket #27, ADR 0001). Calls made outside a job
+leave the key out.
+"""
 
 from dataclasses import dataclass, field
 from typing import Protocol
@@ -9,6 +15,10 @@ SUBMITTED = "submitted"
 VALIDATED = "validated"
 INVALID = "invalid"
 CANCELLED = "cancelled"
+
+
+class IdempotencyKeyMissing(RuntimeError):
+    """A job made a call with an external effect without its idempotency key, so a retry could repeat the effect."""
 
 
 class WrongCompany(RuntimeError):
@@ -48,15 +58,15 @@ class MyInvoisGateway(Protocol):
         """An implementation signs only through signing.Signer, which is what logs it (D13)."""
         ...
 
-    def submit(self, session: TaxpayerSession, signed: SignedDocument) -> str:
+    def submit(self, session: TaxpayerSession, signed: SignedDocument, idempotency_key: str | None = None) -> str:
         """Refuses with WrongCompany a document signed for another company than the session's."""
         ...
 
     def poll_status(self, session: TaxpayerSession, uid: str) -> DocumentStatus: ...
 
-    def cancel(self, session: TaxpayerSession, uid: str, reason: str) -> None: ...
+    def cancel(self, session: TaxpayerSession, uid: str, reason: str, idempotency_key: str | None = None) -> None: ...
 
-    def reject(self, session: TaxpayerSession, uid: str, reason: str) -> None: ...
+    def reject(self, session: TaxpayerSession, uid: str, reason: str, idempotency_key: str | None = None) -> None: ...
 
 
 class KeyProvider(Protocol):
@@ -69,11 +79,11 @@ class KeyProvider(Protocol):
 
 
 class AIProvider(Protocol):
-    def extract(self, document: bytes, schema: dict) -> dict: ...
+    def extract(self, document: bytes, schema: dict, idempotency_key: str | None = None) -> dict: ...
 
 
 class EmailSender(Protocol):
-    def send(self, to: str, subject: str, body: str) -> None: ...
+    def send(self, to: str, subject: str, body: str, idempotency_key: str | None = None) -> None: ...
 
 
 class ObjectStorage(Protocol):

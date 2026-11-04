@@ -17,6 +17,17 @@ def fake_ports():
     ports.uninstall()
 
 
+@pytest.fixture
+def registry():
+    """The job handlers registered by the test are removed again afterwards."""
+    from core import jobs
+
+    saved = dict(jobs.HANDLERS)
+    yield jobs.HANDLERS
+    jobs.HANDLERS.clear()
+    jobs.HANDLERS.update(saved)
+
+
 @pytest.fixture(autouse=True)
 def myinvois_certificates(settings):
     """Separate vault references for each MyInvois environment; no key or certificate is ever in the repository."""

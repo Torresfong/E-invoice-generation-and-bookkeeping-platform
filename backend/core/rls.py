@@ -22,7 +22,7 @@ COMPANY_SETTING = "app.company_id"
 COMPANY_FUNCTION = "app_company_id"
 # One id per request or job, shared by every audit entry written in it (D50 (6)).
 CORRELATION_SETTING = "app.correlation_id"
-# Set by the runner for the one call that claims a job; `claim_job()` returns nothing without it.
+# Set by the runner for the one call that claims a job; `claim_next_job()` and `release_expired_jobs()` return nothing without it.
 CLAIMING_SETTING = "app.claiming"
 
 # The two row rules behind every tenant policy. A user sees the rows of the companies they belong to; a job's

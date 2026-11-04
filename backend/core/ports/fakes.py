@@ -1,7 +1,15 @@
 """In-memory fakes for the four ports. They record what callers send so tests can assert on it."""
 
-from .interfaces import CANCELLED, SUBMITTED, DocumentStatus, TaxpayerSession, WrongCompany
+from .interfaces import CANCELLED, SUBMITTED, DocumentStatus, IdempotencyKeyMissing, TaxpayerSession, WrongCompany
 from .signing import Signer
+
+
+def _require_key_in_a_job(idempotency_key):
+    """A job's external effect must carry the job's key, or a retry after a crash could repeat it (ticket #27)."""
+    from core import jobs  # not at import: the jobs module does not depend on the ports package
+
+    if idempotency_key is None and jobs.in_job():
+        raise IdempotencyKeyMissing("a job made an external call without its idempotency key")
 
 
 class FakeKeyProvider:
@@ -29,6 +37,7 @@ class FakeGateway:
         self.statuses = {}
         self.cancellations = []
         self.rejections = []
+        self._answers = {}  # (operation, idempotency key) -> what the first call answered
 
     def login_as_taxpayer(self, company_id, tin):
         return TaxpayerSession(company_id=company_id, tin=tin, token=f"fake-token-{tin}")
@@ -40,12 +49,17 @@ class FakeGateway:
     def sign(self, session, document):
         return Signer(self.key_provider).sign(session, document)
 
-    def submit(self, session, signed):
+    def submit(self, session, signed, idempotency_key=None):
+        _require_key_in_a_job(idempotency_key)
         if signed.company_id != session.company_id:
             raise WrongCompany(f"signed for company {signed.company_id}, submitted for company {session.company_id}")
+        if ("submit", idempotency_key) in self._answers:
+            return self._answers[("submit", idempotency_key)]
         uid = f"fake-uid-{len(self.submissions) + 1}"
         self.submissions.append({"uid": uid, "tin": session.tin, "signed": signed})
         self.statuses[uid] = DocumentStatus(state=SUBMITTED)
+        if idempotency_key is not None:
+            self._answers[("submit", idempotency_key)] = uid
         return uid
 
     def _own_status(self, session, uid):
@@ -56,30 +70,54 @@ class FakeGateway:
     def poll_status(self, session, uid):
         return self._own_status(session, uid)
 
-    def cancel(self, session, uid, reason):
-        self._own_status(session, uid).state = CANCELLED
+    def cancel(self, session, uid, reason, idempotency_key=None):
+        _require_key_in_a_job(idempotency_key)
+        status = self._own_status(session, uid)
+        if ("cancel", idempotency_key) in self._answers:
+            return
+        status.state = CANCELLED
         self.cancellations.append({"uid": uid, "reason": reason})
+        if idempotency_key is not None:
+            self._answers[("cancel", idempotency_key)] = None
 
-    def reject(self, session, uid, reason):
-        self._own_status(session, uid).rejection_requested = True
+    def reject(self, session, uid, reason, idempotency_key=None):
+        _require_key_in_a_job(idempotency_key)
+        status = self._own_status(session, uid)
+        if ("reject", idempotency_key) in self._answers:
+            return
+        status.rejection_requested = True
         self.rejections.append({"uid": uid, "reason": reason})
+        if idempotency_key is not None:
+            self._answers[("reject", idempotency_key)] = None
 
 
 class FakeAI:
     def __init__(self):
         self.extractions = []
+        self._answers = {}
 
-    def extract(self, document, schema):
+    def extract(self, document, schema, idempotency_key=None):
+        _require_key_in_a_job(idempotency_key)
+        if idempotency_key in self._answers:
+            return self._answers[idempotency_key]
         self.extractions.append((document, schema))
+        if idempotency_key is not None:
+            self._answers[idempotency_key] = {}
         return {}
 
 
 class FakeEmail:
     def __init__(self):
         self.sent = []
+        self._keys = set()
 
-    def send(self, to, subject, body):
+    def send(self, to, subject, body, idempotency_key=None):
+        _require_key_in_a_job(idempotency_key)
+        if idempotency_key in self._keys:
+            return
         self.sent.append({"to": to, "subject": subject, "body": body})
+        if idempotency_key is not None:
+            self._keys.add(idempotency_key)
 
 
 class FakeStorage:

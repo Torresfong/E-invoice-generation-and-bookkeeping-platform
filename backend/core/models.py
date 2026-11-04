@@ -125,9 +125,13 @@ class Job(models.Model):
     this column and never from the payload. `payload` holds identifiers only and `error` holds only an
     exception class name, so the table never contains tenant content. The table is under row-level security
     and is not exposed in any screen or API.
+
+    A worker claims a job by marking it running with a lease, runs the handler outside any row lock, and records
+    the outcome only if it still holds the lease (ADR 0001, ticket #27; see core.jobs).
     """
 
     PENDING = "pending"
+    RUNNING = "running"
     DONE = "done"
     FAILED = "failed"
 
@@ -136,7 +140,12 @@ class Job(models.Model):
     payload = models.JSONField(default=dict)
     status = models.CharField(max_length=10, default=PENDING, db_index=True)
     error = models.TextField(blank=True)
+    # Counted when a worker claims the job, so a crashed attempt is counted without anyone having to record it.
     attempts = models.PositiveSmallIntegerField(default=0)
+    # A pending job is not claimed before this time (null: now). Set by a retry's backoff.
+    run_after = models.DateTimeField(null=True, blank=True)
+    # A running job whose lease has expired belongs to a crashed or hung worker and is returned to pending.
+    lease_expires_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     finished_at = models.DateTimeField(null=True, blank=True)
 

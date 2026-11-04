@@ -19,14 +19,6 @@ job_migration = import_module("core.migrations.0017_job_tenancy")
 
 
 @pytest.fixture
-def registry():
-    saved = dict(jobs.HANDLERS)
-    yield jobs.HANDLERS
-    jobs.HANDLERS.clear()
-    jobs.HANDLERS.update(saved)
-
-
-@pytest.fixture
 def probe(settings):
     settings.ROOT_URLCONF = "core.tests.urls_probe"
 
@@ -145,6 +137,11 @@ def documents(world):
     return ids
 
 
+def failed_attempt(job):
+    """The handler failed with an error it did not classify, which is retried later (ticket #27): not done, not lost."""
+    return (job.status, job.attempts) == (Job.PENDING, 1)
+
+
 def run_one(handler, name="probe-job", **enqueue_args):
     """Queue one job with this handler, run it, and return the stored job."""
     jobs.register(name)(handler)
@@ -193,7 +190,7 @@ def test_a_payload_naming_another_companys_record_reads_nothing_and_the_job_fail
 
     job = run_one(handler, company=world["acme"], doc_id=documents["beta"])
 
-    assert job.status == Job.FAILED and job.error == "LookupError"
+    assert failed_attempt(job) and job.error == "LookupError"
     assert "beta" not in job.error and "18,450" not in job.error
 
 
@@ -215,7 +212,7 @@ def test_the_worker_cannot_read_the_tables_that_hold_accounts_and_credentials(re
 
     job = run_one(handler, company=world["acme"])
 
-    assert job.status == Job.FAILED and job.error == "ProgrammingError"
+    assert failed_attempt(job) and job.error == "ProgrammingError"
 
 
 def test_the_worker_cannot_read_the_audit_trail(registry, world):
@@ -224,7 +221,7 @@ def test_the_worker_cannot_read_the_audit_trail(registry, world):
 
     job = run_one(handler, company=world["acme"])
 
-    assert job.status == Job.FAILED and job.error == "ProgrammingError"
+    assert failed_attempt(job) and job.error == "ProgrammingError"
 
 
 def test_a_change_made_by_the_worker_is_recorded_in_the_trail_as_the_system(registry, world, documents):
@@ -245,7 +242,7 @@ def test_the_worker_cannot_write_a_row_for_another_company(registry, world, docu
 
     job = run_one(handler, company=world["acme"])
 
-    assert job.status == Job.FAILED
+    assert failed_attempt(job)
     assert query("SELECT count(*) FROM probe_doc WHERE body = 'planted'") == [(0,)]
 
 
@@ -312,8 +309,9 @@ def test_the_worker_can_record_a_jobs_outcome_but_not_change_its_company_or_cont
 
 
 def test_only_the_worker_may_claim_a_job(db):
-    assert query("SELECT has_function_privilege('worker', 'claim_job()', 'EXECUTE')") == [(True,)]
-    assert query("SELECT has_function_privilege('web', 'claim_job()', 'EXECUTE')") == [(False,)]
+    claim = "claim_next_job(timestamptz, integer)"
+    assert query("SELECT has_function_privilege('worker', %s, 'EXECUTE')", [claim]) == [(True,)]
+    assert query("SELECT has_function_privilege('web', %s, 'EXECUTE')", [claim]) == [(False,)]
 
 
 def test_a_handler_cannot_write_an_audit_entry_directly_only_through_the_audit_trigger(registry, world):
@@ -326,7 +324,7 @@ def test_a_handler_cannot_write_an_audit_entry_directly_only_through_the_audit_t
 
     job = run_one(handler, company=world["acme"])
 
-    assert job.status == Job.FAILED and job.error == "ProgrammingError"
+    assert failed_attempt(job) and job.error == "ProgrammingError"
     assert AuditEntry.objects.count() == 0
 
 
@@ -435,11 +433,11 @@ def test_a_tenant_table_is_closed_to_the_worker_unless_it_is_opened_for_jobs(db)
     assert query("SELECT has_table_privilege('worker', 'probe_secret', 'SELECT')") == [(False,)]
 
 
-def test_a_handler_that_calls_claim_job_gets_nothing(registry, world):
+def test_a_handler_that_calls_claim_next_job_gets_nothing(registry, world):
     seen = {}
 
     def handler(**payload):
-        seen["rows"] = query("SELECT id, company_id, payload FROM claim_job()")
+        seen["rows"] = query("SELECT id, company_id, payload FROM claim_next_job(now(), 300)")
         seen["flag"] = query("SELECT current_setting('app.claiming', true)")
 
     jobs.enqueue("theirs", company=world["beta"], ref="secret-ref")
@@ -454,7 +452,7 @@ def test_a_handler_cannot_create_a_temporary_table(registry, world):
 
     job = run_one(handler, company=world["acme"])
 
-    assert job.status == Job.FAILED and job.error == "ProgrammingError"
+    assert failed_attempt(job) and job.error == "ProgrammingError"
 
 
 def test_a_login_role_reaching_both_web_and_worker_through_group_roles_is_refused(db):
@@ -483,7 +481,7 @@ def test_the_role_and_company_context_are_put_back_after_a_failing_handler(regis
     assert jobs.run_pending() == 2
 
     first.refresh_from_db()
-    assert first.status == Job.FAILED and first.error == "RuntimeError"
+    assert failed_attempt(first) and first.error == "RuntimeError"
     assert seen == [("worker", "")]
     assert query("SELECT current_user = session_user, coalesce(current_setting('app.company_id', true), '')") == [
         (True, "")
