@@ -4,11 +4,12 @@ Application code reaches external services only through get(). Real adapters are
 tickets that build them; tests install fakes.
 """
 
-from .interfaces import AIProvider, EmailSender, MyInvoisGateway, ObjectStorage
+from .interfaces import AIProvider, EmailSender, KeyProvider, MyInvoisGateway, ObjectStorage
 
 __all__ = [
     "AIProvider",
     "EmailSender",
+    "KeyProvider",
     "MyInvoisGateway",
     "ObjectStorage",
     "PortsNotConfigured",

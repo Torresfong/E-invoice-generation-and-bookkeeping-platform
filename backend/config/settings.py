@@ -94,6 +94,25 @@ SIGNUP_ENABLED = os.environ.get("SIGNUP_ENABLED", "").lower() == "true"
 if SIGNUP_ENABLED and not DEBUG:
     raise RuntimeError("SIGNUP_ENABLED cannot be on outside development until two-factor authentication is done")
 
+# Where the signing certificate of each MyInvois environment lives in the key vault: a reference, never a key (D13).
+# Only production can reach the production certificate, whatever else is set.
+MYINVOIS_ENVIRONMENT = "production" if ENVIRONMENT == "production" else "sandbox"
+MYINVOIS_CERTIFICATES = {
+    "sandbox": os.environ.get("MYINVOIS_SANDBOX_CERTIFICATE_REF", ""),
+    "production": os.environ.get("MYINVOIS_PRODUCTION_CERTIFICATE_REF", ""),
+}
+if MYINVOIS_CERTIFICATES["sandbox"] and MYINVOIS_CERTIFICATES["sandbox"] == MYINVOIS_CERTIFICATES["production"]:
+    raise RuntimeError("Sandbox and production must use different MyInvois certificates")
+
+# Every signing is logged (D13); Django's defaults would drop this line in production.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {"timed": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"}},
+    "handlers": {"signing": {"class": "logging.StreamHandler", "formatter": "timed"}},
+    "loggers": {"core.ports.signing": {"handlers": ["signing"], "level": "INFO"}},
+}
+
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True

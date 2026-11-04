@@ -17,6 +17,16 @@ def fake_ports():
     ports.uninstall()
 
 
+@pytest.fixture(autouse=True)
+def myinvois_certificates(settings):
+    """Separate vault references for each MyInvois environment; no key or certificate is ever in the repository."""
+    settings.MYINVOIS_ENVIRONMENT = "sandbox"
+    settings.MYINVOIS_CERTIFICATES = {
+        "sandbox": "vault/sandbox-certificate",
+        "production": "vault/production-certificate",
+    }
+
+
 @pytest.fixture
 def email_down(fake_ports):
     """The email port refuses every message, as when the mail server is down. A request that sends one answers 500."""
