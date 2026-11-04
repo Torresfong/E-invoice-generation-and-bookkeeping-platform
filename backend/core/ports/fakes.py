@@ -1,6 +1,6 @@
 """In-memory fakes for the four ports. They record what callers send so tests can assert on it."""
 
-from .interfaces import CANCELLED, SUBMITTED, DocumentStatus, TaxpayerSession
+from .interfaces import CANCELLED, SUBMITTED, DocumentStatus, TaxpayerSession, WrongCompany
 from .signing import Signer
 
 
@@ -18,8 +18,8 @@ class FakeKeyProvider:
 class FakeGateway:
     """A test decides how LHDN answers by changing `statuses`; a document starts as submitted.
 
-    A session reaches only its own taxpayer's submitted documents. Which company a document was signed for is not
-    checked against the session that submits it.
+    A session submits only documents signed for its own company and reaches only its own taxpayer's submitted documents,
+    so a caller that mixes up clients fails against the fake.
     """
 
     def __init__(self):
@@ -30,17 +30,19 @@ class FakeGateway:
         self.cancellations = []
         self.rejections = []
 
-    def login_as_taxpayer(self, tin):
-        return TaxpayerSession(tin=tin, token=f"fake-token-{tin}")
+    def login_as_taxpayer(self, company_id, tin):
+        return TaxpayerSession(company_id=company_id, tin=tin, token=f"fake-token-{tin}")
 
     def validate_tin(self, tin):
         self.tins_validated.append(tin)
         return True
 
-    def sign(self, document, company_id):
-        return Signer(self.key_provider).sign(document, company_id)
+    def sign(self, session, document):
+        return Signer(self.key_provider).sign(session, document)
 
     def submit(self, session, signed):
+        if signed.company_id != session.company_id:
+            raise WrongCompany(f"signed for company {signed.company_id}, submitted for company {session.company_id}")
         uid = f"fake-uid-{len(self.submissions) + 1}"
         self.submissions.append({"uid": uid, "tin": session.tin, "signed": signed})
         self.statuses[uid] = DocumentStatus(state=SUBMITTED)

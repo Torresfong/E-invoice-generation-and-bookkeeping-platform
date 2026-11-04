@@ -9,12 +9,13 @@ import pytest
 
 from core import ports
 from core.ports.fakes import FakeGateway
-from core.ports.interfaces import CANCELLED, SUBMITTED, VALIDATED, MyInvoisGateway
+from core.ports.interfaces import CANCELLED, SUBMITTED, VALIDATED, MyInvoisGateway, WrongCompany
 from core.ports.signing import CertificateNotConfigured
 
 DOCUMENT = b'{"invoice": "INV-0001"}'
 DOCUMENT_SHA256 = bytes.fromhex("ea09b11d6dff65b01ee96aa654544fc189f461c97aef42e95308adacab210ad2")
 COMPANY_ID = 7
+OTHER_COMPANY_ID = 8
 
 
 @pytest.fixture
@@ -25,10 +26,13 @@ def no_network(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", refuse)
 
 
+def a_session():
+    return ports.get().gateway.login_as_taxpayer(COMPANY_ID, "C1234567890")
+
+
 def submit_a_document():
-    gateway = ports.get().gateway
-    session = gateway.login_as_taxpayer("C1234567890")
-    return gateway, session, gateway.submit(session, gateway.sign(DOCUMENT, COMPANY_ID))
+    gateway, session = ports.get().gateway, a_session()
+    return gateway, session, gateway.submit(session, gateway.sign(session, DOCUMENT))
 
 
 # --- all calls go through the one module, and callers run against the fake with no network access --------------------
@@ -63,7 +67,7 @@ def test_a_gateway_that_drifts_from_the_interface_is_noticed():
 
 def test_one_taxpayers_session_cannot_reach_anothers_document(fake_ports):
     gateway, _, uid = submit_a_document()
-    other = gateway.login_as_taxpayer("C9999999999")
+    other = gateway.login_as_taxpayer(OTHER_COMPANY_ID, "C9999999999")
 
     for call in (lambda: gateway.poll_status(other, uid), lambda: gateway.cancel(other, uid, "x"), lambda: gateway.reject(other, uid, "x")):
         with pytest.raises(KeyError):
@@ -72,10 +76,21 @@ def test_one_taxpayers_session_cannot_reach_anothers_document(fake_ports):
     assert fake_ports.gateway.statuses[uid].state == SUBMITTED and fake_ports.gateway.cancellations == []
 
 
-def test_printing_a_session_or_a_signed_document_shows_no_token_tin_or_content():
+def test_a_document_signed_for_one_company_cannot_be_submitted_through_anothers_session(fake_ports):
     gateway = ports.get().gateway
+    signed = gateway.sign(a_session(), DOCUMENT)
+    other = gateway.login_as_taxpayer(OTHER_COMPANY_ID, "C9999999999")
 
-    printed = repr(gateway.login_as_taxpayer("C1234567890")) + repr(gateway.sign(DOCUMENT, COMPANY_ID))
+    with pytest.raises(WrongCompany):
+        gateway.submit(other, signed)
+
+    assert fake_ports.gateway.submissions == [] and fake_ports.gateway.statuses == {}
+
+
+def test_printing_a_session_or_a_signed_document_shows_no_token_tin_or_content():
+    session = a_session()
+
+    printed = repr(session) + repr(ports.get().gateway.sign(session, DOCUMENT))
 
     assert "C1234567890" not in printed and "INV-0001" not in printed
 
@@ -119,7 +134,7 @@ def test_a_rejection_is_a_marker_and_leaves_the_document_valid(fake_ports):
 
 
 def test_signing_asks_the_key_provider_to_sign_with_this_environments_certificate(fake_ports):
-    signed = ports.get().gateway.sign(DOCUMENT, COMPANY_ID)
+    signed = ports.get().gateway.sign(a_session(), DOCUMENT)
 
     assert fake_ports.gateway.key_provider.signings == [("vault/sandbox-certificate", DOCUMENT_SHA256)]
     assert signed.document == DOCUMENT
@@ -129,7 +144,7 @@ def test_signing_asks_the_key_provider_to_sign_with_this_environments_certificat
 def test_production_signs_with_the_production_certificate(fake_ports, settings):
     settings.MYINVOIS_ENVIRONMENT = "production"
 
-    ports.get().gateway.sign(DOCUMENT, COMPANY_ID)
+    ports.get().gateway.sign(a_session(), DOCUMENT)
 
     assert fake_ports.gateway.key_provider.signings == [("vault/production-certificate", DOCUMENT_SHA256)]
 
@@ -137,8 +152,8 @@ def test_production_signs_with_the_production_certificate(fake_ports, settings):
 def test_every_signing_is_logged_with_what_was_signed_and_never_the_document(caplog):
     gateway = ports.get().gateway
 
-    gateway.sign(DOCUMENT, COMPANY_ID)
-    gateway.sign(DOCUMENT, COMPANY_ID)
+    gateway.sign(a_session(), DOCUMENT)
+    gateway.sign(a_session(), DOCUMENT)
 
     lines = [r.getMessage() for r in caplog.records if r.name == "core.ports.signing"]
     assert len(lines) == 2
@@ -154,7 +169,7 @@ def test_a_signing_that_fails_in_the_vault_is_still_logged(fake_ports, caplog):
     fake_ports.gateway.key_provider.sign = vault_down
 
     with pytest.raises(RuntimeError):
-        ports.get().gateway.sign(DOCUMENT, COMPANY_ID)
+        ports.get().gateway.sign(a_session(), DOCUMENT)
 
     assert DOCUMENT_SHA256.hex() in caplog.text
 
@@ -171,7 +186,7 @@ def test_nothing_is_signed_when_the_environment_has_no_certificate(environment, 
     settings.MYINVOIS_CERTIFICATES = certificates
 
     with pytest.raises(CertificateNotConfigured):
-        ports.get().gateway.sign(DOCUMENT, COMPANY_ID)
+        ports.get().gateway.sign(a_session(), DOCUMENT)
 
     assert fake_ports.gateway.key_provider.signings == []
     assert "signing" not in caplog.text
@@ -209,6 +224,13 @@ def test_only_the_production_environment_can_reach_the_production_certificate(en
     result = start_django(CHOSEN, ENVIRONMENT=environment, **BOTH)
 
     assert result.stdout.strip() == expected
+
+
+@pytest.mark.parametrize("environment", ["prod", "Production", "live", ""])
+def test_the_app_will_not_start_in_an_environment_it_does_not_know(environment):
+    result = start_django(CHOSEN, ENVIRONMENT=environment, **BOTH)
+
+    assert result.returncode != 0 and "ENVIRONMENT" in result.stderr and result.stdout == ""
 
 
 def test_the_app_will_not_start_with_one_certificate_for_sandbox_and_production():

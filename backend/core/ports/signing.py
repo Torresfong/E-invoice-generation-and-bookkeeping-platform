@@ -10,7 +10,7 @@ import logging
 
 from django.conf import settings
 
-from .interfaces import KeyProvider, SignedDocument
+from .interfaces import KeyProvider, SignedDocument, TaxpayerSession
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ class Signer:
     def __init__(self, key_provider: KeyProvider):
         self._key_provider = key_provider
 
-    def sign(self, document: bytes, company_id: int) -> SignedDocument:
+    def sign(self, session: TaxpayerSession, document: bytes) -> SignedDocument:
         environment = settings.MYINVOIS_ENVIRONMENT
         reference = settings.MYINVOIS_CERTIFICATES[environment]
         if not reference:
@@ -31,6 +31,8 @@ class Signer:
         digest = hashlib.sha256(document).digest()
         logger.info(
             "signing document sha256=%s company=%s environment=%s certificate=%s",
-            digest.hex(), company_id, environment, reference,
+            digest.hex(), session.company_id, environment, reference,
         )
-        return SignedDocument(document=document, signature=self._key_provider.sign(reference, digest))
+        return SignedDocument(
+            company_id=session.company_id, document=document, signature=self._key_provider.sign(reference, digest)
+        )
