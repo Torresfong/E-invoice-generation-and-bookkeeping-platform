@@ -41,8 +41,8 @@ def differences_from_the_interface(implementation):
         name
         for name in methods
         if not hasattr(implementation, name)
-        or inspect.signature(getattr(MyInvoisGateway, name)).parameters.keys()
-        != inspect.signature(getattr(implementation, name)).parameters.keys()
+        or list(inspect.signature(getattr(MyInvoisGateway, name)).parameters)
+        != list(inspect.signature(getattr(implementation, name)).parameters)
     ]
 
 
@@ -55,7 +55,10 @@ def test_a_gateway_that_drifts_from_the_interface_is_noticed():
         def validate_tin(self, number):
             return True
 
-    assert {"validate_tin", "sign"} <= set(differences_from_the_interface(Drifted))
+        def submit(self, signed, session):
+            return "uid"
+
+    assert {"validate_tin", "submit", "sign"} <= set(differences_from_the_interface(Drifted))
 
 
 def test_one_taxpayers_session_cannot_reach_anothers_document(fake_ports):
@@ -156,8 +159,16 @@ def test_a_signing_that_fails_in_the_vault_is_still_logged(fake_ports, caplog):
     assert DOCUMENT_SHA256.hex() in caplog.text
 
 
-def test_nothing_is_signed_when_the_environment_has_no_certificate(fake_ports, settings, caplog):
-    settings.MYINVOIS_CERTIFICATES = {"sandbox": "", "production": "vault/production-certificate"}
+@pytest.mark.parametrize(
+    "environment, certificates",
+    [
+        ("sandbox", {"sandbox": "", "production": "vault/production-certificate"}),
+        ("production", {"sandbox": "vault/sandbox-certificate", "production": ""}),
+    ],
+)
+def test_nothing_is_signed_when_the_environment_has_no_certificate(environment, certificates, fake_ports, settings, caplog):
+    settings.MYINVOIS_ENVIRONMENT = environment
+    settings.MYINVOIS_CERTIFICATES = certificates
 
     with pytest.raises(CertificateNotConfigured):
         ports.get().gateway.sign(DOCUMENT, COMPANY_ID)

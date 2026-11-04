@@ -18,7 +18,8 @@ class FakeKeyProvider:
 class FakeGateway:
     """A test decides how LHDN answers by changing `statuses`; a document starts as submitted.
 
-    A session reaches only its own taxpayer's documents, so a caller that mixes up clients fails against the fake.
+    A session reaches only its own taxpayer's submitted documents. Which company a document was signed for is not
+    checked against the session that submits it.
     """
 
     def __init__(self):

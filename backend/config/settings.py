@@ -95,7 +95,7 @@ if SIGNUP_ENABLED and not DEBUG:
     raise RuntimeError("SIGNUP_ENABLED cannot be on outside development until two-factor authentication is done")
 
 # Where the signing certificate of each MyInvois environment lives in the key vault: a reference, never a key (D13).
-# Only production can reach the production certificate, whatever else is set.
+# Only ENVIRONMENT=production selects the production certificate; any other value gets the sandbox one.
 MYINVOIS_ENVIRONMENT = "production" if ENVIRONMENT == "production" else "sandbox"
 MYINVOIS_CERTIFICATES = {
     "sandbox": os.environ.get("MYINVOIS_SANDBOX_CERTIFICATE_REF", ""),
