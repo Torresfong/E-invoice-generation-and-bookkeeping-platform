@@ -3,6 +3,7 @@
 import pytest
 from django.db import DatabaseError, connection, transaction
 
+from core import services
 from core.audit import audit_trigger_sql
 from core.models import AuditEntry, FirmAuditEntry
 from core.rls import tenant_policy_sql
@@ -97,6 +98,17 @@ def test_a_bare_call_cannot_record_a_sign_in_or_sign_out_for_an_address(world, a
     query("SELECT record_auth_event(%s, %s)", [action, email])
 
     assert AuditEntry.objects.count() == 0 and FirmAuditEntry.objects.count() == 0
+
+
+@pytest.mark.parametrize("action", ["login", "login_failed", "logout"])
+def test_a_bare_call_cannot_record_an_event_for_a_firm_administrator(world, action):
+    administrator = services.create_firm_administrator("admin@firm.example", world["accountant"].firm)
+    query("SELECT start_login_attempt(%s, interval '15 minutes', 5)", [administrator.email])
+    if action == "login_failed":
+        query("SELECT clear_login_failures(%s)", [administrator.email])
+    query("SELECT record_auth_event(%s, %s)", [action, administrator.email])
+
+    assert not FirmAuditEntry.objects.filter(action__in=["login", "login_failed", "logout"]).exists()
 
 
 def test_one_counted_attempt_yields_one_failed_sign_in_entry(world):
