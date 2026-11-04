@@ -13,16 +13,16 @@ CANCELLED = "cancelled"
 
 @dataclass(frozen=True)
 class TaxpayerSession:
-    """A login as intermediary on behalf of one taxpayer (D1). The token is left out of repr so it cannot reach a log."""
+    """A login as intermediary on behalf of one taxpayer (D1). Left out of repr so neither can reach a log."""
 
-    tin: str
+    tin: str = field(repr=False)
     token: str = field(repr=False)
 
 
 @dataclass(frozen=True)
 class SignedDocument:
-    document: bytes
-    signature: bytes
+    document: bytes = field(repr=False)
+    signature: bytes = field(repr=False)
 
 
 @dataclass
@@ -38,7 +38,9 @@ class MyInvoisGateway(Protocol):
 
     def validate_tin(self, tin: str) -> bool: ...
 
-    def sign(self, document: bytes, company_id: int) -> SignedDocument: ...
+    def sign(self, document: bytes, company_id: int) -> SignedDocument:
+        """An implementation signs only through signing.Signer, which is what logs it (D13)."""
+        ...
 
     def submit(self, session: TaxpayerSession, signed: SignedDocument) -> str: ...
 
@@ -50,7 +52,10 @@ class MyInvoisGateway(Protocol):
 
 
 class KeyProvider(Protocol):
-    """The key vault (D13). It signs with the key it holds, so a key that cannot leave the vault fits the same shape."""
+    """The key vault (D13), reached only by signing.Signer behind the gateway: not a fifth port.
+
+    It signs with the key it holds, so a key that cannot leave the vault fits the same shape.
+    """
 
     def sign(self, certificate_reference: str, digest: bytes) -> bytes: ...
 

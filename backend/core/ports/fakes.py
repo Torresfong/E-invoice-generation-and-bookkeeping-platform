@@ -16,7 +16,10 @@ class FakeKeyProvider:
 
 
 class FakeGateway:
-    """A test decides how LHDN answers by changing `statuses`; a document starts as submitted."""
+    """A test decides how LHDN answers by changing `statuses`; a document starts as submitted.
+
+    A session reaches only its own taxpayer's documents, so a caller that mixes up clients fails against the fake.
+    """
 
     def __init__(self):
         self.key_provider = FakeKeyProvider()
@@ -42,15 +45,20 @@ class FakeGateway:
         self.statuses[uid] = DocumentStatus(state=SUBMITTED)
         return uid
 
-    def poll_status(self, session, uid):
+    def _own_status(self, session, uid):
+        if not any(s["uid"] == uid and s["tin"] == session.tin for s in self.submissions):
+            raise KeyError(uid)
         return self.statuses[uid]
 
+    def poll_status(self, session, uid):
+        return self._own_status(session, uid)
+
     def cancel(self, session, uid, reason):
-        self.statuses[uid].state = CANCELLED
+        self._own_status(session, uid).state = CANCELLED
         self.cancellations.append({"uid": uid, "reason": reason})
 
     def reject(self, session, uid, reason):
-        self.statuses[uid].rejection_requested = True
+        self._own_status(session, uid).rejection_requested = True
         self.rejections.append({"uid": uid, "reason": reason})
 
 

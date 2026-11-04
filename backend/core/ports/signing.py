@@ -1,8 +1,8 @@
 """Signing a document for MyInvois (D13). The one route to the signing key, and the one place a signing is logged.
 
 The key stays behind a KeyProvider: the application holds a reference to a certificate in the vault, never the key.
-The log line is written before the key is used, so no signature can exist without one. It says what was signed by hash
-and never holds the document (ADR 0001 rule 5).
+The log line is written before the key is used, so a signing that fails in the vault is logged too. It says what was
+signed by hash and never holds the document (ADR 0001 rule 5).
 """
 
 import hashlib

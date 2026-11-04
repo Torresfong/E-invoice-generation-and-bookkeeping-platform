@@ -25,7 +25,7 @@ def no_network(monkeypatch):
     monkeypatch.setattr(socket.socket, "connect", refuse)
 
 
-def submitted():
+def submit_a_document():
     gateway = ports.get().gateway
     session = gateway.login_as_taxpayer("C1234567890")
     return gateway, session, gateway.submit(session, gateway.sign(DOCUMENT, COMPANY_ID))
@@ -34,17 +34,51 @@ def submitted():
 # --- all calls go through the one module, and callers run against the fake with no network access --------------------
 
 
-@pytest.mark.parametrize(
-    "method", ["login_as_taxpayer", "validate_tin", "sign", "submit", "poll_status", "cancel", "reject"]
-)
-def test_the_fake_takes_the_same_arguments_as_the_interface(method):
-    names = [list(inspect.signature(getattr(cls, method)).parameters) for cls in (MyInvoisGateway, FakeGateway)]
+def differences_from_the_interface(implementation):
+    """The gateway methods `implementation` lacks or whose arguments differ."""
+    methods = [name for name in vars(MyInvoisGateway) if not name.startswith("_") and callable(vars(MyInvoisGateway)[name])]
+    return [
+        name
+        for name in methods
+        if not hasattr(implementation, name)
+        or inspect.signature(getattr(MyInvoisGateway, name)).parameters.keys()
+        != inspect.signature(getattr(implementation, name)).parameters.keys()
+    ]
 
-    assert names[0] == names[1]
+
+def test_the_fake_has_every_method_of_the_interface_with_the_same_arguments():
+    assert differences_from_the_interface(FakeGateway) == []
+
+
+def test_a_gateway_that_drifts_from_the_interface_is_noticed():
+    class Drifted:
+        def validate_tin(self, number):
+            return True
+
+    assert {"validate_tin", "sign"} <= set(differences_from_the_interface(Drifted))
+
+
+def test_one_taxpayers_session_cannot_reach_anothers_document(fake_ports):
+    gateway, _, uid = submit_a_document()
+    other = gateway.login_as_taxpayer("C9999999999")
+
+    for call in (lambda: gateway.poll_status(other, uid), lambda: gateway.cancel(other, uid, "x"), lambda: gateway.reject(other, uid, "x")):
+        with pytest.raises(KeyError):
+            call()
+
+    assert fake_ports.gateway.statuses[uid].state == SUBMITTED and fake_ports.gateway.cancellations == []
+
+
+def test_printing_a_session_or_a_signed_document_shows_no_token_tin_or_content():
+    gateway = ports.get().gateway
+
+    printed = repr(gateway.login_as_taxpayer("C1234567890")) + repr(gateway.sign(DOCUMENT, COMPANY_ID))
+
+    assert "C1234567890" not in printed and "INV-0001" not in printed
 
 
 def test_a_document_goes_from_login_to_submitted_through_the_port_with_no_network(no_network, fake_ports):
-    gateway, session, uid = submitted()
+    gateway, session, uid = submit_a_document()
 
     assert session.tin == "C1234567890"
     assert gateway.poll_status(session, uid).state == SUBMITTED
@@ -52,7 +86,7 @@ def test_a_document_goes_from_login_to_submitted_through_the_port_with_no_networ
 
 
 def test_a_test_can_decide_how_lhdn_answers_a_poll(fake_ports):
-    gateway, session, uid = submitted()
+    gateway, session, uid = submit_a_document()
 
     fake_ports.gateway.statuses[uid].state = VALIDATED
 
@@ -60,7 +94,7 @@ def test_a_test_can_decide_how_lhdn_answers_a_poll(fake_ports):
 
 
 def test_cancelling_a_document_marks_it_cancelled(fake_ports):
-    gateway, session, uid = submitted()
+    gateway, session, uid = submit_a_document()
 
     gateway.cancel(session, uid, "wrong amount")
 
@@ -69,7 +103,7 @@ def test_cancelling_a_document_marks_it_cancelled(fake_ports):
 
 
 def test_a_rejection_is_a_marker_and_leaves_the_document_valid(fake_ports):
-    gateway, session, uid = submitted()
+    gateway, session, uid = submit_a_document()
     fake_ports.gateway.statuses[uid].state = VALIDATED
 
     gateway.reject(session, uid, "wrong buyer")
