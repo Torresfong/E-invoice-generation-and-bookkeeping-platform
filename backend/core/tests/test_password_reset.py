@@ -39,6 +39,17 @@ def test_a_known_address_is_emailed_a_reset_link(client, acme_owner, fake_ports,
     assert "/reset/" in fake_ports.email.sent[0]["body"]
 
 
+def test_a_reset_request_whose_email_cannot_be_sent_leaves_no_token(
+    client, acme_owner, email_down, as_production_connection
+):
+    client.raise_request_exception = False
+    with as_production_connection():
+        response = request_reset(client, "owner@acme.example")
+
+    assert response.status_code == 500
+    assert AuthToken.objects.count() == 0
+
+
 def test_an_unknown_address_gets_the_same_answer_and_no_email(client, acme_owner, fake_ports, as_production_connection):
     with as_production_connection():
         known = request_reset(client, "owner@acme.example")

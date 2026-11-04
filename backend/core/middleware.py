@@ -21,6 +21,9 @@ class TenantContextMiddleware:
     more SQL would only raise and hide the original error, so the request's transaction is marked for
     rollback instead, which undoes them.
 
+    A server error rolls back too (D53). Django turns a view's exception into a 500 response before it
+    reaches this middleware, so without this the request's writes would be committed along with the error.
+
     Limits are documented in docs/architecture/tenancy.md: the web role can still change its own setting,
     and a streaming response is read after this middleware returns, outside the role.
     """
@@ -47,7 +50,7 @@ class TenantContextMiddleware:
                 with connection.cursor() as cursor:
                     cursor.execute("SELECT set_config(%s, '', true)", [IDENTITY_SETTING])
             response = self.get_response(request)
-            if connection.connection.info.transaction_status == TransactionStatus.INERROR:
+            if response.status_code >= 500 or connection.connection.info.transaction_status == TransactionStatus.INERROR:
                 transaction.set_rollback(True)
             else:
                 with connection.cursor() as cursor:

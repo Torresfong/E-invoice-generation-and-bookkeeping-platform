@@ -49,6 +49,18 @@ def test_an_owner_can_invite_a_colleague_by_email(client, world, fake_ports, as_
     assert "/accept/" in fake_ports.email.sent[0]["body"] and "Acme Sdn Bhd" in fake_ports.email.sent[0]["body"]
 
 
+def test_an_invitation_whose_email_cannot_be_sent_leaves_no_invitation(
+    client, world, email_down, as_production_connection
+):
+    client.raise_request_exception = False
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = invite(client, world["acme"], "new.staff@acme.example")
+
+    assert response.status_code == 500
+    assert AuthToken.objects.count() == 0
+
+
 @pytest.mark.parametrize("who", ["acme_staff", "accountant"])
 def test_staff_and_accountants_cannot_invite(client, world, fake_ports, who, as_production_connection):
     with as_production_connection():

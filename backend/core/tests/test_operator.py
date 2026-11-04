@@ -46,6 +46,13 @@ def test_the_accountant_is_emailed_a_link_to_choose_a_password_and_can_then_sign
     assert "Acme Sdn Bhd" in page and "Beta Trading" in page and "Firm accountant" in page
 
 
+def test_an_accountant_whose_setup_email_cannot_be_sent_is_not_created(db, email_down):
+    with pytest.raises(RuntimeError):
+        call_command("create_accountant", "accountant@firm.example", default_firm().name)
+
+    assert not User.objects.filter(email="accountant@firm.example").exists()
+
+
 def test_a_company_created_later_is_opened_to_the_existing_accountants(db, fake_ports):
     make_company("Acme Sdn Bhd")
     call_command("create_accountant", "accountant@firm.example", default_firm().name)
