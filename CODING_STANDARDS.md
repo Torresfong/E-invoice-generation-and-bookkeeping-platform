@@ -4,7 +4,7 @@ Read by the reviewer (`/code-review`), not loaded into every session. Judgement 
 
 ## A write and the call that follows it share one outcome
 
-A port call (email, MyInvois, storage, AI) that must follow a database write goes inside the transaction that makes the write, so a failure rolls both back, or goes through the job queue. Django turns a view's exception into a 500 response before the request's own transaction sees it, so that transaction commits (#86). Seen in `firm_admin.add` and the `create_firm` command (fixed in #83); still open in `invite_staff`, `request_password_reset` and `create_accountant`.
+A port call (email, MyInvois, storage, AI) that must follow a database write goes inside the transaction that makes the write, so a failure rolls both back, or goes through the job queue. Django turns a view's exception into a 500 response before the request's own transaction sees it, so that transaction commits (#86). Seen in `firm_admin.add` and the `create_firm` command (fixed in #83). Since #86 (D53) the tenant middleware rolls the request back on any 5xx response, which covers `invite_staff` and `request_password_reset`; an operator command does not pass through it, so `create_accountant` makes its write and sends its email in one `atomic()` block.
 
 ## A SECURITY DEFINER function checks the caller after it holds the lock
 

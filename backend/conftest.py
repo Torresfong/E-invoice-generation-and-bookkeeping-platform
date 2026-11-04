@@ -18,6 +18,17 @@ def fake_ports():
 
 
 @pytest.fixture
+def email_down(fake_ports):
+    """The email port refuses every message, as when the mail server is down. A request that sends one answers 500."""
+
+    def refuse(to, subject, body):
+        raise RuntimeError("the mail server is down")
+
+    fake_ports.email.send = refuse
+    return fake_ports
+
+
+@pytest.fixture
 def as_user(db):
     """Run a block as the `web` database role with the given user as the signed-in identity.
 
