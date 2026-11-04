@@ -37,7 +37,7 @@ class FakeGateway:
         self.statuses = {}
         self.cancellations = []
         self.rejections = []
-        self._answers = {}  # idempotency key -> what the first call with it answered
+        self._answers = {}  # (operation, idempotency key) -> what the first call answered
 
     def login_as_taxpayer(self, company_id, tin):
         return TaxpayerSession(company_id=company_id, tin=tin, token=f"fake-token-{tin}")
@@ -51,15 +51,15 @@ class FakeGateway:
 
     def submit(self, session, signed, idempotency_key=None):
         _require_key_in_a_job(idempotency_key)
-        if idempotency_key in self._answers:
-            return self._answers[idempotency_key]
         if signed.company_id != session.company_id:
             raise WrongCompany(f"signed for company {signed.company_id}, submitted for company {session.company_id}")
+        if ("submit", idempotency_key) in self._answers:
+            return self._answers[("submit", idempotency_key)]
         uid = f"fake-uid-{len(self.submissions) + 1}"
         self.submissions.append({"uid": uid, "tin": session.tin, "signed": signed})
         self.statuses[uid] = DocumentStatus(state=SUBMITTED)
         if idempotency_key is not None:
-            self._answers[idempotency_key] = uid
+            self._answers[("submit", idempotency_key)] = uid
         return uid
 
     def _own_status(self, session, uid):
@@ -72,21 +72,23 @@ class FakeGateway:
 
     def cancel(self, session, uid, reason, idempotency_key=None):
         _require_key_in_a_job(idempotency_key)
-        if idempotency_key in self._answers:
+        status = self._own_status(session, uid)
+        if ("cancel", idempotency_key) in self._answers:
             return
-        self._own_status(session, uid).state = CANCELLED
+        status.state = CANCELLED
         self.cancellations.append({"uid": uid, "reason": reason})
         if idempotency_key is not None:
-            self._answers[idempotency_key] = None
+            self._answers[("cancel", idempotency_key)] = None
 
     def reject(self, session, uid, reason, idempotency_key=None):
         _require_key_in_a_job(idempotency_key)
-        if idempotency_key in self._answers:
+        status = self._own_status(session, uid)
+        if ("reject", idempotency_key) in self._answers:
             return
-        self._own_status(session, uid).rejection_requested = True
+        status.rejection_requested = True
         self.rejections.append({"uid": uid, "reason": reason})
         if idempotency_key is not None:
-            self._answers[idempotency_key] = None
+            self._answers[("reject", idempotency_key)] = None
 
 
 class FakeAI:

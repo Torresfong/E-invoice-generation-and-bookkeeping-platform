@@ -16,7 +16,7 @@ from django.db import DatabaseError, connection, transaction
 
 from core import jobs, ports
 from core.models import Job
-from core.ports.interfaces import SignedDocument
+from core.ports.interfaces import SignedDocument, WrongCompany
 
 from .test_tenancy import query
 
@@ -167,7 +167,7 @@ def test_a_job_without_a_handler_fails_at_once(registry, clock):
     jobs.run_pending()
 
     job = Job.objects.get()
-    assert (job.status, job.attempts) == (Job.FAILED, 1)
+    assert (job.status, job.attempts, job.error) == (Job.FAILED, 1, "NoHandler")
 
 
 def test_a_job_that_crashes_every_worker_that_takes_it_ends_up_failed(registry, clock):
@@ -489,3 +489,23 @@ def test_the_job_execution_migration_reverses_and_applies_again(db):
     assert query("SELECT count(*) FROM pg_proc WHERE proname = 'claim_job'") == [(0,)]
     for signature in ["claim_next_job(timestamptz, integer)", "failed_job_count()"]:
         assert query("SELECT has_function_privilege('worker', %s, 'EXECUTE')", [signature]) == [(True,)]
+
+
+def test_the_fake_gateway_keeps_a_key_per_operation_so_a_reused_key_is_not_mistaken_for_a_repeat(fake_ports):
+    gateway = ports.get().gateway
+    session = gateway.login_as_taxpayer(1, "C1234567890")
+    uid = gateway.submit(session, SignedDocument(company_id=1, document=b"x", signature=b"y"), idempotency_key="k")
+
+    gateway.cancel(session, uid, "wrong amount", idempotency_key="k")
+
+    assert fake_ports.gateway.cancellations == [{"uid": uid, "reason": "wrong amount"}]
+
+
+def test_the_fake_gateway_refuses_a_replay_from_another_companys_session(fake_ports):
+    gateway = ports.get().gateway
+    session = gateway.login_as_taxpayer(1, "C1234567890")
+    signed = SignedDocument(company_id=1, document=b"x", signature=b"y")
+    gateway.submit(session, signed, idempotency_key="k")
+
+    with pytest.raises(WrongCompany):
+        gateway.submit(gateway.login_as_taxpayer(2, "C9999999999"), signed, idempotency_key="k")
