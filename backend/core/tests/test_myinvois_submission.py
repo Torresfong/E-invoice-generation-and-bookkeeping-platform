@@ -12,7 +12,7 @@ from django.utils import translation
 
 from core import jobs
 from core.models import Job
-from core.ports.interfaces import IntermediaryCredentials
+from core.ports.interfaces import IntermediaryCredentials, Submission, SubmissionUid
 from core.submission import DocumentRejected, StaleDocument, submit_invoice
 
 DOCUMENT = b'{"invoice": "INV-0001"}'
@@ -158,3 +158,10 @@ def test_the_stale_notice_is_available_in_chinese(gateway, fake_ports):
 
     (mail,) = fake_ports.email.sent
     assert "重新批准" in mail["subject"] and CODE in mail["subject"]
+
+
+def test_an_answer_with_no_result_for_the_document_is_retried_later(gateway):
+    gateway.submit = lambda session, signed, idempotency_key=None: Submission(SubmissionUid("s"), [], [])
+
+    with pytest.raises(jobs.TransientError):
+        run(gateway, Attempts(gateway))

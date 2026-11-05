@@ -19,10 +19,9 @@ from django.utils.translation import gettext as _
 
 from core import ports
 from core.jobs import PermanentError, TransientError
-from core.ports.interfaces import DocumentUuid, DuplicateSubmission
+from core.ports.interfaces import ALREADY_SUBMITTED, DocumentUuid, DuplicateSubmission
 
 STALE_AFTER = timedelta(hours=72)
-ALREADY_SUBMITTED = "DV302"
 
 
 class StaleDocument(PermanentError):
@@ -72,6 +71,8 @@ def submit_invoice(*, gateway, session, document, code_number, issued_at, now, o
         return _recover(gateway, session, code_number)
     if submission.accepted:
         return SubmittedDocument(submission.accepted[0].uuid, recovered=False)
+    if not submission.rejected:
+        raise TransientError("LHDN answered the submission with no result for the document")
     code = submission.rejected[0].error_code
     if code == ALREADY_SUBMITTED:
         return _recover(gateway, session, code_number)

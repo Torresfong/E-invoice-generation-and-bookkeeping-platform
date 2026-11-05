@@ -44,6 +44,7 @@ class TinCheck(Enum):
     NOT_FOUND = "not_found"
 
 
+ALREADY_SUBMITTED = "DV302"  # LHDN rejects the same internal number within 2 hours with this code
 ID_TYPES = ("NRIC", "PASSPORT", "BRN", "ARMY")
 SESSION_MINUTES = 60
 

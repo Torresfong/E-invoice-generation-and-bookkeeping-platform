@@ -6,6 +6,7 @@ from datetime import timedelta
 from django.utils import timezone
 
 from .interfaces import (
+    ALREADY_SUBMITTED,
     CANCELLED,
     ID_TYPES,
     INVALID,
@@ -115,7 +116,7 @@ class FakeGateway:
             raise SessionExpired("the login has expired")
 
     def submit(self, session, signed, idempotency_key=None):
-        from core.jobs import TransientError
+        from core.jobs import TransientError  # not at import: the jobs module does not depend on the ports package
 
         _require_key_in_a_job(idempotency_key)
         self._check(session)
@@ -138,7 +139,7 @@ class FakeGateway:
             if code in self.reject_code_numbers:
                 rejected.append(RejectedDocument(code, self.reject_code_numbers[code]))
             elif any(m["tin"] == session.tin and m["code"] == code and now - m["at"] < self.NUMBER_REPEAT for m in self._meta.values()):
-                rejected.append(RejectedDocument(code, "DV302"))
+                rejected.append(RejectedDocument(code, ALREADY_SUBMITTED))
             else:
                 uuid = DocumentUuid(f"fake-uuid-{len(self.documents) + 1}")
                 self.documents[uuid] = DocumentStatus(uuid=uuid, state=SUBMITTED)
@@ -146,8 +147,6 @@ class FakeGateway:
                 accepted.append(AcceptedDocument(code, uuid))
         self.submissions.append({"submission_uid": submission_uid, "tin": session.tin, "signed": list(signed)})
         if self.lose_next_response:
-            from core.jobs import TransientError
-
             self.lose_next_response = False
             raise TransientError("the response was lost")
         return Submission(submission_uid, accepted, rejected)
