@@ -179,7 +179,7 @@ def test_a_document_goes_from_login_to_submitted_through_the_port_with_no_networ
 
     (status,) = gateway.poll_status(session, submission.submission_uid)
     assert status.uuid == uuid and status.state == SUBMITTED
-    assert [d["tin"] for d in fake_ports.gateway.submissions] == ["C1234567890"]
+    assert [d["onbehalf_of"] for d in fake_ports.gateway.submissions] == ["C1234567890"]
 
 
 def test_one_submission_can_succeed_in_part(fake_ports):
@@ -274,6 +274,27 @@ def test_one_taxpayers_session_cannot_reach_anothers_document(fake_ports):
     assert gateway.find_document(other, CODE) is None
 
     assert fake_ports.gateway.documents[uuid].state == SUBMITTED and fake_ports.gateway.cancellations == []
+
+
+def test_two_branches_sharing_a_tin_cannot_reach_each_others_documents(fake_ports):
+    gateway = fake_ports.gateway
+    first, second = a_session(rob="IG1111111111"), a_session(OTHER_COMPANY_ID, rob="IG2222222222")
+    own = gateway.submit(first, [a_signed_document(first)])
+    uuid = own.accepted[0].uuid
+
+    for call in (
+        lambda: gateway.poll_status(second, own.submission_uid),
+        lambda: gateway.cancel(second, uuid, "x"),
+    ):
+        with pytest.raises(KeyError):
+            call()
+    assert gateway.find_document(second, CODE) is None
+
+    # the same internal number is not a duplicate for the other branch, and finds its own uuid
+    again = gateway.submit(second, [a_signed_document(second)])
+    assert len(again.accepted) == 1 and again.rejected == []
+    assert gateway.find_document(second, CODE).uuid == again.accepted[0].uuid != uuid
+    assert gateway.find_document(first, CODE).uuid == uuid
 
 
 # --- LHDN has no idempotency key: it answers a repeat with an error (D58 (5)) ----------------------------------------

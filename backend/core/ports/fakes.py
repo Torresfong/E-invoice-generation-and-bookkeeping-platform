@@ -73,7 +73,7 @@ class FakeGateway:
         self.lose_next_response = False  # LHDN accepts the next submit, but the answer never arrives
         self.drop_next_request = False  # the next submit never reaches LHDN
         self._meta = {}  # uuid -> what LHDN knows about the document besides its status
-        self._payloads = {}  # (tin, payload fingerprint) -> when it was accepted
+        self._payloads = {}  # (represented party, payload fingerprint) -> when it was accepted
 
     # --- what a test does to LHDN's side
 
@@ -128,24 +128,24 @@ class FakeGateway:
             raise TransientError("the request timed out")
         now = self.now()
         fingerprint = frozenset((d.code_number, d.document_hash) for d in signed)
-        sent = self._payloads.get((session.tin, fingerprint))
+        sent = self._payloads.get((session.onbehalf_of, fingerprint))
         if sent is not None and now - sent < self.PAYLOAD_REPEAT:
             raise DuplicateSubmission("DuplicateSubmission: this payload was submitted within the last 10 minutes")
-        self._payloads[(session.tin, fingerprint)] = now
+        self._payloads[(session.onbehalf_of, fingerprint)] = now
         submission_uid = SubmissionUid(f"fake-submission-{len(self.submissions) + 1}")
         accepted, rejected = [], []
         for document in signed:
             code = document.code_number
             if code in self.reject_code_numbers:
                 rejected.append(RejectedDocument(code, self.reject_code_numbers[code]))
-            elif any(m["tin"] == session.tin and m["code"] == code and now - m["at"] < self.NUMBER_REPEAT for m in self._meta.values()):
+            elif any(m["onbehalf_of"] == session.onbehalf_of and m["code"] == code and now - m["at"] < self.NUMBER_REPEAT for m in self._meta.values()):
                 rejected.append(RejectedDocument(code, ALREADY_SUBMITTED))
             else:
                 uuid = DocumentUuid(f"fake-uuid-{len(self.documents) + 1}")
                 self.documents[uuid] = DocumentStatus(uuid=uuid, state=SUBMITTED)
-                self._meta[uuid] = {"tin": session.tin, "code": code, "at": now, "submission": submission_uid}
+                self._meta[uuid] = {"onbehalf_of": session.onbehalf_of, "code": code, "at": now, "submission": submission_uid}
                 accepted.append(AcceptedDocument(code, uuid))
-        self.submissions.append({"submission_uid": submission_uid, "tin": session.tin, "signed": list(signed)})
+        self.submissions.append({"submission_uid": submission_uid, "onbehalf_of": session.onbehalf_of, "signed": list(signed)})
         if self.lose_next_response:
             self.lose_next_response = False
             raise TransientError("the response was lost")
@@ -154,7 +154,7 @@ class FakeGateway:
     def _own_document(self, session, uuid):
         if not isinstance(uuid, DocumentUuid):
             raise TypeError("a document is identified by its uuid, not by a submission uid or a bare string")
-        if self._meta.get(uuid, {}).get("tin") != session.tin:
+        if self._meta.get(uuid, {}).get("onbehalf_of") != session.onbehalf_of:
             raise KeyError(uuid)
         return self.documents[uuid]
 
@@ -162,14 +162,14 @@ class FakeGateway:
         self._check(session)
         if not isinstance(submission_uid, SubmissionUid):
             raise TypeError("a submission is polled by its submission uid, not by a document uuid or a bare string")
-        owned = [s for s in self.submissions if s["submission_uid"] == submission_uid and s["tin"] == session.tin]
+        owned = [s for s in self.submissions if s["submission_uid"] == submission_uid and s["onbehalf_of"] == session.onbehalf_of]
         if not owned:
             raise KeyError(submission_uid)
         return [self.documents[u] for u, m in self._meta.items() if m["submission"] == submission_uid]
 
     def find_document(self, session, code_number):
         self._check(session)
-        found = [u for u, m in self._meta.items() if m["tin"] == session.tin and m["code"] == code_number]
+        found = [u for u, m in self._meta.items() if m["onbehalf_of"] == session.onbehalf_of and m["code"] == code_number]
         return self.documents[found[-1]] if found else None
 
     def cancel(self, session, uuid, reason, idempotency_key=None):
