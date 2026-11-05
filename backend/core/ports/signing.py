@@ -23,7 +23,7 @@ class Signer:
     def __init__(self, key_provider: KeyProvider):
         self._key_provider = key_provider
 
-    def sign(self, session: TaxpayerSession, document: bytes) -> SignedDocument:
+    def sign(self, session: TaxpayerSession, document: bytes, code_number: str) -> SignedDocument:
         environment = settings.MYINVOIS_ENVIRONMENT
         reference = settings.MYINVOIS_CERTIFICATES[environment]
         if not reference:
@@ -34,5 +34,8 @@ class Signer:
             digest.hex(), session.company_id, environment, reference,
         )
         return SignedDocument(
-            company_id=session.company_id, document=document, signature=self._key_provider.sign(reference, digest)
+            company_id=session.company_id,
+            code_number=code_number,
+            document=document,
+            signature=self._key_provider.sign(reference, digest),
         )

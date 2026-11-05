@@ -296,3 +296,18 @@ msgid ""
 "New accounts cannot be created right now. Please contact your accounting "
 "firm."
 msgstr "目前无法创建新账户，请联系您的会计师事务所。"
+
+#: .\core\submission.py
+#, python-format
+msgid "Invoice %(number)s must be approved again"
+msgstr "发票 %(number)s 需要重新批准"
+
+#: .\core\submission.py
+#, python-format
+msgid ""
+"Invoice %(number)s was not sent to LHDN within 72 hours of its issue time, "
+"and LHDN no longer accepts it. Your draft is kept. Please review it and "
+"approve it again."
+msgstr ""
+"发票 %(number)s 在开具后 72 小时内未能提交给 LHDN，LHDN 已不再接受。您的草稿已保留，"
+"请检查后重新批准。"

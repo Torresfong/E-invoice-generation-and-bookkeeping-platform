@@ -12,7 +12,7 @@ def probe_job():
     def probe(user_id):
         p = ports.get()
         p.storage.put(f"probe/{user_id}", b"payload")
-        p.gateway.validate_tin("C1234567890")
+        p.gateway.validate_tin("C1234567890", "BRN", "201901234567")
         p.ai.extract(p.storage.get(f"probe/{user_id}"), {"type": "object"}, idempotency_key=jobs.idempotency_key("ai"))
         p.email.send("owner@example.com", "Probe", "done", idempotency_key=jobs.idempotency_key("email"))
 
@@ -32,7 +32,7 @@ def test_signed_in_user_page_and_queued_job_work_with_all_four_fake_ports(client
     jobs.run_pending()
 
     assert fake_ports.storage.objects[f"probe/{user.pk}"] == b"payload"
-    assert fake_ports.gateway.tins_validated == ["C1234567890"]
+    assert fake_ports.gateway.tins_validated == [("C1234567890", "BRN", "201901234567")]
     assert len(fake_ports.ai.extractions) == 1
     assert fake_ports.email.sent[0]["subject"] == "Probe"
 
