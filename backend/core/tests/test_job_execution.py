@@ -20,7 +20,7 @@ from django.db import DatabaseError, connection, transaction
 
 from core import jobs, ports
 from core.models import Job
-from core.ports.interfaces import SignedDocument, WrongCompany
+from core.ports.interfaces import DuplicateSubmission, IntermediaryCredentials, SignedDocument, WrongCompany
 
 from .test_tenancy import query
 
@@ -237,10 +237,13 @@ def test_a_worker_that_outlives_its_lease_cannot_overwrite_the_retry_or_keep_its
 
 def _send_everything(ports, key):
     """One job's external effects: an email, a MyInvois submission and an AI extraction, each under its own step."""
-    session = ports.gateway.login_as_taxpayer(1, "C1234567890")
-    signed = SignedDocument(company_id=1, document=b"invoice", signature=b"signature")
+    session = ports.gateway.login_as_taxpayer(IntermediaryCredentials("id", "secret"), 1, "C1234567890")
+    signed = SignedDocument(company_id=1, code_number=key(), document=key().encode(), signature=b"signature")  # one document per job
     ports.email.send("owner@acme.example", "Invoice ready", "Hello", idempotency_key=key("email"))
-    ports.gateway.submit(session, signed, idempotency_key=key("submit"))
+    try:
+        ports.gateway.submit(session, [signed], idempotency_key=key("submit"))
+    except DuplicateSubmission:
+        pass  # LHDN has no idempotency key: a repeat is answered with a 422, and the document is already there
     ports.ai.extract(b"receipt", {"type": "object"}, idempotency_key=key("extract"))
 
 
@@ -495,24 +498,15 @@ def test_the_job_execution_migration_reverses_and_applies_again(db):
         assert query("SELECT has_function_privilege('worker', %s, 'EXECUTE')", [signature]) == [(True,)]
 
 
-def test_the_fake_gateway_keeps_a_key_per_operation_so_a_reused_key_is_not_mistaken_for_a_repeat(fake_ports):
-    gateway = ports.get().gateway
-    session = gateway.login_as_taxpayer(1, "C1234567890")
-    uid = gateway.submit(session, SignedDocument(company_id=1, document=b"x", signature=b"y"), idempotency_key="k")
-
-    gateway.cancel(session, uid, "wrong amount", idempotency_key="k")
-
-    assert fake_ports.gateway.cancellations == [{"uid": uid, "reason": "wrong amount"}]
-
-
 def test_the_fake_gateway_refuses_a_replay_from_another_companys_session(fake_ports):
     gateway = ports.get().gateway
-    session = gateway.login_as_taxpayer(1, "C1234567890")
-    signed = SignedDocument(company_id=1, document=b"x", signature=b"y")
-    gateway.submit(session, signed, idempotency_key="k")
+    credentials = IntermediaryCredentials("id", "secret")
+    session = gateway.login_as_taxpayer(credentials, 1, "C1234567890")
+    signed = SignedDocument(company_id=1, code_number="INV-1", document=b"x", signature=b"y")
+    gateway.submit(session, [signed], idempotency_key="k")
 
     with pytest.raises(WrongCompany):
-        gateway.submit(gateway.login_as_taxpayer(2, "C9999999999"), signed, idempotency_key="k")
+        gateway.submit(gateway.login_as_taxpayer(credentials, 2, "C9999999999"), [signed], idempotency_key="k")
 
 
 # --- review follow-ups (PR #109) ---------------------------------------------------------------------------
