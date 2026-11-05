@@ -165,3 +165,15 @@ def test_an_answer_with_no_result_for_the_document_is_retried_later(gateway):
 
     with pytest.raises(jobs.TransientError):
         run(gateway, Attempts(gateway))
+
+
+def test_a_document_lhdn_already_holds_is_recovered_even_when_the_retry_comes_after_72_hours(gateway, fake_ports):
+    attempts = Attempts(gateway)
+    gateway.lose_next_response = True
+    with pytest.raises(jobs.TransientError):
+        run(gateway, attempts)
+
+    result = run(gateway, attempts, issued_at=NOW - timedelta(hours=80))
+
+    assert result.recovered is True and len(gateway.submissions) == 1
+    assert fake_ports.email.sent == []  # the owner is not asked to approve a document LHDN already has

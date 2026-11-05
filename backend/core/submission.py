@@ -5,7 +5,7 @@ answer. So before calling LHDN the caller records the invoice number and documen
 (timeout, lost response) the document is looked up by its internal number and its uuid taken if LHDN already has it.
 A 422 or DV302 means "already submitted": the uuid is recovered, never retried blindly.
 
-A document issued more than 72 hours before submission is not re-issued or re-signed. The job stops, the draft is kept
+A document issued more than 72 hours before submission is not re-issued or re-signed, unless LHDN already holds it. The job stops, the draft is kept
 and the owner is told; the owner approves again, so approval locking (D17, D19) is never bypassed.
 
 Nothing here holds document content: errors and the owner's notice name the invoice number and an LHDN code only.
@@ -46,6 +46,10 @@ def submit_invoice(*, gateway, session, document, code_number, issued_at, now, o
     `jobs.idempotency_key`.
     """
     if now - issued_at > STALE_AFTER:
+        # The document may already be at LHDN, accepted before an answer was lost: then there is nothing to re-issue.
+        found = gateway.find_document(session, code_number)
+        if found is not None:
+            return SubmittedDocument(found.uuid, recovered=True)
         ports.get().email.send(
             owner_email,
             _("Invoice %(number)s must be approved again") % {"number": code_number},
