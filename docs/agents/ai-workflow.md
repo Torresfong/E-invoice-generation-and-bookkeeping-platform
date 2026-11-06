@@ -1,7 +1,7 @@
 # Dual-AI Development and Handoff Workflow
 
 ## Assignment and isolation
-1. Select an unblocked `ready-for-agent` issue, except #19/#23 without permission; read issue, acceptance criteria, relevant decisions, specs and code.
+1. Select an unblocked `ready-for-agent` issue, do not select blocked without permission; read issue, acceptance criteria, relevant decisions, specs and code.
 2. Either Claude Code or Codex can be the implementing developer. Create `ticket-NN-<slug>` from current `main`; do not push directly to `main`.
 3. If working simultaneously on separate tasks, use separate branches and worktrees. Do not let two agents edit the same checkout or push to one branch at the same time.
 4. Test first; implement surgically; run the **full** test suite before claiming completion (`python manage.py check`, migration drift check, `pytest` from `backend/`). Every acceptance-criteria checkbox must be satisfied and backed by evidence. If an external prerequisite or environment blocker prevents a required check, use the fake port when appropriate, record the blocked command and reason in the PR, and do not claim completed verification.
