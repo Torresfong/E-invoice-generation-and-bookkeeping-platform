@@ -24,7 +24,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 9. As a client owner, I want a clear explanation when LHDN marks an invoice invalid, and to correct and resubmit it, so that a validation failure does not cost me a day of work.
 10. As a client owner, I want to be notified when a buyer requests rejection, so that I can respond within the permitted window; the invoice stays validated until I cancel it.
 11. As a client owner, I want to cancel a validated invoice within LHDN's window, so that mistakes can be reversed correctly.
-12. As a client owner, I want each validated invoice emailed to my customer as an English PDF with the MyInvois QR code and validation link, so that the customer gets a proper document.
+12. As a client owner, I want each validated invoice emailed to my customer as an English PDF with the MyInvois QR code and validation link, stating that LHDN has validated it, so that the customer gets a proper document.
 13. As a client owner, I want the email to come from the platform's domain under my company's name with my address as reply-to, so that replies reach me.
 14. As a client owner, I want to choose the tax type and rate for each line and have the system calculate the amounts, so that SST is correct and still my decision.
 15. As a client owner, I want to invoice in a foreign currency with the daily reference rate proposed and overridable, so that I follow the rate I actually used while the original currency and amount are always kept.
@@ -37,6 +37,12 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 22. As a client owner, I want guidance to authorise the platform company in MyInvois, accept the reviewed service agreement, and see the connection and operation checks for my company and environment, so that the platform acts for my company only under usable authorisation (D57).
 23. As a client owner, I want to consent to AI processing and cross-border transfer in plain wording, so that I know where my documents go.
 24. As a client owner, I want a full export of my data if the pilot ends, so that I am never locked in.
+67. As a client owner, I want to set my company's e-invoice status (mandatory, voluntary or exempt), the date it takes effect, and to switch e-invoicing on or off, so that the platform submits my invoices to LHDN only when I have chosen it (D59).
+68. As a client owner, I want an invoice issued while e-invoicing is off, or before its effective date, to be a normal invoice that is never sent to LHDN, so that I use the same invoicing screens either way (D59).
+69. As a client owner, I want to confirm a deliberate choice, recorded with who and when, before a company of status mandatory switches e-invoicing off or issues a normal invoice, so that the choice is never accidental (D59).
+70. As a client owner, I want an invoice that lacks data LHDN requires on the company, the customer or a line to be stopped before submission with the missing field named, so that a rejection is caught before it is sent.
+71. As a client owner, I want each e-invoice to show LHDN's document UUID, the time it was issued and the time it was validated, besides its status, so that I can trace it in the MyInvois Portal.
+72. As a client owner, I want an invoice that waited more than 72 hours for submission to come back to me for approval under the same number, so that an expired issue time never goes out unseen (D60).
 
 ### Client staff
 25. As client staff, I want to draft invoices and upload documents, so that the owner only has to approve.
@@ -85,7 +91,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 61. As an operator, I want database and files stored in Malaysia with daily backups copied to a second Malaysian zone, so that the residency promise holds.
 62. As an operator, I want records kept at least 7 years under a retention agreement, so that tax record rules are met.
 63. As an operator, I want a support channel with business hours, a one-working-day target and a weekly rotation between the two developers, so that pilot clients are never unsupported.
-64. As an operator, I want all MyInvois calls behind one module, so that a library or gateway can replace it if the sandbox spike fails.
+64. As an operator, I want all MyInvois calls and every LHDN-specific rule behind one module, separate from the invoice generation engine, so that a library or gateway can replace it, and LHDN's changes stay out of invoice logic (D59).
 65. As an operator, I want the AI provider swappable behind one port, so that the provider chosen from the sample test can change without rework.
 
 ## Implementation Decisions
@@ -155,7 +161,7 @@ Official references checked 2026-11-05: [Portal registration FAQ](https://www.ha
 
 A good test checks external behaviour only: what a signed-in role sees and can do, what is sent to the external ports, and what ends up exported. It does not assert on internal structure, private functions or query shapes.
 
-**Seam 1 (main).** The web application's HTTP interface with the background job runner executed in-process. Tests sign in as a role, call the real pages and endpoints, run queued jobs, and assert on responses, stored state and calls made to the ports. The four ports (MyInvois gateway, AI provider, email, object storage) are replaced by fakes. Company isolation is covered here by end-to-end cross-company requests that must fail. Cases include the invoice lifecycle, numbering, buyer snapshot, role limits, document states, bounce-on-upload, review and verification, reminders and escalation, export idempotency and post-export changes, assistant function limits and human-confirmed writes, and prompt-injection attempts through uploaded documents.
+**Seam 1 (main).** The web application's HTTP interface with the background job runner executed in-process. Tests sign in as a role, call the real pages and endpoints, run queued jobs, and assert on responses, stored state and calls made to the ports. The four ports (MyInvois gateway, AI provider, email, object storage) are replaced by fakes. Company isolation is covered here by end-to-end cross-company requests that must fail. Cases include the invoice lifecycle, the e-invoice and normal-invoice routes and the company setting that chooses between them (including the confirmation for status mandatory and the 72-hour return for approval), numbering, buyer snapshot, role limits, document states, bounce-on-upload, review and verification, reminders and escalation, export idempotency and post-export changes, assistant function limits and human-confirmed writes, and prompt-injection attempts through uploaded documents.
 
 **Seam 2.** Contract tests of the MyInvois port against the real sandbox, proving the fake matches LHDN behaviour. This is also the evidence for the week 1 to 3 spike.
 
@@ -167,7 +173,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 
 - Automatic extraction of bank statements, payment vouchers, payroll records and loan documents (stored and searchable only).
 - Account coding inside the platform; the export carries only the firm's default codes (D51), and the accountant recodes in SQL Account.
-- Consolidated e-invoices for consumer sales and self-billed e-invoices for foreign suppliers.
+- Consolidated e-invoices for consumer sales, and self-billed e-invoices in every circumstance LHDN lists (not only foreign suppliers); onboarding checks that a client has none (D59).
 - SST returns and automatic tax-rate determination.
 - The platform's own ledger and financial reports; SQL Account stays the books of record.
 - Payment and receipt tracking against invoices.
