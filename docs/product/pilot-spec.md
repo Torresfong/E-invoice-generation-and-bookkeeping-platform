@@ -43,6 +43,8 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 70. As a client owner, I want an invoice that lacks data LHDN requires on the company, the customer or a line to be stopped before submission with the missing field named, so that a rejection is caught before it is sent.
 71. As a client owner, I want each e-invoice to show LHDN's document UUID, the time it was issued and the time it was validated, besides its status, so that I can trace it in the MyInvois Portal.
 72. As a client owner, I want an invoice that waited more than 72 hours for submission to come back to me for approval under the same number, so that an expired issue time never goes out unseen (D60).
+73. As a client owner, I want to keep the products and services I sell once, each with its LHDN classification code, unit code and default tax type, and choose them on invoice lines, so that the data LHDN requires per line is never typed again (D59).
+74. As a client owner, I want a customer or an item that appears on a submitted invoice to be deactivated rather than deleted, so that past e-invoices keep their buyer and lines (D59).
 
 ### Client staff
 25. As client staff, I want to draft invoices and upload documents, so that the owner only has to approve.
@@ -174,6 +176,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 - Automatic extraction of bank statements, payment vouchers, payroll records and loan documents (stored and searchable only).
 - Account coding inside the platform; the export carries only the firm's default codes (D51), and the accountant recodes in SQL Account.
 - Consolidated e-invoices for consumer sales, and self-billed e-invoices in every circumstance LHDN lists (not only foreign suppliers); onboarding checks that a client has none (D59).
+- A customer-facing request for an e-invoice (a page where a buyer supplies tax details and asks for one), and marking an invoice as already validated in another system, since the platform is the only issuer after go-live (D18, D59).
 - SST returns and automatic tax-rate determination.
 - The platform's own ledger and financial reports; SQL Account stays the books of record.
 - Payment and receipt tracking against invoices.

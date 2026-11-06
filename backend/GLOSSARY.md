@@ -20,6 +20,10 @@ _Avoid_: Customer (when speaking of an issued invoice)
 Any invoice the platform generates for a company, including credit, debit and refund notes. It is an e-invoice or a normal invoice, depending on the company's e-invoice setting.
 _Avoid_: Bill, document
 
+**Item**:
+A product or service a company sells, kept once with its LHDN classification code, unit code and default tax type, and chosen on invoice lines.
+_Avoid_: Product, stock item, SKU
+
 **E-invoice**:
 An invoice that has been submitted to LHDN through MyInvois.
 _Avoid_: Digital invoice
