@@ -8,3 +8,11 @@ __pycache__/
 docs/research/
 teaching/
 
+# Keep machine-specific Claude permissions out of commits
+.claude/settings.local.json
+
+# Ignore environment-specific secrets; keep public templates
+.env.*
+!.env.example
+!.env.sample
+!.env.template
