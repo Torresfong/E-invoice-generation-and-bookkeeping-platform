@@ -17,8 +17,56 @@ The customer details copied onto an invoice at approval and locked.
 _Avoid_: Customer (when speaking of an issued invoice)
 
 **Invoice**:
-An e-invoice the platform issues to LHDN for a company, including credit, debit and refund notes.
+Any invoice the platform generates for a company, including credit, debit and refund notes. It is an e-invoice or a normal invoice, depending on the company's e-invoice setting.
 _Avoid_: Bill, document
+
+**Item**:
+A product or service a company sells, kept once with its LHDN classification code, unit code and default tax type, and chosen on invoice lines.
+_Avoid_: Product, stock item, SKU
+
+**E-invoice**:
+An invoice that has been submitted to LHDN through MyInvois.
+_Avoid_: Digital invoice
+
+**Normal invoice**:
+An invoice generated for a company with e-invoicing off. It is never submitted to LHDN and has no validation status or QR code.
+_Avoid_: Paper invoice, plain invoice
+
+**E-invoice setting**:
+A company's own choice and details for LHDN e-invoicing: its status (mandatory, voluntary or exempt) and the date it takes effect, its TIN, BRN and ROB, and its supplier details.
+_Avoid_: LHDN profile, e-invoice flag
+
+**TIN**:
+The tax identification number LHDN gives a taxpayer.
+_Avoid_: Tax ID
+
+**BRN**:
+The business registration number of a company, as on its SSM registration.
+_Avoid_: BIN, SSM number
+
+**ROB**:
+A registration number that LHDN, for some taxpayers, uses together with the TIN to identify them; we pass it as TIN:ROB when we act for such a taxpayer. The LHDN pages we read do not say what the abbreviation stands for.
+_Avoid_: Branch number
+
+**Intermediary**:
+The company that submits e-invoices to LHDN on behalf of taxpayers. Here it is our platform company, not the accounting firm.
+_Avoid_: Agent, provider
+
+**Representation**:
+A taxpayer's authority, granted in the official MyInvois portal with dates and permissions, for our platform company to act for it.
+_Avoid_: Authorisation, consent
+
+**UUID**:
+The identifier LHDN gives a document it accepts.
+_Avoid_: Document id
+
+**Long ID**:
+The temporary identifier LHDN gives a valid document, used with the UUID to build its validation link.
+_Avoid_: Validation code
+
+**Submission ID**:
+The identifier LHDN gives a batch of documents sent in one submission.
+_Avoid_: Batch id
 
 **Document**:
 A bookkeeping file a company uploads, such as a purchase invoice, receipt or bank statement.
