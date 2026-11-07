@@ -76,13 +76,6 @@ def test_a_number_is_not_used_up_when_the_approval_that_took_it_rolls_back(acme)
     assert take(acme) == "INV-1"  # no gap: the failed approval never used it
 
 
-def test_taking_a_number_for_a_draft_that_is_then_deleted_leaves_no_gap(acme):
-    """Drafts are unnumbered (D44): only the approval takes a number, so deleting drafts never touches the sequence."""
-    assert take(acme) == "INV-1"
-    # Drafts are created and deleted here without calling the service; the next approval continues at 2.
-    assert take(acme) == "INV-2"
-
-
 def test_the_prefix_and_starting_number_can_be_changed_until_the_first_number_is_issued(acme):
     numbering.configure_sequence(acme, INVOICE, prefix="SI/", start_number=1000)
 

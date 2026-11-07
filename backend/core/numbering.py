@@ -23,7 +23,8 @@ DOCUMENT_TYPES = (INVOICE, CREDIT_NOTE, DEBIT_NOTE, REFUND_NOTE)
 # SQL Account's import template holds 20 characters of document number (D51 (3)).
 MAX_NUMBER_LENGTH = 20
 MAX_PREFIX_LENGTH = 10
-MAX_START_NUMBER = 10**MAX_PREFIX_LENGTH - 1
+MAX_DIGITS = 10
+MAX_START_NUMBER = 10**MAX_DIGITS - 1
 
 
 class SequenceNotConfigured(Exception):
@@ -52,8 +53,10 @@ def configure_sequence(company, document_type, prefix, start_number):
         raise InvalidConfiguration(f"unknown document type {document_type!r}")
     if not isinstance(start_number, int) or isinstance(start_number, bool) or not 1 <= start_number <= MAX_START_NUMBER:
         raise InvalidConfiguration("the starting number must be a whole number of at least 1 and at most 10 digits")
-    if len(prefix) > MAX_PREFIX_LENGTH or len(format_number(prefix, start_number)) > MAX_NUMBER_LENGTH:
+    if len(prefix) > MAX_PREFIX_LENGTH:
         raise InvalidConfiguration(f"the prefix may have at most {MAX_PREFIX_LENGTH} characters")
+    if len(format_number(prefix, start_number)) > MAX_NUMBER_LENGTH:
+        raise InvalidConfiguration(f"the prefix and number may have at most {MAX_NUMBER_LENGTH} characters together")
 
     with transaction.atomic():
         sequence, created = DocumentSequence.objects.select_for_update().get_or_create(
@@ -82,6 +85,6 @@ def allocate_number(company, document_type):
         raise SequenceNotConfigured(f"no {document_type} sequence for company {company.pk}")
     number = format_number(sequence.prefix, sequence.next_number)
     if len(number) > MAX_NUMBER_LENGTH:
-        raise InvalidConfiguration("the next number no longer fits in 20 characters")
+        raise InvalidConfiguration(f"the next number no longer fits in {MAX_NUMBER_LENGTH} characters")
     DocumentSequence.objects.filter(pk=sequence.pk).update(next_number=sequence.next_number + 1)
     return number
