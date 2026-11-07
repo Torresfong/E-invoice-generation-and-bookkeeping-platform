@@ -7,7 +7,7 @@ from core.rls import enable_tenant_rls
 # Gapless numbering (ticket #45, D18, D44, D59 (6)). The counter is guarded in the database itself, so no writer
 # (the numbering service, a shell, a later screen) can skip, reuse or take back a number:
 #   - an update may only add one to `next_number`, or, while no number has been issued, restart the sequence from a
-#     new prefix and starting number;
+#     new prefix, padding and starting number;
 #   - a sequence that has issued a number cannot be deleted, because a new one would start again from 1.
 # The company and document type of a sequence never change.
 
@@ -25,7 +25,7 @@ BEGIN
     IF NEW.company_id <> OLD.company_id OR NEW.document_type <> OLD.document_type THEN
         RAISE EXCEPTION 'a sequence cannot move to another company or document type';
     END IF;
-    IF NEW.prefix = OLD.prefix AND NEW.start_number = OLD.start_number
+    IF NEW.prefix = OLD.prefix AND NEW.start_number = OLD.start_number AND NEW.padding = OLD.padding
        AND NEW.next_number IN (OLD.next_number, OLD.next_number + 1) THEN
         RETURN NEW;  -- a number was taken, or nothing changed
     END IF;
@@ -58,11 +58,15 @@ class Migration(migrations.Migration):
                 ("prefix", models.CharField(blank=True, max_length=10)),
                 ("start_number", models.BigIntegerField()),
                 ("next_number", models.BigIntegerField()),
+                ("padding", models.SmallIntegerField(default=0, db_default=0)),
                 ("company", models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to="core.company")),
             ],
             options={
                 "constraints": [
                     models.UniqueConstraint(fields=("company", "document_type"), name="one_sequence_per_company_and_type"),
+                    models.CheckConstraint(
+                        condition=models.Q(("padding__gte", 0), ("padding__lte", 10)), name="sequence_padding_range"
+                    ),
                     models.CheckConstraint(condition=models.Q(("start_number__gte", 1)), name="sequence_start_positive"),
                     models.CheckConstraint(
                         condition=models.Q(("next_number__gte", models.F("start_number"))),

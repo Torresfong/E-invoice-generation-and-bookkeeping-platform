@@ -129,10 +129,13 @@ class DocumentSequence(TenantModel):
     prefix = models.CharField(max_length=10, blank=True)
     start_number = models.BigIntegerField()
     next_number = models.BigIntegerField()
+    # Zero-padded width of the digits, so an owner can continue "INV-00123"; 0 means no padding.
+    padding = models.SmallIntegerField(default=0, db_default=0)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(fields=["company", "document_type"], name="one_sequence_per_company_and_type"),
+            models.CheckConstraint(condition=models.Q(padding__gte=0, padding__lte=10), name="sequence_padding_range"),
             models.CheckConstraint(condition=models.Q(start_number__gte=1), name="sequence_start_positive"),
             models.CheckConstraint(
                 condition=models.Q(next_number__gte=models.F("start_number")), name="sequence_next_not_before_start"

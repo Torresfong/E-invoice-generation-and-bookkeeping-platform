@@ -37,6 +37,37 @@ def test_numbers_run_one_after_another_from_the_owners_starting_number(db):
     assert [take(company) for _ in range(3)] == ["ACM1043", "ACM1044", "ACM1045"]
 
 
+def test_numbers_are_padded_with_zeros_to_the_owners_width(db):
+    company = make_company()
+    numbering.configure_sequence(company, INVOICE, prefix="INV-", start_number=123, padding=5)
+
+    assert [take(company) for _ in range(2)] == ["INV-00123", "INV-00124"]
+
+
+def test_a_number_longer_than_the_padding_is_not_cut(db):
+    company = make_company()
+    numbering.configure_sequence(company, INVOICE, prefix="I", start_number=99, padding=2)
+
+    assert [take(company) for _ in range(2)] == ["I99", "I100"]
+
+
+def test_the_padding_is_locked_with_the_prefix_once_a_number_is_issued(acme):
+    take(acme)
+
+    with pytest.raises(numbering.SequenceInUse):
+        numbering.configure_sequence(acme, INVOICE, prefix="INV-", start_number=1, padding=6)
+    with pytest.raises(DatabaseError):  # and the database refuses it for any other writer
+        with transaction.atomic():
+            DocumentSequence.objects.filter(company=acme).update(padding=6)
+
+
+def test_the_padding_must_be_between_zero_and_ten(db):
+    company = make_company()
+    for bad in (-1, 11):
+        with pytest.raises(numbering.InvalidConfiguration):
+            numbering.configure_sequence(company, INVOICE, prefix="INV-", start_number=1, padding=bad)
+
+
 def test_the_prefix_may_be_empty(db):
     company = make_company()
     numbering.configure_sequence(company, INVOICE, prefix="", start_number=7)
@@ -212,3 +243,56 @@ def test_taking_a_number_is_audited_without_the_number_itself(acme):
 
     entry = AuditEntry.objects.filter(company=acme, target_type="core_documentsequence", action="update").latest("id")
     assert entry.changed_fields == ["next_number"]
+
+
+# --- the table's own policy, grants and isolation (reviewed for #45) ----------------------------------------------
+
+
+def test_the_sequence_table_is_under_forced_row_level_security_with_one_web_policy_and_no_worker_access(db):
+    rows = query("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'core_documentsequence'")
+    assert rows == [(True, True)]
+    policies = query("SELECT policyname, roles FROM pg_policies WHERE tablename = 'core_documentsequence'")
+    assert [(name, set(roles)) for name, roles in policies if name != "definer_functions"] == [
+        ("tenant_isolation", {"web"})
+    ]
+    privileges = {
+        role: query(
+            "SELECT string_agg(privilege_type, ',' ORDER BY privilege_type) FROM information_schema.role_table_grants "
+            "WHERE table_name = 'core_documentsequence' AND grantee = %s",
+            [role],
+        )[0][0]
+        for role in ("web", "worker", "PUBLIC")
+    }
+    assert privileges == {"web": "DELETE,INSERT,SELECT,UPDATE", "worker": None, "PUBLIC": None}
+
+
+def test_a_user_cannot_create_a_sequence_for_another_company_or_move_one(acme, as_user):
+    beta = make_company("Beta Trading")
+    owner = make_member("owner@acme.example", acme, CompanyAccess.OWNER)
+
+    with as_user(owner):
+        with pytest.raises(DatabaseError):
+            with transaction.atomic():
+                query(
+                    "INSERT INTO core_documentsequence (company_id, document_type, prefix, start_number, next_number) "
+                    "VALUES (%s, 'credit_note', 'X', 1, 1)",
+                    [beta.pk],
+                )
+        with pytest.raises(DatabaseError):
+            with transaction.atomic():
+                query("UPDATE core_documentsequence SET company_id = %s WHERE company_id = %s", [beta.pk, acme.pk])
+
+
+def test_a_user_with_no_membership_sees_no_sequence_and_the_worker_role_sees_none(acme, as_user):
+    stranger = make_member("stranger@other.example", make_company("Other Co"), CompanyAccess.OWNER)
+
+    with as_user(stranger):
+        assert query("SELECT count(*) FROM core_documentsequence") == [(0,)]
+    with connection.cursor() as cursor:
+        cursor.execute("SET ROLE worker")
+        try:
+            with pytest.raises(DatabaseError):
+                with transaction.atomic():
+                    cursor.execute("SELECT count(*) FROM core_documentsequence")
+        finally:
+            cursor.execute("RESET ROLE")

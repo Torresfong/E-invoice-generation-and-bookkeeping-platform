@@ -39,12 +39,12 @@ class InvalidConfiguration(ValueError):
     pass
 
 
-def format_number(prefix, number):
-    return f"{prefix}{number}"
+def format_number(prefix, number, padding=0):
+    return f"{prefix}{number:0{padding}d}"
 
 
-def configure_sequence(company, document_type, prefix, start_number):
-    """Set the prefix and the number the first approval will take, continuing from the owner's existing books.
+def configure_sequence(company, document_type, prefix, start_number, padding=0):
+    """Set the prefix, the zero-padded width and the number the first approval will take, continuing from the owner's books.
 
     Allowed only until the first number is issued; afterwards it raises `SequenceInUse`. The caller checks that the
     user is the company owner (`core.permissions`).
@@ -55,21 +55,24 @@ def configure_sequence(company, document_type, prefix, start_number):
         raise InvalidConfiguration("the starting number must be a whole number of at least 1 and at most 10 digits")
     if len(prefix) > MAX_PREFIX_LENGTH:
         raise InvalidConfiguration(f"the prefix may have at most {MAX_PREFIX_LENGTH} characters")
-    if len(format_number(prefix, start_number)) > MAX_NUMBER_LENGTH:
+    if not isinstance(padding, int) or isinstance(padding, bool) or not 0 <= padding <= MAX_DIGITS:
+        raise InvalidConfiguration(f"the padding must be between 0 and {MAX_DIGITS}")
+    if len(format_number(prefix, start_number, padding)) > MAX_NUMBER_LENGTH:
         raise InvalidConfiguration(f"the prefix and number may have at most {MAX_NUMBER_LENGTH} characters together")
 
     with transaction.atomic():
         sequence, created = DocumentSequence.objects.select_for_update().get_or_create(
             company=company,
             document_type=document_type,
-            defaults={"prefix": prefix, "start_number": start_number, "next_number": start_number},
+            defaults={"prefix": prefix, "start_number": start_number, "next_number": start_number, "padding": padding},
         )
         if created:
             return sequence
         if sequence.next_number != sequence.start_number:
             raise SequenceInUse(f"{document_type} numbers have already been issued for this company")
-        sequence.prefix, sequence.start_number, sequence.next_number = prefix, start_number, start_number
-        sequence.save(update_fields=["prefix", "start_number", "next_number"])
+        sequence.prefix, sequence.padding = prefix, padding
+        sequence.start_number = sequence.next_number = start_number
+        sequence.save(update_fields=["prefix", "padding", "start_number", "next_number"])
         return sequence
 
 
@@ -83,7 +86,7 @@ def allocate_number(company, document_type):
     sequence = DocumentSequence.objects.select_for_update().filter(company=company, document_type=document_type).first()
     if sequence is None:
         raise SequenceNotConfigured(f"no {document_type} sequence for company {company.pk}")
-    number = format_number(sequence.prefix, sequence.next_number)
+    number = format_number(sequence.prefix, sequence.next_number, sequence.padding)
     if len(number) > MAX_NUMBER_LENGTH:
         raise InvalidConfiguration(f"the next number no longer fits in {MAX_NUMBER_LENGTH} characters")
     DocumentSequence.objects.filter(pk=sequence.pk).update(next_number=sequence.next_number + 1)
