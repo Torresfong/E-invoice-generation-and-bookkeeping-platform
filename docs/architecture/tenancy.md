@@ -200,3 +200,13 @@ Implements the second half of ADR 0001's table and D36's queue. Code: `core/jobs
 - `schedule_purge()` checks and then inserts, so two deploys running `schedule_jobs` at the same moment can queue two purge chains. They only repeat a harmless delete; remove the extra pending job if it happens.
 - A hostile handler can also write its own `lease_expires_at` and `run_after` (migration 0033 grants both), as it can write `attempts`.
 - `attempts` is still writable by the worker role (migration 0017 granted it), so a hostile handler could reset its own count. Same class of limit as `app.company_id`.
+
+## Document numbering (07b, #45)
+
+Implements D18, D44, D59 (6), D60 (2). `core_documentsequence` is a tenant table (company id, forced row-level security, audit trigger), one row per company and document type (`invoice`, `credit_note`, `debit_note`, `refund_note`), holding the owner's prefix, starting number and the next number.
+
+- **Taken once, at approval.** `core.numbering.allocate_number(company, type)` is called by the approval action inside its transaction. It locks the sequence row until that transaction ends, so concurrent approvals take turns, and a rolled-back approval never used its number. Drafts are unnumbered. A cancelled document keeps its number, and an approval repeated after 72 hours keeps the number it has, so neither calls the service.
+- **Database guard (migration 0034).** A trigger allows an update only to add one to the counter, or, while no number has been issued, to restart the sequence with a new prefix and starting number. A sequence that has issued a number cannot be deleted. Skipping, reusing or taking back a number therefore fails for every writer that runs triggers.
+- **Configuration.** `configure_sequence` sets the prefix (at most 10 characters) and starting number, and is refused with `SequenceInUse` once a number was issued. The prefix is frozen with it, so one sequence never mixes prefixes. The caller checks the `configure_numbering` permission (owner only). The number is the prefix and the digits as entered, no padding, at most 20 characters for the SQL Account export (D51 (3)).
+- **Audit.** Each number taken writes an update entry naming `next_number`, never its value.
+- **Not built here.** The approval action, and the onboarding screen that enters the last used number (#23).

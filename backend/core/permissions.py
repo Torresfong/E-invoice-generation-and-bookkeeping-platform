@@ -17,6 +17,7 @@ OWNER, STAFF, ACCOUNTANT = CompanyAccess.OWNER, CompanyAccess.STAFF, CompanyAcce
 ACTIONS = {
     "view_company": {OWNER, STAFF, ACCOUNTANT},
     "invite_staff": {OWNER},
+    "configure_numbering": {OWNER},  # prefix and starting number of the invoice sequence (D18)
     "view_audit_trail": {OWNER, ACCOUNTANT},
     "view_own_activity": {OWNER, STAFF, ACCOUNTANT},
 }
