@@ -1,6 +1,6 @@
 # Tenancy and row-level security
 
-Implements D11 and D40 (1), (2) for `CompanyAccess`, (3) and (4). Built in ticket 02a (#31). Still to come: the policy on user records and the pre-authentication lookup function (D40 (2)) in 02b (#32), and job-queue tenancy (D36) in 02d (#34).
+Implements D11 and D40 (1), (2) for `CompanyAccess`, (3) and (4). Built in ticket 02a (#31). Later tickets added to it, each in its own section below: sign-in and the pre-authentication functions (02b, #32; D40, D48), audit (02c, #33; D50, D54), firms and their administrators (02h, 02i, 02j; D49, D50, D56), job queue tenancy and execution (02d, #34 and ticket 24, #27; D36, D53, ADR 0001).
 
 ## How isolation works
 
@@ -13,18 +13,20 @@ Implements D11 and D40 (1), (2) for `CompanyAccess`, (3) and (4). Built in ticke
 
 ## Adding a tenant table
 
+This applies to the `backend/myinvois/` app too (D61 (4)): each of its tables follows these steps, and its app label is fixed before its first migration. `core` imports nothing from that app.
+
 1. Subclass `core.models.TenantModel` (it adds the `company` foreign key).
 2. In the migration that creates the table, add `core.rls.enable_tenant_rls("app_table")` straight after the `CreateModel`. It grants the web role access to that table and applies the policy.
 3. Use `GENERATED ... AS IDENTITY` ids, which Django's `BigAutoField` already does. A separate sequence would need its own grant to the web role.
 
-The web role starts with access to nothing and there are no default privileges, so a table added without step 2 is unreachable by it and forgetting the policy fails closed. Users, jobs, sessions and Django's own tables are closed to the web role for now; the ticket that puts each under a policy opens it (02b for users, 02d for jobs). A schema test fails if the web role can use any table that is not under forced row-level security.
+The web role starts with access to nothing and there are no default privileges, so a table added without step 2 is unreachable by it and forgetting the policy fails closed. Sessions and Django's own tables stay closed to the web role, except `django_session` (see "Identity and sessions"); users and jobs were opened by their own policies in 02b and 02d. A schema test fails if the web role can use any table that is not under forced row-level security.
 
 ## Roles and deployment
 
 - Migrations create the `web` role without a login. If it already exists (roles are cluster-wide), they reset it to `NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS` and stop with an error unless those attributes hold. They must run as the table owner, never as `web`.
 - For production, the application should connect with a login role that is a member of `web` and owns nothing (`CREATE ROLE app LOGIN PASSWORD ... IN ROLE web`), while migrations run with the owner's credentials. The middleware also drops to `web` on every request, so a connection made with the owner's credentials (as in development and tests) still cannot skip row-level security while handling a request.
-- The user and session lookup that happens before the middleware runs as the connection's own role. Ticket 02b gives the user table its own policy and a narrow pre-authentication lookup function.
-- The web role reads only its own row of the user table and uses the session table (see the 02b section below); it still cannot reach jobs until 02d (#34).
+- The user and session lookup that happens before the middleware runs as the connection's own role. The user table has its own policy and a narrow pre-authentication lookup function (02b, below).
+- The web role reads only its own row of the user table and uses the session table (see the 02b section below). It reads and queues jobs for its own companies only (see "Background jobs").
 - A streaming response is read after the middleware returns, outside the web role and its transaction. Do not query tenant data lazily inside a streamed response.
 
 ## Threat model and limits
@@ -47,7 +49,7 @@ This is not built in ticket 02a and is mandatory before any real client data is 
 
 Implements D40 (2), (4), (5), (7) and D48 for staff and accountants. Owner self-registration is #67.
 
-**Users and roles.** `core.User` signs in with an email address (stored lowercase, unique ignoring case) and an Argon2 password. The role is on the `CompanyAccess` row, and a partial unique index allows one `owner` row per company. Owners and staff have one row; a firm accountant has one row per company of their own firm, added when the company is created (`core.services.create_company_with_owner`) or when the accountant is created (`manage.py create_accountant`). Accountants are never created or invited by a client (D48); in a firm they are created by its firm administrator (D49, ticket 02i, #74). Several firms are supported (D49): the code that grants every accountant every company is replaced by one that grants only the company's own firm's accountants, in ticket 02h (#72); until then there is one firm.
+**Users and roles.** `core.User` signs in with an email address (stored lowercase, unique ignoring case) and an Argon2 password. The role is on the `CompanyAccess` row, and a partial unique index allows one `owner` row per company. Owners and staff have one row; a firm accountant has one row per company of their own firm, added when the company is created (`core.services.create_company_with_owner`) or when the accountant is created (`manage.py create_accountant`). Accountants are never created or invited by a client (D48); in a firm they are created by its firm administrator (D49, ticket 02i, #74). Several firms are supported (D49): the code that grants every accountant every company is replaced by one that grants only the company's own firm's accountants (ticket 02h, #72, "Firms" below).
 
 **Who may do what.** `core.permissions` holds the action-level rules (D40 (4)): `ACTIONS` maps an action to the roles that may perform it, `require` raises 403 in a view, and `{% can "action" company as allowed %}` offers the same check in templates. Register a new protected action in `ACTIONS`. A company the user cannot reach is a 404, so its existence is not revealed.
 
@@ -77,7 +79,7 @@ The web role has no direct access to `core_authtoken` or `core_loginfailure`, an
 
 **Deployment settings that matter.** `ENVIRONMENT` must be set to something other than `development` in production: it turns on secure cookies and the `SECRET_KEY` check. HSTS, SSL redirects and the proxy header are not configured yet. All of this is part of the go-live work in #39.
 
-**Firm portal language.** The firm portal is English only (CLAUDE.md), but the sign-in and company pages are shared and follow the browser's language. Fixing an accountant's language belongs with the firm portal screens.
+**Firm portal language.** The firm portal is English only (pilot spec, "Languages"), but the sign-in and company pages are shared and follow the browser's language. Fixing an accountant's language belongs with the firm portal screens.
 
 **Firms (D49, ticket 02h, #72).** A `Firm` is an accounting firm. Every company has exactly one (`Company.firm`, not null, foreign key with PROTECT), and every firm accountant belongs to exactly one (`User.firm`; a check constraint refuses an accountant without a firm). Firms are created, and accountants are created inside them, only by operator commands (`create_firm`, `create_accountant EMAIL FIRM`, `move_company COMPANY_ID FIRM`), never through the web: the web role has `SELECT` on `core_firm` and no write right on firms, on the firm links or on the user and membership tables, and no route creates them. Firms are named uniquely, ignoring case, and the commands find them by name.
 
@@ -89,7 +91,7 @@ The web role has no direct access to `core_authtoken` or `core_loginfailure`, an
 
 *The firm table.* `core_firm` is under forced row-level security. A user sees the firm named on their own user row, and no other, so an accountant sees their firm and a client sees none. A client-facing path must use `company.firm_id`, not `company.firm`: the client cannot read the firm row, so following the link raises `DoesNotExist`. The migration owner has the usual `definer_functions` policy so the operator commands can write it. The job worker has no access to it.
 
-*Audit.* Assigning a company to a firm, and moving it, are entries in that company's trail: `create` on `company` when the company is created for a firm, `update` on `company` when it moves, `changed_fields` = `["firm"]` and the actor shown as `operator` (written by `audit.record_operator_event`). They name no firm and no value, so the company's owner who reads the trail learns that the firm changed, not which firms. The firm trail (D50) comes with 02j (#75).
+*Audit.* Assigning a company to a firm, and moving it, are entries in that company's trail: `create` on `company` when the company is created for a firm, `update` on `company` when it moves, `changed_fields` = `["firm"]` and the actor shown as `operator` (written by `audit.record_operator_event`). They name no firm and no value, so the company's owner who reads the trail learns that the firm changed, not which firms. The firm trail (D50, 02j, #75) is described under "Audit trail".
 
 *Existing data.* Migration 0020 puts any company and accountant that exist before firms into one "Default firm"; with no data it creates nothing. There is no production data yet.
 
@@ -117,15 +119,15 @@ What limits this: expiry is capped and only an Argon2 hash is accepted, so a jun
 
 Implements D40 (6). Entries are in `core_auditentry`: company, who (account id and a copy of the address), what, which record, which fields changed, and when.
 
-**What is recorded.** Every insert, update and delete on a business table, written by a trigger; successful and failed sign-ins and sign-outs; and domain events that are not a row change (an approval, a submission) through `core.audit.record`. Nothing else: the audit trail of the assistant, signings and exports belong to their own tickets.
+**What is recorded.** Every insert, update and delete on a business table, written by a trigger; successful and failed sign-ins and sign-outs; and domain events that are not a row change (an approval, a submission) through `core.audit.record`. Nothing else: the audit trail of the assistant and exports belong to their own tickets, and signings are a log line, not an entry (D55).
 
 **Adding a business table to the trail.** In the migration that creates the table, after `enable_tenant_rls`, add `core.audit.enable_audit("app_table")`. The table needs `id` and `company_id`. The trigger runs with the rights of whoever makes the change, so the signed-in user writes their own entry under the same row-level security as any other insert, and a change to a company the user cannot reach is refused. A change made with no signed-in user (an operator command, a job) is recorded with no actor. An update that changes nothing records nothing.
 
 **What is never stored.** Only the *names* of changed fields, never their values, so an entry cannot hold a password, a token, a TIN or an amount. `core.audit.record` must not be given content either.
 
-**Sign-in events.** One entry for each company the account belongs to, written by the `record_auth_event` definer function because nobody is identified at a failed sign-in. With no signed-in user the function writes only `login_failed`, and only by using up one counted attempt made in the last minute (`core_loginfailure.audited`, migration 0032), so a bare call writes nothing and one attempt gives at most one entry; a successful sign-in is recorded as the person who just signed in (`complete_sign_in` sets the identity), and a signed-in user can record only their own events (D54, #84). An accountant's sign-in therefore appears in every company's trail today; with firms (D50) accountant and administrator sign-ins go to the firm trail instead (ticket 02j, #75). Not recorded: attempts for an address with no account (there is nothing to attach them to, and they would let anyone grow the table) and attempts refused by the lock (they do not test a password). Both still count towards the throttle.
+**Sign-in events.** One entry for each company the account belongs to, written by the `record_auth_event` definer function because nobody is identified at a failed sign-in. With no signed-in user the function writes only `login_failed`, and only by using up one counted attempt made in the last minute (`core_loginfailure.audited`, migration 0032), so a bare call writes nothing and one attempt gives at most one entry; a successful sign-in is recorded as the person who just signed in (`complete_sign_in` sets the identity), and a signed-in user can record only their own events (D54, #84). Accountant and administrator sign-ins do not go to company trails: with firms (D50) they go to the firm trail (ticket 02j, #75); owner and staff sign-ins stay in the company trail. Not recorded: attempts for an address with no account (there is nothing to attach them to, and they would let anyone grow the table) and attempts refused by the lock (they do not test a password). Both still count towards the throttle.
 
-**Append-only.** The web role has `SELECT` and `INSERT` only. A trigger also refuses `UPDATE` and `DELETE` from every other role, the table owner included. `TRUNCATE` is not trapped: the web role has no right to it, and Django's test runner needs it. There is no page that changes an entry. Retention and export (7 years, D-retention) will need a controlled path for the operator; it does not exist yet.
+**Append-only.** The web role has `SELECT` and `INSERT` only. A trigger also refuses `UPDATE` and `DELETE` from every other role, the table owner included. `TRUNCATE` is not trapped: the web role has no right to it, and Django's test runner needs it. There is no page that changes an entry. Retention and export (7 years, D4; D50 (7)) will need a controlled path for the operator; it does not exist yet.
 
 **Who may read.** Company isolation is row-level security (the standard company rule, for reads and inserts). Which entries a role may see is the permission service: the owner and the firm's accountants read the company's full trail at `/companies/<id>/audit/`; staff are refused it with a 403 and read only their own activity at `/companies/<id>/activity/`, which every role can open for themself. A company the user cannot reach is a 404.
 

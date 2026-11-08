@@ -1,6 +1,6 @@
 # 0001: Jobs carry a company id and sit under row-level security
 
-Status: accepted by the repository owner on 2026-10-28, after an independent review of the first draft. Relates to D10 (Postgres-backed queue), D11 (row-level security) and D36.
+Status: accepted by the repository owner on 2026-10-28, after an independent review of the first draft. Relates to D10 (Postgres-backed queue), D11 (row-level security), D36, D53 (no irreversible port call inside a request) and D58 (5) (LHDN has no idempotency key). Amended 2026-11-08 to match what was built: rule 2 now names the claim function, and rule 7 records the idempotent-call rule the table already listed. Built behaviour and limits: `docs/architecture/tenancy.md`, "Background jobs" and "Job execution".
 
 This replaces the first draft, which exempted the job table from row-level security as a "global system table". The review showed the exemption was weaker than argued, so it is dropped.
 
@@ -11,11 +11,12 @@ Background work (extraction, MyInvois polling, reminders, exports) is queued in 
 ## Decision
 
 1. **Jobs are tenant-scoped.** `Job` gets a `company_id` column (null only for system jobs that touch no tenant data) and a row-level security policy for the web role, with a check on insert. A request from one company can neither see nor queue jobs for another.
-2. **Two database roles.** The web role is subject to the policy. The worker role may claim rows across companies (with `SKIP LOCKED`) but is neither the table owner nor a superuser, so row-level security is never skipped silently.
+2. **Two database roles.** The web role is subject to the policy. The worker role is neither the table owner nor a superuser, so row-level security is never skipped silently. It sees across companies only inside one narrow `SECURITY DEFINER` function, `claim_next_job()`, which locks one pending job (`SKIP LOCKED`) and answers only while the runner is claiming. While a handler runs, the worker sees the job's own company alone.
 3. **Context comes from the column, never the payload.** The company id is a real column set from the authenticated session when the job is queued. Before calling a handler, the worker sets the tenant context from that column. A handler therefore cannot read another company's rows even if its payload names one.
 4. **Identifiers only in payloads.** A payload holds ids and short references, never document content, names, TINs or amounts. `enqueue()` enforces this: it accepts only int, bool, None, UUID and strings of at most 40 characters, rejects everything else (including floats, decimals, lists and objects), and names the offending key in the error without echoing the value.
 5. **No content in errors or logs.** A failed job stores only the exception class name, and the log line carries the job id, name and class. Exception messages and tracebacks are neither stored nor logged by the queue. Handlers must follow the same rule when they log.
-6. **No exposure.** The job table is not shown in any admin screen, API or report, and a test will pin that admin stays uninstalled or excludes it.
+6. **No exposure.** The job table is not shown in any admin screen, API or report, and a test pins that admin stays uninstalled or excludes it.
+7. **External effects carry an idempotency key.** A job can run again after a crash, possibly after its external call succeeded. A handler passes `jobs.idempotency_key(step)` (the same on every attempt, an identifier only) to every port call with an external effect, and the email and AI ports do the effect once for a repeated key. The MyInvois gateway is the exception: LHDN has no idempotency key, so the key only guards our own worker and `core/submission.py` recovers the document by its internal number (D58 (5)). Per D53 (3), a call that cannot be undone is queued as a job and is not made inside a request transaction.
 
 ## What exists now and what comes later
 
