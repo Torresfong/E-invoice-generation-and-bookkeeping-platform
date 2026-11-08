@@ -13,6 +13,9 @@ teaching/
 .claude/hooks/
 .claude/worktrees/
 .codegraph
+.claude/settings.json
+.claude/config.json
+
 
 
 # Keep machine-specific Claude permissions out of commits
@@ -28,3 +31,5 @@ teaching/
 *.postman_environment.json
 *.postman_collection.json
 *postman_globals.json
+# Session handoff notes
+handoff-*.md
