@@ -23,3 +23,8 @@ teaching/
 !.env.example
 !.env.sample
 !.env.template
+
+# Postman exports can hold client IDs and secrets
+*.postman_environment.json
+*.postman_collection.json
+*postman_globals.json
