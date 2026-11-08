@@ -12,6 +12,7 @@ teaching/
 .claude/skills/
 .claude/hooks/
 .claude/worktrees/
+.codegraph
 
 
 # Keep machine-specific Claude permissions out of commits
