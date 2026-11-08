@@ -13,6 +13,9 @@ teaching/
 .claude/hooks/
 .claude/worktrees/
 .codegraph
+.claude/settings.json
+.claude/config.json
+
 
 
 # Keep machine-specific Claude permissions out of commits
