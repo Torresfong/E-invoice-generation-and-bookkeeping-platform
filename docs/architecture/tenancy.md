@@ -1,6 +1,6 @@
 # Tenancy and row-level security
 
-Implements D11 and D40 (1), (2) for `CompanyAccess`, (3) and (4). Built in ticket 02a (#31). Later tickets added to it, each in its own section below: sign-in and the pre-authentication functions (02b, #32; D40, D48), audit (02c, #33; D50, D54), firms and their administrators (02h, 02i, 02j; D49, D50, D56), job queue tenancy and execution (02d, #34 and ticket 24, #27; D36, D53, ADR 0001).
+Implements D11 and D40 (1), (2) for `CompanyAccess`, (3) and (4). Built in ticket 02a (#31). Later tickets added to it, each in its own section below: sign-in and the pre-authentication functions (02b, #32; D40, D48), audit (02c, #33; D50, D54), firms and their administrators (02h, 02i, 02j; D49, D50, D56), job queue tenancy and execution (02d, #34 and ticket 24, #27; D36, D53, ADR 0001) and document numbering (07b, #45; D62).
 
 ## How isolation works
 
@@ -205,10 +205,10 @@ Implements the second half of ADR 0001's table and D36's queue. Code: `core/jobs
 
 ## Document numbering (07b, #45)
 
-Implements D18, D44, D59 (6), D60 (2). `core_documentsequence` is a tenant table (company id, forced row-level security, audit trigger), one row per company and document type (`invoice`, `credit_note`, `debit_note`, `refund_note`), holding the owner's prefix, starting number and the next number.
+Implements D62 (format and limits), D18, D44, D59 (6), D60 (2). `core_documentsequence` is a tenant table (company id, forced row-level security, audit trigger), one row per company and document type (`invoice`, `credit_note`, `debit_note`, `refund_note`), holding the owner's prefix, starting number and the next number.
 
 - **Taken once, at approval.** `core.numbering.allocate_number(company, type)` is called by the approval action inside its transaction. It locks the sequence row until that transaction ends, so concurrent approvals take turns, and a rolled-back approval never used its number. Drafts are unnumbered. A cancelled document keeps its number, and an approval repeated after 72 hours keeps the number it has, so neither calls the service.
 - **Database guard (migration 0034).** A trigger allows an update only to add one to the counter, or, while no number has been issued, to restart the sequence with a new prefix and starting number. A sequence that has issued a number cannot be deleted. Jumping ahead, reusing or taking back a number therefore fails for every writer that runs triggers. The trigger cannot tell whether a +1 went with a document, so gaplessness also depends on the approval taking the number in the same transaction that stores the document, and on that document table (07c) enforcing a unique number per company and document type.
-- **Configuration.** `configure_sequence` sets the prefix (at most 10 characters), the zero-padded width of the digits (0 to 10; 0 means none, so `INV-` with width 5 gives `INV-00123`) and the starting number, and is refused with `SequenceInUse` once a number was issued. The prefix and width are frozen with it, so one sequence never mixes formats; a change of prefix for a new financial year is not allowed (product owner, 2026-11-07). The caller checks the `configure_numbering` permission (owner only). A number is at most 20 characters for the SQL Account export (D51 (3)).
+- **Configuration.** `configure_sequence` sets the prefix (at most 10 characters), the zero-padded width of the digits (0 to 10; 0 means none, so `INV-` with width 5 gives `INV-00123`) and the starting number, and is refused with `SequenceInUse` once a number was issued. The prefix and width are frozen with it, so one sequence never mixes formats; a change of prefix for a new financial year is not allowed (D62, product owner 2026-11-07). The caller checks the `configure_numbering` permission (owner only). A number is at most 20 characters for the SQL Account export (D51 (3)).
 - **Audit.** Each number taken writes an update entry naming `next_number`, never its value.
 - **Not built here.** The approval action, and the onboarding screen that enters the last used number (#23).
