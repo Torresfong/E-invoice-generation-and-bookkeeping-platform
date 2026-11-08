@@ -65,7 +65,9 @@
       "PowerShell(gh issue create *)",
       "PowerShell(gh issue view *)",
       "PowerShell(gh issue list *)",
-      "PowerShell(gh issue edit *)"
+      "PowerShell(gh issue edit *)",
+      "Bash(gh issue edit *)",
+      "Bash(gh api -X POST *)"
     ],
     "ask": [
       "Bash(git reset *)",
@@ -90,10 +92,7 @@
       "PowerShell(pnpm publish *)",
       "Bash(gh pr merge *)",
       "Bash(gh pr review * --approve *)",
-      "Bash(gh api *merge*)",
-      "Bash(git merge *)",
-      "PowerShell(gh pr review * --approve *)",
-      "PowerShell(gh api *merge*)"
+      "PowerShell(gh pr review * --approve *)"
     ],
     "deny": [
       "Bash(git push --force *)",
@@ -104,6 +103,9 @@
       "Bash(git push origin main *)",
       "Bash(git push origin HEAD:main *)",
       "Bash(git push origin HEAD:refs/heads/main *)",
+      "Bash(gh api *merge*)",
+      "Bash(git merge *)",
+      "PowerShell(gh api *merge*)",
       "PowerShell(gh pr merge *)",
       "PowerShell(git merge *)",
       "PowerShell(git push --force *)",
@@ -112,10 +114,12 @@
       "PowerShell(git push origin HEAD:main *)",
       "PowerShell(git push origin HEAD:refs/heads/main *)",
       "Read(.env)",
-      "Read(.env.*)",
-      "Read(!.env.example)",
-      "Read(!.env.sample)",
-      "Read(!.env.template)",
+      "Read(.env.local)",
+      "Read(.env.*.local)",
+      "Read(.env.development)",
+      "Read(.env.production)",
+      "Read(.env.staging)",
+      "Read(.env.test)",
       "Read(secrets/**)",
       "Read(.aws/credentials)",
       "Read(.npmrc)",
@@ -137,12 +141,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python",
-            "args": [
-              "${CLAUDE_PROJECT_DIR}/.claude/hooks/block-python-heredoc.py"
-            ],
-            "timeout": 10,
-            "onFailure": "block"
+            "command": "python \"${CLAUDE_PROJECT_DIR}/.claude/hooks/block-python-heredoc.py\"",
+            "timeout": 10
           }
         ]
       }

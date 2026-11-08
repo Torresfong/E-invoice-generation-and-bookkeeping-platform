@@ -7,6 +7,13 @@ __pycache__/
 .scratch/
 docs/research/
 teaching/
+.codex
+.agents/skills/
+.claude/skills/
+.claude/hooks/
+.claude/worktrees/
+.codegraph
+
 
 # Keep machine-specific Claude permissions out of commits
 .claude/settings.local.json
