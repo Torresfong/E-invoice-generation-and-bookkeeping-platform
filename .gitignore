@@ -23,3 +23,6 @@ teaching/
 !.env.example
 !.env.sample
 !.env.template
+
+# Session handoff notes
+handoff-*.md
