@@ -171,11 +171,40 @@ def test_every_member_of_the_company_can_read_the_setting(world, as_user):
 def test_a_company_has_at_most_one_setting(world):
     change(world["acme_owner"], world["acme"])
 
+    # even a row that matches the latest change is refused: one per company
     with pytest.raises(IntegrityError):
         with transaction.atomic():
             CompanyEInvoiceSetting.objects.create(
-                company=world["acme"], effective_from=D1, einvoicing_enabled=False, **supplier()
+                company=world["acme"], effective_from=D1, einvoicing_enabled=True, status="voluntary", **supplier()
             )
+
+
+def test_the_setting_cannot_be_written_to_differ_from_the_latest_recorded_change(world, as_user):
+    change(world["acme_owner"], world["acme"])
+    setting = CompanyEInvoiceSetting.objects.get(company=world["acme"])
+
+    with as_user(world["acme_owner"]):
+        for edit in ({"tin": "C0000000009"}, {"einvoicing_enabled": False}, {"status": "exempt"}, {"city": "Ipoh"}):
+            with pytest.raises(DatabaseError):
+                with transaction.atomic():
+                    CompanyEInvoiceSetting.objects.filter(pk=setting.pk).update(**edit)
+
+    setting.refresh_from_db()
+    assert (setting.tin, setting.einvoicing_enabled, setting.status, setting.city) == (TIN, True, "voluntary", "Kuala Lumpur")
+
+
+def test_a_setting_with_no_history_cannot_be_created(world):
+    with pytest.raises(DatabaseError):
+        with transaction.atomic():
+            CompanyEInvoiceSetting.objects.create(
+                company=world["acme"], effective_from=D1, einvoicing_enabled=True, **supplier()
+            )
+
+
+def test_the_setting_matches_the_history_when_the_status_is_not_checked(world):
+    change(world["acme_owner"], world["acme"], enabled=False, status=None)
+
+    assert CompanyEInvoiceSetting.objects.get(company=world["acme"]).status is None
 
 
 def test_jobs_can_read_the_setting_but_not_write_it(db):
@@ -508,7 +537,7 @@ def test_the_guard_triggers_reverse_and_apply_again(db):
     def guards():
         with connection.cursor() as cursor:
             cursor.execute(
-                "SELECT count(*) FROM pg_trigger WHERE tgname IN ('a_einvoice_owner_guard', 'b_einvoice_setting_guard', 'b_einvoice_change_guard')"
+                "SELECT count(*) FROM pg_trigger WHERE tgname IN ('a_einvoice_owner_guard', 'b_einvoice_setting_guard', 'c_einvoice_setting_matches_history', 'b_einvoice_change_guard')"
             )
             return cursor.fetchone()[0]
 
@@ -519,4 +548,4 @@ def test_the_guard_triggers_reverse_and_apply_again(db):
         for statement in [*migration.FUNCTIONS_FORWARD, *migration.TRIGGERS_FORWARD]:
             cursor.execute(statement)
 
-    assert guards() == 4
+    assert guards() == 5

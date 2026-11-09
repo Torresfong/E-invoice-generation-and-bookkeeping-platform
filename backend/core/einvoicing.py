@@ -146,9 +146,9 @@ def update_setting(
     _validate(einvoicing_enabled, status, effective_from, supplier)
 
     with transaction.atomic():
-        setting, _created = CompanyEInvoiceSetting.objects.select_for_update().get_or_create(
-            company=company, defaults={"effective_from": effective_from, "einvoicing_enabled": False}
-        )
+        # Lock the existing setting, if any, so two owners saving at once take turns. The history row goes first: the
+        # database accepts a setting only when it equals the latest history row (migration 0035).
+        setting = CompanyEInvoiceSetting.objects.select_for_update().filter(company=company).first()
         previous = (
             CompanyEInvoiceSettingChange.objects.filter(company=company).order_by("-effective_from", "-id").first()
         )
@@ -169,8 +169,10 @@ def update_setting(
             acknowledgement_version=ACKNOWLEDGEMENT_VERSION if needs_acknowledgement else "",
             **supplier,
         )
-        setting.einvoicing_enabled, setting.status, setting.effective_from = einvoicing_enabled, status, effective_from
-        for name, value in supplier.items():
+        values = {"einvoicing_enabled": einvoicing_enabled, "status": status, "effective_from": effective_from, **supplier}
+        if setting is None:
+            return CompanyEInvoiceSetting.objects.create(company=company, **values)
+        for name, value in values.items():
             setattr(setting, name, value)
         setting.save()
         return setting

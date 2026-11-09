@@ -12,7 +12,7 @@ from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
 from . import audit, einvoicing, firm_admin, permissions, registration, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry
+from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, SupplierDetails
 from .signin import complete_sign_in
 
 logger = logging.getLogger(__name__)
@@ -168,7 +168,7 @@ def _einvoice_page(request, access, form=None, **extra):
         "access": access,
         "setting": setting,
         "form": form if form is not None else setting,
-        "statuses": einvoicing.SupplierDetails.STATUS_CHOICES,
+        "statuses": SupplierDetails.STATUS_CHOICES,
         "acknowledgement_text": einvoicing.ACKNOWLEDGEMENT_TEXT,
         **extra,
     }

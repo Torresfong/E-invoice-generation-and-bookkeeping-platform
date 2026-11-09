@@ -55,6 +55,30 @@ END
 $$
 """
 
+SETTING_MATCH_FUNCTION = """
+CREATE FUNCTION einvoice_setting_matches_history() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS
+$$
+DECLARE
+    latest core_companyeinvoicesettingchange%ROWTYPE;
+BEGIN
+    -- The setting is the latest recorded change and nothing else, so no write can alter a TIN or the on/off
+    -- switch without leaving a history row. IS DISTINCT FROM treats a NULL status as a value, not as unknown.
+    SELECT * INTO latest FROM core_companyeinvoicesettingchange
+    WHERE company_id = NEW.company_id ORDER BY effective_from DESC, id DESC LIMIT 1;
+    IF NOT FOUND OR (NEW.einvoicing_enabled, NEW.status, NEW.effective_from, NEW.tin, NEW.brn, NEW.rob, NEW.msic_code,
+                     NEW.address_line1, NEW.address_line2, NEW.city, NEW.postal_zone, NEW.state_code, NEW.country_code)
+       IS DISTINCT FROM
+       (latest.einvoicing_enabled, latest.status, latest.effective_from, latest.tin, latest.brn, latest.rob,
+        latest.msic_code, latest.address_line1, latest.address_line2, latest.city, latest.postal_zone,
+        latest.state_code, latest.country_code) THEN
+        RAISE EXCEPTION 'the e-invoice setting must match the latest recorded change';
+    END IF;
+    RETURN NEW;
+END
+$$
+"""
+
 CHANGE_GUARD_FUNCTION = """
 CREATE FUNCTION einvoice_change_guard() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS
@@ -92,7 +116,7 @@ END
 $$
 """
 
-FUNCTIONS_FORWARD = [OWNER_GUARD_FUNCTION, SETTING_GUARD_FUNCTION, CHANGE_GUARD_FUNCTION]
+FUNCTIONS_FORWARD = [OWNER_GUARD_FUNCTION, SETTING_GUARD_FUNCTION, SETTING_MATCH_FUNCTION, CHANGE_GUARD_FUNCTION]
 
 TRIGGERS_FORWARD = [
     # Postgres fires triggers of one table in name order, so the owner check ("a_") runs before the other guard ("b_").
@@ -100,6 +124,8 @@ TRIGGERS_FORWARD = [
     "FOR EACH ROW EXECUTE FUNCTION einvoice_owner_guard()",
     "CREATE TRIGGER b_einvoice_setting_guard BEFORE UPDATE OR DELETE ON core_companyeinvoicesetting "
     "FOR EACH ROW EXECUTE FUNCTION einvoice_setting_guard()",
+    "CREATE TRIGGER c_einvoice_setting_matches_history BEFORE INSERT OR UPDATE ON core_companyeinvoicesetting "
+    "FOR EACH ROW EXECUTE FUNCTION einvoice_setting_matches_history()",
     "CREATE TRIGGER a_einvoice_owner_guard BEFORE INSERT OR UPDATE ON core_companyeinvoicesettingchange "
     "FOR EACH ROW EXECUTE FUNCTION einvoice_owner_guard()",
     "CREATE TRIGGER b_einvoice_change_guard BEFORE INSERT OR UPDATE OR DELETE ON core_companyeinvoicesettingchange "
@@ -116,8 +142,10 @@ PRIVILEGES_FORWARD = [
 REVERSE = [
     "DROP TRIGGER IF EXISTS b_einvoice_change_guard ON core_companyeinvoicesettingchange",
     "DROP TRIGGER IF EXISTS a_einvoice_owner_guard ON core_companyeinvoicesettingchange",
+    "DROP TRIGGER IF EXISTS c_einvoice_setting_matches_history ON core_companyeinvoicesetting",
     "DROP TRIGGER IF EXISTS b_einvoice_setting_guard ON core_companyeinvoicesetting",
     "DROP TRIGGER IF EXISTS a_einvoice_owner_guard ON core_companyeinvoicesetting",
+    "DROP FUNCTION IF EXISTS einvoice_setting_matches_history()",
     "DROP FUNCTION IF EXISTS einvoice_change_guard()",
     "DROP FUNCTION IF EXISTS einvoice_setting_guard()",
     "DROP FUNCTION IF EXISTS einvoice_owner_guard()",
