@@ -1,0 +1,72 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "Items" %} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{% trans "Items" %}</h1>
+  <p>{{ company.name }}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% can "manage_items" company as may_manage %}
+  {% if items %}
+    <table>
+      <thead>
+        <tr>
+          <th>{% trans "Name" %}</th>
+          <th>{% trans "LHDN classification code" %}</th>
+          <th>{% trans "LHDN unit code" %}</th>
+          <th>{% trans "Default tax type" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in items %}
+          <tr>
+            <td><a href="/companies/{{ company.pk }}/items/{{ item.pk }}/">{{ item.name }}</a></td>
+            <td>{{ item.classification_code }}</td>
+            <td>{{ item.unit_code }}</td>
+            <td>{{ item.default_tax_type }}</td>
+            <td>{% if item.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}</td>
+            <td>
+              {% if may_manage %}
+                {% if item.is_active %}
+                  <form method="post" action="/companies/{{ company.pk }}/items/{{ item.pk }}/deactivate/">{% csrf_token %}<button type="submit">{% trans "Deactivate" %}</button></form>
+                {% else %}
+                  <form method="post" action="/companies/{{ company.pk }}/items/{{ item.pk }}/activate/">{% csrf_token %}<button type="submit">{% trans "Activate" %}</button></form>
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% trans "No items yet." %}</p>
+  {% endif %}
+  {% if may_manage %}
+    <h2>{% trans "Add an item" %}</h2>
+    <form method="post" action="/companies/{{ company.pk }}/items/">
+      {% csrf_token %}
+      <p><label>{% trans "Name" %} <input name="name" maxlength="200" value="{{ form.name|default:'' }}" required></label></p>
+      <p><label>{% trans "LHDN classification code" %}
+        <select name="classification_code" required>
+          <option value="">—</option>
+          {% for code, description in classification_codes %}<option value="{{ code }}" {% if form.classification_code == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
+        </select></label></p>
+      <p><label>{% trans "LHDN unit code" %} <input name="unit_code" maxlength="10" list="unit-codes" value="{{ form.unit_code|default:'' }}" required></label></p>
+      <datalist id="unit-codes">{% for code, name in unit_codes %}<option value="{{ code }}">{{ name }}</option>{% endfor %}</datalist>
+      <p><label>{% trans "Default tax type" %}
+        <select name="default_tax_type" required>
+          <option value="">—</option>
+          {% for code, description in tax_types %}<option value="{{ code }}" {% if form.default_tax_type == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
+        </select></label></p>
+      <button type="submit">{% trans "Save" %}</button>
+    </form>
+  {% endif %}
+  <p><a href="/companies/{{ company.pk }}/">{% trans "Back to the company" %}</a></p>
+</body>
+</html>

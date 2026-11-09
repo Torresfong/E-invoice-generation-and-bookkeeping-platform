@@ -1,0 +1,19 @@
+# Keep certificates, keys and secrets out of the image (D13). The build context is ./backend.
+# Unlike .gitignore, patterns here match only at the context root unless they start with **/.
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.key
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+
+.git
+.gitignore
+**/.pytest_cache
+**/.ruff_cache
+**/__pycache__
+**/*.pyc
+.venv

@@ -489,6 +489,90 @@ msgstr "电子发票已关闭。所有者尚未设置。"
 msgid "Back to the company"
 msgstr "返回公司"
 
+#: .\core\templates\company.html .\core\templates\items.html
+msgid "Items"
+msgstr "商品和服务"
+
+#: .\core\templates\items.html
+msgid "Name"
+msgstr "名称"
+
+#: .\core\templates\items.html
+msgid "LHDN classification code"
+msgstr "LHDN 分类代码"
+
+#: .\core\templates\items.html
+msgid "LHDN unit code"
+msgstr "LHDN 计量单位代码"
+
+#: .\core\templates\items.html
+msgid "Default tax type"
+msgstr "默认税种"
+
+#: .\core\templates\items.html
+msgid "Active"
+msgstr "启用中"
+
+#: .\core\templates\items.html
+msgid "Inactive"
+msgstr "已停用"
+
+#: .\core\templates\items.html
+msgid "Deactivate"
+msgstr "停用"
+
+#: .\core\templates\items.html
+msgid "Activate"
+msgstr "启用"
+
+#: .\core\templates\items.html
+msgid "No items yet."
+msgstr "暂无商品或服务。"
+
+#: .\core\templates\items.html
+msgid "Add an item"
+msgstr "添加商品或服务"
+
+#: .\core\templates\item.html
+msgid "Only the company owner can change the LHDN codes."
+msgstr "只有公司所有者可以更改 LHDN 代码。"
+
+#: .\core\templates\item.html
+msgid "History"
+msgstr "历史记录"
+
+#: .\core\templates\item.html
+msgid "Before"
+msgstr "更改前"
+
+#: .\core\templates\item.html
+msgid "After"
+msgstr "更改后"
+
+#: .\core\templates\item.html
+msgid "Back to the items"
+msgstr "返回商品和服务列表"
+
+#: .\core\views.py
+msgid "Item saved."
+msgstr "商品或服务已保存。"
+
+#: .\core\items.py
+msgid "name"
+msgstr "名称"
+
+#: .\core\items.py
+msgid "classification code"
+msgstr "分类代码"
+
+#: .\core\items.py
+msgid "unit code"
+msgstr "计量单位代码"
+
+#: .\core\items.py
+msgid "default tax type"
+msgstr "默认税种"
+
 #: .\core\templates\einvoice_setting.html
 msgid ""
 "This switch applies to new invoices only. Switching e-invoicing off does not "
