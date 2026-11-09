@@ -15,6 +15,7 @@
     <form method="post" action="/companies/{{ company.pk }}/einvoicing/">
       {% csrf_token %}
       <p><label><input type="checkbox" name="einvoicing_enabled" {% if form.einvoicing_enabled %}checked{% endif %}> {% trans "E-invoicing is on" %}</label></p>
+      <p>{% trans "This switch applies to new invoices only. Switching e-invoicing off does not stop credit, debit and refund notes on invoices that were already sent to LHDN, and switching it on does not move earlier normal invoices to e-invoicing." %}</p>
       <p><label>{% trans "Status" %}
         <select name="status">
           <option value="">{% trans "Not checked yet" %}</option>
@@ -40,6 +41,7 @@
     </form>
   {% else %}
     <p>{% trans "Only the company owner can change this setting." %}</p>
+    <p>{% trans "This switch applies to new invoices only. Switching e-invoicing off does not stop credit, debit and refund notes on invoices that were already sent to LHDN, and switching it on does not move earlier normal invoices to e-invoicing." %}</p>
     {% if setting %}
       <dl>
         <dt>{% trans "E-invoicing" %}</dt><dd>{% if setting.einvoicing_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</dd>

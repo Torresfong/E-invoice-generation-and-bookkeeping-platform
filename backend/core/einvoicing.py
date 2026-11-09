@@ -20,6 +20,7 @@ from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
 from . import permissions
+from .db import scalar
 from .models import CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, SupplierDetails
 
 # Bumped whenever the wording below changes, so each recorded acknowledgement says which text the owner accepted.
@@ -146,9 +147,14 @@ def update_setting(
     _validate(einvoicing_enabled, status, effective_from, supplier)
 
     with transaction.atomic():
-        # Lock the existing setting, if any, so two owners saving at once take turns. The history row goes first: the
-        # database accepts a setting only when it equals the latest history row (migration 0035).
-        setting = CompanyEInvoiceSetting.objects.select_for_update().filter(company=company).first()
+        # Saves of one company take turns, including the very first save when there is no setting row to lock yet.
+        # The lock is the one the history trigger takes, so it is held through the whole transaction.
+        scalar(
+            "SELECT pg_advisory_xact_lock(hashtext('core_companyeinvoicesettingchange'), (%s::bigint %% 2147483647)::int)",
+            [company.pk],
+        )
+        # The history row goes first: the database accepts a setting only when it equals the latest history row.
+        setting =CompanyEInvoiceSetting.objects.select_for_update().filter(company=company).first()
         previous = (
             CompanyEInvoiceSettingChange.objects.filter(company=company).order_by("-effective_from", "-id").first()
         )

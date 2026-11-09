@@ -79,6 +79,38 @@ END
 $$
 """
 
+# The check above runs when the setting is written. This one runs when the transaction ends, after a write to either
+# table, so appending a history row without updating the setting (or the reverse) cannot be committed. It is
+# deferred so the service can write the history first and the setting second in one transaction.
+AGREEMENT_FUNCTION = """
+CREATE FUNCTION einvoice_agreement_check() RETURNS trigger
+LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS
+$$
+DECLARE
+    latest core_companyeinvoicesettingchange%ROWTYPE;
+    cur core_companyeinvoicesetting%ROWTYPE;
+    has_latest boolean;
+    has_cur boolean;
+BEGIN
+    SELECT * INTO latest FROM core_companyeinvoicesettingchange
+    WHERE company_id = NEW.company_id ORDER BY effective_from DESC, id DESC LIMIT 1;
+    has_latest := FOUND;
+    SELECT * INTO cur FROM core_companyeinvoicesetting WHERE company_id = NEW.company_id;
+    has_cur := FOUND;
+    IF has_latest <> has_cur OR (has_cur AND (
+        cur.einvoicing_enabled, cur.status, cur.effective_from, cur.tin, cur.brn, cur.rob, cur.msic_code,
+        cur.address_line1, cur.address_line2, cur.city, cur.postal_zone, cur.state_code, cur.country_code)
+       IS DISTINCT FROM
+       (latest.einvoicing_enabled, latest.status, latest.effective_from, latest.tin, latest.brn, latest.rob,
+        latest.msic_code, latest.address_line1, latest.address_line2, latest.city, latest.postal_zone,
+        latest.state_code, latest.country_code)) THEN
+        RAISE EXCEPTION 'the e-invoice setting and its history must agree';
+    END IF;
+    RETURN NULL;
+END
+$$
+"""
+
 CHANGE_GUARD_FUNCTION = """
 CREATE FUNCTION einvoice_change_guard() RETURNS trigger
 LANGUAGE plpgsql SET search_path = pg_catalog, public, pg_temp AS
@@ -116,7 +148,9 @@ END
 $$
 """
 
-FUNCTIONS_FORWARD = [OWNER_GUARD_FUNCTION, SETTING_GUARD_FUNCTION, SETTING_MATCH_FUNCTION, CHANGE_GUARD_FUNCTION]
+FUNCTIONS_FORWARD = [
+    OWNER_GUARD_FUNCTION, SETTING_GUARD_FUNCTION, SETTING_MATCH_FUNCTION, AGREEMENT_FUNCTION, CHANGE_GUARD_FUNCTION,
+]
 
 TRIGGERS_FORWARD = [
     # Postgres fires triggers of one table in name order, so the owner check ("a_") runs before the other guard ("b_").
@@ -130,6 +164,10 @@ TRIGGERS_FORWARD = [
     "FOR EACH ROW EXECUTE FUNCTION einvoice_owner_guard()",
     "CREATE TRIGGER b_einvoice_change_guard BEFORE INSERT OR UPDATE OR DELETE ON core_companyeinvoicesettingchange "
     "FOR EACH ROW EXECUTE FUNCTION einvoice_change_guard()",
+    "CREATE CONSTRAINT TRIGGER einvoice_agreement_setting AFTER INSERT OR UPDATE ON core_companyeinvoicesetting "
+    "DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION einvoice_agreement_check()",
+    "CREATE CONSTRAINT TRIGGER einvoice_agreement_change AFTER INSERT ON core_companyeinvoicesettingchange "
+    "DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION einvoice_agreement_check()",
 ]
 
 # Jobs read the setting; the web role neither deletes either table nor updates the history.
@@ -140,6 +178,9 @@ PRIVILEGES_FORWARD = [
 ]
 
 REVERSE = [
+    "DROP TRIGGER IF EXISTS einvoice_agreement_change ON core_companyeinvoicesettingchange",
+    "DROP TRIGGER IF EXISTS einvoice_agreement_setting ON core_companyeinvoicesetting",
+    "DROP FUNCTION IF EXISTS einvoice_agreement_check()",
     "DROP TRIGGER IF EXISTS b_einvoice_change_guard ON core_companyeinvoicesettingchange",
     "DROP TRIGGER IF EXISTS a_einvoice_owner_guard ON core_companyeinvoicesettingchange",
     "DROP TRIGGER IF EXISTS c_einvoice_setting_matches_history ON core_companyeinvoicesetting",

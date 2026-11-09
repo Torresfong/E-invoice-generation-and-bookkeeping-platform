@@ -488,3 +488,13 @@ msgstr "电子发票已关闭。所有者尚未设置。"
 #: .\core\templates\einvoice_setting.html
 msgid "Back to the company"
 msgstr "返回公司"
+
+#: .\core\templates\einvoice_setting.html
+msgid ""
+"This switch applies to new invoices only. Switching e-invoicing off does not "
+"stop credit, debit and refund notes on invoices that were already sent to "
+"LHDN, and switching it on does not move earlier normal invoices to "
+"e-invoicing."
+msgstr ""
+"此开关仅适用于新发票。关闭电子发票不会影响对已提交至 LHDN 的发票开具贷项、借项和退款票据；"
+"开启电子发票也不会把之前的普通发票改为电子发票。"

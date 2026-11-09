@@ -52,6 +52,12 @@ def change(user, company, *, enabled=True, status="voluntary", effective_from=D1
     )
 
 
+def settle():
+    """Run the end-of-transaction agreement checks now, as a commit would."""
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS einvoice_agreement_setting, einvoice_agreement_change IMMEDIATE")
+
+
 def history(company):
     return list(CompanyEInvoiceSettingChange.objects.filter(company=company).order_by("id"))
 
@@ -339,10 +345,15 @@ def test_switching_off_when_the_status_is_not_checked_yet_needs_no_acknowledgeme
 def test_the_database_lets_a_not_checked_status_be_switched_off_without_an_acknowledgement(world):
     change(world["acme_owner"], world["acme"], enabled=True, status=None, effective_from=D1)
 
-    CompanyEInvoiceSettingChange.objects.create(
-        company=world["acme"], changed_by=world["acme_owner"], einvoicing_enabled=False, status=None,
-        effective_from=D2, **supplier(),
-    )
+    with transaction.atomic():
+        CompanyEInvoiceSettingChange.objects.create(
+            company=world["acme"], changed_by=world["acme_owner"], einvoicing_enabled=False, status=None,
+            effective_from=D2, **supplier(),
+        )
+        CompanyEInvoiceSetting.objects.filter(company=world["acme"]).update(
+            einvoicing_enabled=False, status=None, effective_from=D2
+        )
+        settle()
 
     assert history(world["acme"])[-1].einvoicing_enabled is False
 
@@ -549,3 +560,81 @@ def test_the_guard_triggers_reverse_and_apply_again(db):
             cursor.execute(statement)
 
     assert guards() == 5
+
+
+# --- the setting and its history agree when a transaction ends -------------------------------------------------------------
+
+
+def test_a_history_row_appended_without_updating_the_setting_cannot_be_committed(world):
+    change(world["acme_owner"], world["acme"])
+
+    with pytest.raises(DatabaseError):
+        with transaction.atomic():
+            CompanyEInvoiceSettingChange.objects.create(
+                company=world["acme"], changed_by=world["acme_owner"], einvoicing_enabled=False,
+                status="voluntary", effective_from=D2, **supplier(),
+            )
+            settle()
+
+
+def test_a_history_row_with_no_setting_at_all_cannot_be_committed(world):
+    with pytest.raises(DatabaseError):
+        with transaction.atomic():
+            CompanyEInvoiceSettingChange.objects.create(
+                company=world["acme"], changed_by=world["acme_owner"], einvoicing_enabled=True,
+                status="voluntary", effective_from=D1, **supplier(),
+            )
+            settle()
+
+
+def test_the_service_writes_history_then_setting_and_they_agree_at_the_end(world):
+    with transaction.atomic():
+        change(world["acme_owner"], world["acme"], enabled=False, status=None)
+        change(world["acme_owner"], world["acme"], effective_from=D2)
+        settle()
+
+
+@pytest.mark.django_db(transaction=True)
+def test_two_first_saves_at_once_take_turns_instead_of_failing():
+    import threading
+
+    from .factories import make_company, make_member
+
+    company = make_company("Race Co")
+    owner = make_member("owner@race.example", company, CompanyAccess.OWNER)
+    start, errors = threading.Barrier(2), []
+
+    def save():
+        try:
+            start.wait()
+            change(owner, company)
+        except Exception as problem:  # noqa: BLE001 - the test reports whatever the save raised
+            errors.append(type(problem).__name__)
+        finally:
+            connection.close()
+
+    threads = [threading.Thread(target=save) for _ in range(2)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert errors == []
+    assert CompanyEInvoiceSetting.objects.filter(company=company).count() == 1
+    assert len(history(company)) == 2
+
+
+# --- the screen says what the switch covers (D61 (2)) -------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+def test_the_screen_says_the_switch_governs_new_invoices_only(client, world, as_production_connection, who):
+    with as_production_connection():
+        sign_in(client, world[who])
+        english = client.get(f"/companies/{world['acme'].pk}/einvoicing/").content.decode()
+        chinese = client.get(
+            f"/companies/{world['acme'].pk}/einvoicing/", headers={"accept-language": "zh-hans"}
+        ).content.decode()
+
+    assert "applies to new invoices only" in english and "already sent to LHDN" in english
+    assert "仅适用于新发票" in chinese
