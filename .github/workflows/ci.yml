@@ -56,7 +56,8 @@ jobs:
           fetch-depth: 0
       - name: Install gitleaks
         run: |
-          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+          curl -sSfL --retry 5 --retry-all-errors --retry-delay 5 -o gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          tar -xzf gitleaks.tar.gz gitleaks
       - name: Scan the pushed changes
         env:
           EVENT_NAME: ${{ github.event_name }}
