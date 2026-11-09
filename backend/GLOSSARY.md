@@ -95,7 +95,7 @@ A company user who drafts invoices and uploads documents but cannot approve or s
 _Avoid_: Employee, member
 
 **Firm**:
-An accounting firm. Every company belongs to exactly one firm, and a firm's accountants reach only that firm's companies. Created only by the platform operator.
+An accounting firm. A company belongs to at most one firm and may have none; a firm's accountants reach only that firm's companies. Created only by the platform operator.
 _Avoid_: Practice, agency, accounting company
 
 **Firm accountant**:

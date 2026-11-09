@@ -21,7 +21,7 @@ class UserManager(BaseUserManager):
 
 
 class Firm(models.Model):
-    """An accounting firm (D49). Each company belongs to exactly one firm and each firm accountant to exactly one.
+    """An accounting firm (D49, D67). A company may have no firm; each firm accountant belongs to exactly one.
 
     Created only by the platform operator. The web role can read its own firm and nothing else.
     """
