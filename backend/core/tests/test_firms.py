@@ -413,14 +413,14 @@ def test_the_nullable_firm_migration_preserves_existing_data_and_reverses(firms_
     latest = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
     before = firm_company_access_counts()
     try:
-        MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
+        MigrationExecutor(connection).migrate([("core", "0036_item_master")])
         assert company_firm_is_nullable() == [("NO",)]
 
         MigrationExecutor(connection).migrate(latest)
         assert company_firm_is_nullable() == [("YES",)]
         assert firm_company_access_counts() == before
 
-        MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
+        MigrationExecutor(connection).migrate([("core", "0036_item_master")])
         assert company_firm_is_nullable() == [("NO",)]
     finally:
         MigrationExecutor(connection).migrate(latest)
@@ -434,11 +434,11 @@ def test_the_nullable_firm_migration_cannot_reverse_while_a_company_has_no_firm(
     company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
     try:
         with pytest.raises(DatabaseError):
-            MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
+            MigrationExecutor(connection).migrate([("core", "0036_item_master")])
         assert company_firm_is_nullable() == [("YES",)]  # the refused reversal changed nothing
 
         services.move_company(company, firms_world["alpha"])  # resolve the firm-less row, as the PR's rollback note says
-        MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
+        MigrationExecutor(connection).migrate([("core", "0036_item_master")])
         assert company_firm_is_nullable() == [("NO",)]
     finally:
         MigrationExecutor(connection).migrate(latest)

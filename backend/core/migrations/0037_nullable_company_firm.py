@@ -3,7 +3,7 @@ from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0035_company_einvoice_setting")]
+    dependencies = [("core", "0036_item_master")]
 
     operations = [
         migrations.AlterField(
