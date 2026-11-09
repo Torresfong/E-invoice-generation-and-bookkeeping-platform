@@ -47,7 +47,7 @@
   <ol>
     {% for change in history %}
       <li>
-        {{ change.changed_at|date:"Y-m-d H:i" }} · {{ change.changed_by.email|default:"—" }}
+        {{ change.changed_at|date:"Y-m-d H:i" }} · {{ change.changed_by_email|default:"—" }}
         {% if change.before %}
           <br>{% trans "Before" %}: {% for key, value in change.before.items %}{{ key }}={{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}
         {% endif %}

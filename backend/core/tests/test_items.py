@@ -232,7 +232,7 @@ def test_every_change_is_kept_with_its_values_before_and_after_and_who_made_it(w
 
     changes = list(items.history(item))
 
-    assert [(c.changed_by.email, c.before is None) for c in changes] == [
+    assert [(c.changed_by_email, c.before is None) for c in changes] == [
         ("staff@acme.example", True),
         ("owner@acme.example", False),
         ("staff@acme.example", False),

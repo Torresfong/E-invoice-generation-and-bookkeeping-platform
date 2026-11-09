@@ -240,6 +240,9 @@ class ItemChange(TenantModel):
 
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="changes")
     changed_by = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name="+")
+    # A copy of the address, like `AuditEntry.actor_email`: the database lets a user read only their own user row, so a
+    # colleague, or an accountant, could not otherwise see who made the change.
+    changed_by_email = models.CharField(max_length=254, blank=True, db_default="")
     changed_at = models.DateTimeField(db_default=Now())
     before = models.JSONField(null=True)
     after = models.JSONField()

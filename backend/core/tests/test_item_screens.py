@@ -102,6 +102,26 @@ def test_the_owner_changes_the_codes_from_the_edit_screen(client, world, as_prod
     assert (item.classification_code, item.unit_code) == (COMPUTER, KILOGRAM)
 
 
+@pytest.mark.parametrize("reader", ["acme_owner", "accountant"])
+def test_the_history_names_who_made_each_change_to_a_reader_who_cannot_see_that_user(
+    client, world, as_production_connection, reader
+):
+    """The web role sees only its own user row, so the name must be kept on the history row itself."""
+    with as_production_connection():
+        sign_in(client, world["acme_staff"])
+        client.post(items_url(world["acme"]), item_form(name="Widget"))
+        client.post("/logout/")
+    item = Item.objects.get(company=world["acme"])
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        client.post(items_url(world["acme"], item.pk), item_form(name="Widget", classification_code=COMPUTER))
+        client.post("/logout/")
+        sign_in(client, world[reader])
+        page = client.get(items_url(world["acme"], item.pk)).content.decode()
+
+    assert "staff@acme.example" in page and "owner@acme.example" in page
+
+
 def test_the_edit_screen_keeps_a_code_that_lhdn_has_since_retired_selected(
     client, world, as_production_connection, monkeypatch
 ):

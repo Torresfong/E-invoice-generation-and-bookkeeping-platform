@@ -58,6 +58,7 @@ $$
 DECLARE
     v_before jsonb;
     v_after jsonb;
+    v_email text;
 BEGIN
     v_after := jsonb_build_object(
         'name', NEW.name, 'classification_code', NEW.classification_code, 'unit_code', NEW.unit_code,
@@ -70,8 +71,11 @@ BEGIN
             RETURN NULL;
         END IF;
     END IF;
-    INSERT INTO core_itemchange (company_id, item_id, changed_by_id, changed_at, before, after)
-    VALUES (NEW.company_id, NEW.id, app_user_id(), now(), v_before, v_after);
+    -- The signed-in user can read their own user row, so their address is copied here: a colleague who later reads
+    -- the history cannot read that row. An operator command has no user and leaves it empty.
+    SELECT email INTO v_email FROM core_user WHERE id = app_user_id();
+    INSERT INTO core_itemchange (company_id, item_id, changed_by_id, changed_by_email, changed_at, before, after)
+    VALUES (NEW.company_id, NEW.id, app_user_id(), coalesce(v_email, ''), now(), v_before, v_after);
     RETURN NULL;
 END
 $$
@@ -147,6 +151,7 @@ class Migration(migrations.Migration):
             name='ItemChange',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('changed_by_email', models.CharField(blank=True, db_default='', max_length=254)),
                 ('changed_at', models.DateTimeField(db_default=django.db.models.functions.datetime.Now())),
                 ('before', models.JSONField(null=True)),
                 ('after', models.JSONField()),

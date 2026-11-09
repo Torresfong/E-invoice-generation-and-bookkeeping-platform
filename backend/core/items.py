@@ -137,5 +137,8 @@ def item_for_new_draft(company, item_id):
 
 
 def history(item):
-    """Every change to `item`, oldest first, each with its values before and after and who made it."""
-    return list(ItemChange.objects.filter(item=item).select_related("changed_by"))
+    """Every change to `item`, oldest first, each with its values before and after and the address of who made it.
+
+    The address is read from the history row, not joined from the user table, which a reader may not see in full.
+    """
+    return list(ItemChange.objects.filter(item=item))
