@@ -143,6 +143,71 @@ class DocumentSequence(TenantModel):
         ]
 
 
+class SupplierDetails(models.Model):
+    """The supplier fields of a company's e-invoice setting, shared by the setting and each history row (D59 (2)).
+
+    TIN, BRN and ROB identify the business to LHDN. They must never reach a log, an audit entry, a fixture or a
+    `repr`, so `__str__` and `__repr__` show the company id only.
+    """
+
+    MANDATORY, VOLUNTARY, EXEMPT = "mandatory", "voluntary", "exempt"
+    STATUS_CHOICES = [(MANDATORY, "Mandatory"), (VOLUNTARY, "Voluntary"), (EXEMPT, "Exempt")]
+
+    einvoicing_enabled = models.BooleanField(default=False, db_default=False)
+    # Empty until the exemption check of D63 has been done ("not yet checked").
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, null=True, blank=True)
+    effective_from = models.DateField()
+    tin = models.CharField(max_length=20, blank=True, default="")
+    brn = models.CharField(max_length=20, blank=True, default="")
+    rob = models.CharField(max_length=20, blank=True, default="")
+    msic_code = models.CharField(max_length=5, blank=True, default="")
+    address_line1 = models.CharField(max_length=150, blank=True, default="")
+    address_line2 = models.CharField(max_length=150, blank=True, default="")
+    city = models.CharField(max_length=50, blank=True, default="")
+    postal_zone = models.CharField(max_length=5, blank=True, default="")
+    state_code = models.CharField(max_length=2, blank=True, default="")
+    country_code = models.CharField(max_length=3, blank=True, default="MYS")
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return f"{type(self).__name__} (company {self.company_id})"
+
+    __repr__ = __str__
+
+
+class CompanyEInvoiceSetting(SupplierDetails, TenantModel):
+    """The current e-invoice setting of a company: one row at most (D59 (2), D61 (3)).
+
+    Only the company owner may write it (migration 0035 refuses anyone else), and every write goes through
+    `core.einvoicing.update_setting`, which also keeps a `CompanyEInvoiceSettingChange`.
+    """
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["company"], name="one_einvoice_setting_per_company")]
+
+
+class CompanyEInvoiceSettingChange(SupplierDetails, TenantModel):
+    """One change to a company's e-invoice setting, kept for good with its date and person (D59 (2), D63).
+
+    Append-only: the database refuses to update or delete a row. `einvoicing_enabled(company, on_date)` reads the latest
+    row whose effective date has arrived. `status` may be empty, so the first time a status is set shows in the history.
+    """
+
+    changed_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    changed_at = models.DateTimeField(db_default=Now())
+    # Set when a mandatory company is switched off: who accepted the warning, when, and which wording they saw.
+    acknowledged_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledgement_version = models.CharField(max_length=40, blank=True, default="")
+
+    class Meta:
+        indexes = [models.Index(fields=["company", "effective_from", "id"], name="einvoice_change_lookup")]
+
+
 class Job(models.Model):
     """A queued background job (D10, D36, ADR 0001).
 

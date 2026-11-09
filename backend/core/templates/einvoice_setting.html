@@ -1,0 +1,60 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "E-invoice setting" %} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{% trans "E-invoice setting" %}</h1>
+  <p>{{ company.name }}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% can "manage_einvoicing" company as may_manage %}
+  {% if may_manage %}
+    <form method="post" action="/companies/{{ company.pk }}/einvoicing/">
+      {% csrf_token %}
+      <p><label><input type="checkbox" name="einvoicing_enabled" {% if form.einvoicing_enabled %}checked{% endif %}> {% trans "E-invoicing is on" %}</label></p>
+      <p><label>{% trans "Status" %}
+        <select name="status">
+          <option value="">{% trans "Not checked yet" %}</option>
+          {% for value, label in statuses %}<option value="{{ value }}" {% if form.status == value %}selected{% endif %}>{% trans label %}</option>{% endfor %}
+        </select></label></p>
+      <p><label>{% trans "Effective from" %} <input type="date" name="effective_from" value="{{ form.effective_from|date:'Y-m-d' }}" required></label></p>
+      <h2>{% trans "Supplier details" %}</h2>
+      <p><label>{% trans "TIN" %} <input name="tin" maxlength="20" value="{{ form.tin|default:'' }}"></label></p>
+      <p><label>{% trans "BRN" %} <input name="brn" maxlength="20" value="{{ form.brn|default:'' }}"></label></p>
+      <p><label>{% trans "ROB (optional)" %} <input name="rob" maxlength="20" value="{{ form.rob|default:'' }}"></label></p>
+      <p><label>{% trans "MSIC code" %} <input name="msic_code" maxlength="5" value="{{ form.msic_code|default:'' }}"></label></p>
+      <p><label>{% trans "Address line 1" %} <input name="address_line1" maxlength="150" value="{{ form.address_line1|default:'' }}"></label></p>
+      <p><label>{% trans "Address line 2" %} <input name="address_line2" maxlength="150" value="{{ form.address_line2|default:'' }}"></label></p>
+      <p><label>{% trans "City" %} <input name="city" maxlength="50" value="{{ form.city|default:'' }}"></label></p>
+      <p><label>{% trans "Postcode" %} <input name="postal_zone" maxlength="5" value="{{ form.postal_zone|default:'' }}"></label></p>
+      <p><label>{% trans "State code" %} <input name="state_code" maxlength="2" value="{{ form.state_code|default:'' }}"></label></p>
+      <p><label>{% trans "Country code" %} <input name="country_code" maxlength="3" value="{{ form.country_code|default:'MYS' }}"></label></p>
+      {% if needs_acknowledgement %}
+        <p role="alert">{% trans "Switching e-invoicing off for a mandatory company needs your acknowledgement." %}</p>
+        <p><label><input type="checkbox" name="acknowledged" required> {{ acknowledgement_text }}</label></p>
+      {% endif %}
+      <button type="submit">{% trans "Save" %}</button>
+    </form>
+  {% else %}
+    <p>{% trans "Only the company owner can change this setting." %}</p>
+    {% if setting %}
+      <dl>
+        <dt>{% trans "E-invoicing" %}</dt><dd>{% if setting.einvoicing_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</dd>
+        <dt>{% trans "Status" %}</dt><dd>{% if setting.status %}{{ setting.get_status_display }}{% else %}{% trans "Not checked yet" %}{% endif %}</dd>
+        <dt>{% trans "Effective from" %}</dt><dd>{{ setting.effective_from|date:"Y-m-d" }}</dd>
+        <dt>{% trans "TIN" %}</dt><dd>{{ setting.tin }}</dd>
+        <dt>{% trans "BRN" %}</dt><dd>{{ setting.brn }}</dd>
+        <dt>{% trans "ROB (optional)" %}</dt><dd>{{ setting.rob }}</dd>
+        <dt>{% trans "MSIC code" %}</dt><dd>{{ setting.msic_code }}</dd>
+        <dt>{% trans "Address" %}</dt><dd>{{ setting.address_line1 }} {{ setting.address_line2 }} {{ setting.postal_zone }} {{ setting.city }}</dd>
+      </dl>
+    {% else %}
+      <p>{% trans "E-invoicing is off. The owner has not set it up yet." %}</p>
+    {% endif %}
+  {% endif %}
+  <p><a href="/companies/{{ company.pk }}/">{% trans "Back to the company" %}</a></p>
+</body>
+</html>

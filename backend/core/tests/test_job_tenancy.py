@@ -10,7 +10,7 @@ from django.urls import get_resolver
 from core import jobs
 from core.audit import audit_trigger_sql
 from core.models import AuditEntry, Job
-from core.rls import tenant_policy_sql
+from core.rls import JOB_COMPANY_CHECK, WORKER_ROLE, tenant_policy_sql
 
 from .factories import PASSWORD
 from .test_tenancy import query
@@ -490,6 +490,12 @@ def test_the_role_and_company_context_are_put_back_after_a_failing_handler(regis
 
 def test_the_job_migration_reverses_and_applies_again(db):
     with connection.cursor() as cursor:
+        # Tables added after 0017 and opened to the worker (the e-invoice setting) depend on `app_company_id()`, which
+        # this reversal drops; a real rollback would undo them first, so set their worker policies aside and restore them.
+        cursor.execute("SELECT tablename FROM pg_policies WHERE policyname = 'worker_company_context' AND tablename <> 'core_job'")
+        later_tables = [row[0] for row in cursor.fetchall()]
+        for table in later_tables:
+            cursor.execute(f"DROP POLICY worker_company_context ON {table}")
         for statement in job_migration.REVERSE:
             cursor.execute(statement)
         assert query("SELECT relrowsecurity FROM pg_class WHERE relname = 'core_job'") == [(False,)]
@@ -498,6 +504,11 @@ def test_the_job_migration_reverses_and_applies_again(db):
         assert "IS NOT NULL THEN" not in query("SELECT pg_get_functiondef('audit_row_change'::regproc)")[0][0]
         for statement in job_migration.FORWARD:
             cursor.execute(statement)
+        for table in later_tables:
+            cursor.execute(
+                f"CREATE POLICY worker_company_context ON {table} TO {WORKER_ROLE} "
+                f"USING ({JOB_COMPANY_CHECK}) WITH CHECK ({JOB_COMPANY_CHECK})"
+            )
 
     assert query("SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE relname = 'core_job'") == [(True, True)]
     assert query("SELECT has_function_privilege('worker', 'claim_job()', 'EXECUTE')") == [(True,)]

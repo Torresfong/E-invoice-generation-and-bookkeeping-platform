@@ -311,3 +311,180 @@ msgid ""
 msgstr ""
 "发票 %(number)s 在开具后 72 小时内未能提交给 LHDN，LHDN 已不再接受。您的草稿已保留，"
 "请检查后重新批准。"
+
+#: .\core\einvoicing.py
+msgid ""
+"I understand that this company is a mandatory e-invoicing taxpayer. "
+"Switching e-invoicing off means its invoices will not be sent to LHDN "
+"MyInvois, and I am responsible for the consequences under the Income Tax "
+"Act and the e-invoice guidelines."
+msgstr ""
+"我了解本公司属于强制实施电子发票的纳税人。关闭电子发票意味着其发票将不会提交至 "
+"LHDN MyInvois，我须承担《所得税法》及电子发票指南下的相关后果。"
+
+#: .\core\einvoicing.py
+#, python-format
+msgid "Check the %(field)s."
+msgstr "请检查%(field)s。"
+
+#: .\core\einvoicing.py
+#, python-format
+msgid "Enter the %(field)s."
+msgstr "请填写%(field)s。"
+
+#: .\core\einvoicing.py
+msgid "The change cannot take effect before an earlier change."
+msgstr "更改的生效日期不能早于之前的更改。"
+
+#: .\core\einvoicing.py
+msgid "status"
+msgstr "状态"
+
+#: .\core\einvoicing.py
+msgid "effective date"
+msgstr "生效日期"
+
+#: .\core\einvoicing.py
+msgid "TIN"
+msgstr "税务识别号 (TIN)"
+
+#: .\core\einvoicing.py
+msgid "BRN"
+msgstr "公司注册号 (BRN)"
+
+#: .\core\einvoicing.py
+msgid "ROB"
+msgstr "商业注册号 (ROB)"
+
+#: .\core\einvoicing.py
+msgid "MSIC code"
+msgstr "行业分类码 (MSIC)"
+
+#: .\core\einvoicing.py
+msgid "address line 1"
+msgstr "地址第一行"
+
+#: .\core\einvoicing.py
+msgid "address line 2"
+msgstr "地址第二行"
+
+#: .\core\einvoicing.py
+msgid "city"
+msgstr "城市"
+
+#: .\core\einvoicing.py
+msgid "postcode"
+msgstr "邮政编码"
+
+#: .\core\einvoicing.py
+msgid "state code"
+msgstr "州代码"
+
+#: .\core\einvoicing.py
+msgid "country code"
+msgstr "国家代码"
+
+#: .\core\views.py
+msgid "E-invoice setting saved."
+msgstr "电子发票设置已保存。"
+
+#: .\core\templates\company.html
+#: .\core\templates\einvoice_setting.html
+msgid "E-invoice setting"
+msgstr "电子发票设置"
+
+#: .\core\templates\einvoice_setting.html
+msgid "E-invoicing is on"
+msgstr "已开启电子发票"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Status"
+msgstr "状态"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Not checked yet"
+msgstr "尚未核查"
+
+#: .\core\models.py
+msgid "Mandatory"
+msgstr "强制"
+
+#: .\core\models.py
+msgid "Voluntary"
+msgstr "自愿"
+
+#: .\core\models.py
+msgid "Exempt"
+msgstr "豁免"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Effective from"
+msgstr "生效日期"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Supplier details"
+msgstr "供应商资料"
+
+#: .\core\templates\einvoice_setting.html
+msgid "ROB (optional)"
+msgstr "商业注册号 (ROB，可选)"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Address line 1"
+msgstr "地址第一行"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Address line 2"
+msgstr "地址第二行"
+
+#: .\core\templates\einvoice_setting.html
+msgid "City"
+msgstr "城市"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Postcode"
+msgstr "邮政编码"
+
+#: .\core\templates\einvoice_setting.html
+msgid "State code"
+msgstr "州代码"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Country code"
+msgstr "国家代码"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Switching e-invoicing off for a mandatory company needs your acknowledgement."
+msgstr "为强制实施电子发票的公司关闭电子发票，需要您的确认。"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Save"
+msgstr "保存"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Only the company owner can change this setting."
+msgstr "只有公司所有者可以更改此设置。"
+
+#: .\core\templates\einvoice_setting.html
+msgid "E-invoicing"
+msgstr "电子发票"
+
+#: .\core\templates\einvoice_setting.html
+msgid "On"
+msgstr "开"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Off"
+msgstr "关"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Address"
+msgstr "地址"
+
+#: .\core\templates\einvoice_setting.html
+msgid "E-invoicing is off. The owner has not set it up yet."
+msgstr "电子发票已关闭。所有者尚未设置。"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Back to the company"
+msgstr "返回公司"

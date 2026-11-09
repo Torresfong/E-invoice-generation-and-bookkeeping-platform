@@ -13,6 +13,7 @@
   {% can "view_audit_trail" company as may_audit %}
   <ul>
     {% if may_audit %}<li><a href="/companies/{{ company.pk }}/audit/">{% trans "Audit trail" %}</a></li>{% endif %}
+    <li><a href="/companies/{{ company.pk }}/einvoicing/">{% trans "E-invoice setting" %}</a></li>
     <li><a href="/companies/{{ company.pk }}/activity/">{% trans "My activity" %}</a></li>
   </ul>
   {% can "invite_staff" company as may_invite %}
