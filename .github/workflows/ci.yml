@@ -46,3 +46,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: docker build ./backend
+  secret-scan:
+    runs-on: ubuntu-latest
+    env:
+      GITLEAKS_VERSION: "8.28.0"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
+      - name: Scan the pushed changes
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          else
+            range="${{ github.event.before }}..${{ github.sha }}"
+          fi
+          # A new branch or first push has an all-zero "before" sha; scan the latest commit then.
+          case "$range" in 0000000*) range="${{ github.sha }}^!" ;; esac
+          ./gitleaks detect --source . --log-opts="$range" --redact --verbose
