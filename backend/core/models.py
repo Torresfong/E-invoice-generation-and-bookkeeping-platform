@@ -36,6 +36,46 @@ class Firm(models.Model):
         return self.name
 
 
+class FirmApplication(models.Model):
+    """A firm's request to join the platform, waiting for the operator (D67 (1)).
+
+    Not a tenant table: an applicant has no firm, no account and no access, so nothing here carries a company or a firm
+    until approval. The web role has no privilege on it at all; an application is stored by the SECURITY DEFINER function
+    `submit_firm_application` and decided by operator commands, which run as the table owner. Who decided and when is
+    recorded here, since a refusal creates no firm whose trail could hold it.
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REFUSED = "refused"
+    STATUSES = [(PENDING, "Pending"), (APPROVED, "Approved"), (REFUSED, "Refused")]
+
+    firm_name = models.CharField(max_length=200)
+    ssm_number = models.CharField(max_length=50)
+    contact_name = models.CharField(max_length=200)
+    contact_email = models.EmailField()
+    # What the applicant says about the firm's people; a note for the operator, never used to create accounts.
+    people = models.TextField(blank=True)
+    status = models.CharField(max_length=10, choices=STATUSES, default=PENDING)
+    created_at = models.DateTimeField(db_default=Now())
+    decided_at = models.DateTimeField(null=True, blank=True)
+    decided_by = models.CharField(max_length=254, blank=True)
+    refusal_note = models.TextField(blank=True)
+    # Set on approval only.
+    firm = models.OneToOneField(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        constraints = [
+            # One open application per name and per address; the same name as an existing firm is checked against `Firm`.
+            models.UniqueConstraint(
+                Lower("firm_name"), condition=models.Q(status="pending"), name="firm_application_pending_name_unique"
+            ),
+            models.UniqueConstraint(
+                Lower("contact_email"), condition=models.Q(status="pending"), name="firm_application_pending_email_unique"
+            ),
+        ]
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     """The sign-in identity: an email address and a password (D40 (5)).
 

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apply as an accounting firm</title>
+</head>
+<body>
+  <h1>Apply as an accounting firm</h1>
+  {% if closed %}
+    <p>Applications are closed right now.</p>
+  {% elif received %}
+    <p role="status">If this application can be accepted, the platform operator will review it and email you. Until then there is no account and nothing to sign in to.</p>
+  {% else %}
+    {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+    <form method="post">
+      {% csrf_token %}
+      <p><label>Firm name <input type="text" name="firm_name" value="{{ form.firm_name }}" maxlength="200" required></label></p>
+      <p><label>SSM registration number <input type="text" name="ssm_number" value="{{ form.ssm_number }}" maxlength="50" required></label></p>
+      <p><label>Your name <input type="text" name="contact_name" value="{{ form.contact_name }}" maxlength="200" required></label></p>
+      <p><label>Your email address <input type="email" name="email" value="{{ form.email }}" maxlength="254" autocomplete="username" required></label></p>
+      <p><label>The firm's people (names and roles)<br><textarea name="people" maxlength="2000" rows="4">{{ form.people }}</textarea></label></p>
+      <button type="submit">Send application</button>
+    </form>
+  {% endif %}
+  <p><a href="/login/">Back to sign in</a></p>
+</body>
+</html>

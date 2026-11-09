@@ -93,6 +93,10 @@ SIGNUP_WINDOW_SECONDS = 60 * 60
 SIGNUP_ENABLED = os.environ.get("SIGNUP_ENABLED", "").lower() == "true"
 if SIGNUP_ENABLED and not DEBUG:
     raise RuntimeError("SIGNUP_ENABLED cannot be on outside development until two-factor authentication is done")
+# A firm applying to join (D67 (1)) is limited and switched off in the same way as owner sign-up, and shares its limits.
+FIRM_APPLICATIONS_ENABLED = os.environ.get("FIRM_APPLICATIONS_ENABLED", "").lower() == "true"
+if FIRM_APPLICATIONS_ENABLED and not DEBUG:
+    raise RuntimeError("FIRM_APPLICATIONS_ENABLED cannot be on outside development until two-factor authentication is done")
 
 # Where the signing certificate of each MyInvois environment lives in the key vault: a reference, never a key (D13).
 # Only ENVIRONMENT=production selects the production certificate; an environment not listed here will not start, so a

@@ -171,6 +171,7 @@ DJANGO_OWN = {
 PLATFORM = {
     "core_company": "the tenant itself",
     "core_firm": "an accounting firm; a user reads only their own",
+    "core_firmapplication": "a firm's application, before it has a firm; reachable through a function only (D67 (1))",
     "core_firmauditentry": "the firm trail, keyed by firm (D50)",
     "core_loginfailure": "throttling by hashed address; reachable through functions only",
     "core_user": "an account; a user reads only their own row",

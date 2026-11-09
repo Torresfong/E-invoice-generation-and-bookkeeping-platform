@@ -11,7 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, customers, einvoicing, firm_admin, items, permissions, registration, throttle, tokens
+from . import audit, customers, einvoicing, firm_admin, firm_applications, items, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Item, SupplierDetails
 from .signin import complete_sign_in
 
@@ -514,6 +514,44 @@ def signup_links(request):
     if request.method != "POST":
         return render(request, "signup_links.html")
     return render(request, "signup_links.html", {"url": registration.create_signup_link()})
+
+
+# --- a firm applies to join (D67 (1)): English only, and it creates no firm and no account -----------------------
+
+APPLICATION_FIELDS = ("firm_name", "ssm_number", "contact_name", "email", "people")
+
+
+def apply_as_firm(request):
+    """The public form for a firm to apply. The operator decides later; nothing here creates a firm or a user."""
+    if not settings.FIRM_APPLICATIONS_ENABLED:
+        return render(request, "firm_apply.html", {"closed": True}, status=403)
+    if request.method != "POST":
+        return render(request, "firm_apply.html")
+
+    form = {name: request.POST.get(name, "").strip() for name in APPLICATION_FIELDS}
+    # Counted before anything else is checked, like owner sign-up, and apart from its counts.
+    if not throttle.allow_signup(form["email"], request.META.get("REMOTE_ADDR", ""), kind="firm-application"):
+        logger.info("firm application refused: throttled")
+        return render(request, "firm_apply.html", {"form": form, "error": "Too many attempts. Try again later."}, status=429)
+
+    problem = None
+    try:
+        validate_email(form["email"])
+    except ValidationError:
+        problem = "Enter a valid email address."
+    if problem is None and not (form["firm_name"] and form["ssm_number"] and form["contact_name"]):
+        problem = "Enter the firm's name, its SSM registration number and your name."
+    if problem is None and (
+        len(form["firm_name"]) > 200 or len(form["ssm_number"]) > 50 or len(form["contact_name"]) > 200
+        or len(form["email"]) > 254 or len(form["people"]) > 2000
+    ):
+        problem = "One of the answers is too long."
+    if problem:
+        return render(request, "firm_apply.html", {"form": form, "error": problem})
+
+    # Answers "received" even when the address or the name is taken and nothing was stored.
+    firm_applications.submit(form["firm_name"], form["ssm_number"], form["contact_name"], form["email"], form["people"])
+    return render(request, "firm_apply.html", {"received": True})
 
 
 # --- owner self-registration (D48, D49 (4)) ---------------------------------------------------------------------
