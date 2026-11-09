@@ -58,12 +58,18 @@ jobs:
         run: |
           curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" | tar -xz gitleaks
       - name: Scan the pushed changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            range="${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}"
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            range="$PR_BASE..$PR_HEAD"
           else
-            range="${{ github.event.before }}..${{ github.sha }}"
+            range="$PUSH_BEFORE..$SHA"
           fi
           # A new branch or first push has an all-zero "before" sha; scan the latest commit then.
-          case "$range" in 0000000*) range="${{ github.sha }}^!" ;; esac
+          case "$range" in 0000000*) range="$SHA^!" ;; esac
           ./gitleaks detect --source . --log-opts="$range" --redact --verbose
