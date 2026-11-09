@@ -42,7 +42,7 @@ def _lock_pending(pk):
     return application
 
 
-def _decide(application, status):
+def _stamp_decision(application, status):
     application.status = status
     application.decided_by = audit.OPERATOR
     application.decided_at = timezone.now()
@@ -58,7 +58,7 @@ def approve(pk):
     application = _lock_pending(pk)
     administrator = services.create_firm_with_administrator(application.firm_name, application.contact_email)
     tokens.issue_setup_link(administrator)
-    _decide(application, FirmApplication.APPROVED)
+    _stamp_decision(application, FirmApplication.APPROVED)
     application.firm = administrator.firm
     application.save()
     # The applicant had no firm until now, so the decision is recorded in the new firm's trail and on the application.
@@ -72,7 +72,7 @@ def approve(pk):
 def refuse(pk, note=""):
     """Refuse an application. Creates nothing; who decided, when and why stay on the application."""
     application = _lock_pending(pk)
-    _decide(application, FirmApplication.REFUSED)
+    _stamp_decision(application, FirmApplication.REFUSED)
     application.refusal_note = note.strip()
     application.save()
     return application
