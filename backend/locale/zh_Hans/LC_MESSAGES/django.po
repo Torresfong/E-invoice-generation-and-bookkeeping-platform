@@ -640,6 +640,14 @@ msgid "Check the ID value."
 msgstr "请检查证件号码。"
 
 #: .\core\customers.py
+msgid "Choose the ID type."
+msgstr "请选择证件类型。"
+
+#: .\core\customers.py
+msgid "This customer was changed by someone else. Reload it and try again."
+msgstr "该客户刚被其他人修改。请刷新后重试。"
+
+#: .\core\customers.py
 #, python-format
 msgid "A customer needs a %(field)s while e-invoicing is on."
 msgstr "开启电子发票后，客户必须填写%(field)s。"

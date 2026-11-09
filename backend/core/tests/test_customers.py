@@ -120,6 +120,15 @@ def test_an_id_type_without_an_id_value_is_refused_even_with_no_tin(world):
         make(world["acme_owner"], world["acme"], tin="", id_type="BRN", id_value="")
 
 
+def test_an_id_value_without_a_type_and_a_type_without_a_value_are_told_apart(world):
+    with pytest.raises(customers.InvalidCustomer) as no_type:
+        make(world["acme_owner"], world["acme"], tin="", id_type="", id_value=BRN_VALUE)
+    with pytest.raises(customers.InvalidCustomer) as no_value:
+        make(world["acme_owner"], world["acme"], tin="", id_type="BRN", id_value="")
+
+    assert str(no_type.value) != str(no_value.value)
+
+
 # --- a company with e-invoicing off may save a customer without a TIN (D59 (7), D46) -------------------------------
 
 
@@ -219,6 +228,23 @@ def test_a_customer_can_be_saved_with_nothing_changed_by_staff_without_a_new_che
     )
 
     assert fake_ports.gateway.tins_validated == [] and len(customers.history(customer)) == 1
+
+
+def test_an_edit_does_not_overwrite_a_change_saved_while_the_tin_was_being_checked(world, fake_ports, monkeypatch):
+    customer = make(world["acme_owner"], world["acme"])
+    real_check = fake_ports.gateway.validate_tin
+
+    def check_while_someone_else_saves(tin, id_type, id_value):
+        Customer.objects.filter(pk=customer.pk).update(legal_name="Saved by someone else")
+        return real_check(tin, id_type, id_value)
+
+    monkeypatch.setattr(fake_ports.gateway, "validate_tin", check_while_someone_else_saves)
+
+    with pytest.raises(customers.InvalidCustomer):
+        customers.update_customer(world["acme_owner"], customer, tin=OTHER_TIN)
+
+    customer.refresh_from_db()
+    assert (customer.legal_name, customer.tin) == ("Saved by someone else", TIN)
 
 
 def test_with_e_invoicing_on_the_owner_cannot_blank_the_tin(world):

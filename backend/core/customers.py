@@ -20,9 +20,9 @@ from .einvoicing import einvoicing_enabled
 from .models import Customer, CustomerChange
 from .ports.interfaces import ID_TYPES, TinCheck
 
-MAX_NAME_LENGTH = 200
-MAX_TIN_LENGTH = 20
-MAX_ID_VALUE_LENGTH = 20
+MAX_NAME_LENGTH = Customer._meta.get_field("legal_name").max_length
+MAX_TIN_LENGTH = Customer._meta.get_field("tin").max_length
+MAX_ID_VALUE_LENGTH = Customer._meta.get_field("id_value").max_length
 IDENTITY_FIELDS = ("legal_name", "tin", "id_type", "id_value")
 
 __all__ = [
@@ -41,14 +41,16 @@ class CustomerNotAvailable(LookupError):
 
 def _check(fields, *, einvoicing_on):
     """Refuse a bad name, a half-filled ID, a missing TIN or ID when e-invoicing is on, and a TIN LHDN does not accept."""
-    name, tin, id_type, id_value = (fields[f] for f in IDENTITY_FIELDS)
+    name, tin, id_type, id_value = (fields[f] for f in ("legal_name", "tin", "id_type", "id_value"))
     if not name.strip() or len(name) > MAX_NAME_LENGTH:
         raise InvalidCustomer(_("Check the legal name."))
     if len(tin) > MAX_TIN_LENGTH:
         raise InvalidCustomer(_("Check the TIN."))
     if id_type and id_type not in ID_TYPES:
         raise InvalidCustomer(_("Check the ID type."))
-    if len(id_value) > MAX_ID_VALUE_LENGTH or bool(id_type) != bool(id_value):
+    if id_value and not id_type:
+        raise InvalidCustomer(_("Choose the ID type."))
+    if len(id_value) > MAX_ID_VALUE_LENGTH or (id_type and not id_value):
         raise InvalidCustomer(_("Check the ID value."))
     if einvoicing_on:
         for field, label in (("tin", _("TIN")), ("id_type", _("ID type")), ("id_value", _("ID value"))):
@@ -91,14 +93,19 @@ def update_customer(user, customer, *, legal_name=None, tin=None, id_type=None, 
     """
     permissions.require(user, "manage_customers", customer.company)
     given = {"legal_name": legal_name, "tin": tin, "id_type": id_type, "id_value": id_value}
-    current = Customer.objects.get(pk=customer.pk)
-    wanted = {f: getattr(current, f) if given[f] is None else given[f].strip() for f in IDENTITY_FIELDS}
-    if wanted != {f: getattr(current, f) for f in IDENTITY_FIELDS}:
-        permissions.require(user, "change_customer_identity", current.company)
+    seen = Customer.objects.get(pk=customer.pk)
+    before = {f: getattr(seen, f) for f in IDENTITY_FIELDS}
+    wanted = {f: before[f] if given[f] is None else given[f].strip() for f in IDENTITY_FIELDS}
+    if wanted != before:
+        permissions.require(user, "change_customer_identity", seen.company)
         # The gateway is called before the row is locked, so a slow answer from LHDN holds no lock.
-        _check(wanted, einvoicing_on=einvoicing_enabled(current.company, timezone.localdate()))
+        _check(wanted, einvoicing_on=einvoicing_enabled(seen.company, timezone.localdate()))
         with transaction.atomic():
-            Customer.objects.select_for_update().filter(pk=current.pk).update(**wanted)
+            locked = Customer.objects.select_for_update().get(pk=seen.pk)
+            if {f: getattr(locked, f) for f in IDENTITY_FIELDS} != before:
+                # Someone saved first: what was checked above no longer describes the row, so nothing is overwritten.
+                raise InvalidCustomer(_("This customer was changed by someone else. Reload it and try again."))
+            Customer.objects.filter(pk=seen.pk).update(**wanted)
     customer.refresh_from_db()
     return customer
 
@@ -116,6 +123,7 @@ def deactivate_customer(user, customer):
 
 
 def reactivate_customer(user, customer):
+    """Let `customer` be chosen on new drafts again."""
     return _set_active(user, customer, True)
 
 
