@@ -33,3 +33,9 @@ teaching/
 *postman_globals.json
 # Session handoff notes
 handoff-*.md
+
+# Signing certificates and private keys must never be committed (D13)
+*.pem
+*.p12
+*.pfx
+*.key
