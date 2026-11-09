@@ -252,6 +252,51 @@ class ItemChange(TenantModel):
         ordering = ["id"]
 
 
+class Customer(TenantModel):
+    """A buyer a company invoices (D46, D59 (7), (10); ticket #7).
+
+    `tin`, `id_type` and `id_value` may be empty only while the company has e-invoicing off; a TIN that is given has
+    been checked through the gateway. Only the owner changes the legal name, TIN or ID. A customer is deactivated, never
+    deleted, so it stays on every invoice it already appears on (migration 0038 refuses a delete and records each
+    change in `CustomerChange`). The TIN and ID value never appear in logs or error messages.
+    """
+
+    legal_name = models.CharField(max_length=200)
+    tin = models.CharField(max_length=20, blank=True, default="", db_default="")
+    id_type = models.CharField(max_length=8, blank=True, default="", db_default="")
+    id_value = models.CharField(max_length=20, blank=True, default="", db_default="")
+    is_active = models.BooleanField(default=True, db_default=True)
+    created_at = models.DateTimeField(db_default=Now())
+
+    class Meta:
+        indexes = [models.Index(fields=["company", "is_active", "legal_name"], name="customer_company_active_name")]
+        ordering = ["legal_name", "id"]
+
+    def __str__(self):
+        return self.legal_name
+
+    def __repr__(self):
+        return f"<Customer {self.pk}>"
+
+
+class CustomerChange(TenantModel):
+    """One change to a customer with its values before and after, written by a database trigger (ticket #7).
+
+    Append-only, like `ItemChange`. `before` is empty for the row that records the customer's creation.
+    """
+
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="changes")
+    changed_by = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name="+")
+    changed_by_email = models.CharField(max_length=254, blank=True, db_default="")
+    changed_at = models.DateTimeField(db_default=Now())
+    before = models.JSONField(null=True)
+    after = models.JSONField()
+
+    class Meta:
+        indexes = [models.Index(fields=["customer", "id"], name="customer_change_lookup")]
+        ordering = ["id"]
+
+
 class Job(models.Model):
     """A queued background job (D10, D36, ADR 0001).
 

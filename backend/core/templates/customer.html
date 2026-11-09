@@ -1,0 +1,50 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ customer.legal_name }} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{{ customer.legal_name }}</h1>
+  <p>{{ company.name }} · {% if customer.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% can "change_customer_identity" company as may_change_identity %}
+  {% if may_change_identity %}
+    <form method="post" action="/companies/{{ company.pk }}/customers/{{ customer.pk }}/">
+      {% csrf_token %}
+      <p><label>{% trans "Legal name" %} <input name="legal_name" maxlength="200" value="{{ form.legal_name|default:'' }}" required></label></p>
+      <p><label>{% trans "TIN" %} <input name="tin" maxlength="20" value="{{ form.tin|default:'' }}"></label></p>
+      <p><label>{% trans "ID type" %}
+        <select name="id_type">
+          <option value="">—</option>
+          {% for type in id_types %}<option value="{{ type }}" {% if form.id_type == type %}selected{% endif %}>{{ type }}</option>{% endfor %}
+        </select></label></p>
+      <p><label>{% trans "ID value" %} <input name="id_value" maxlength="20" value="{{ form.id_value|default:'' }}"></label></p>
+      <p>{% trans "The TIN is checked with MyInvois before the customer is saved." %}</p>
+      <button type="submit">{% trans "Save" %}</button>
+    </form>
+  {% else %}
+    <dl>
+      <dt>{% trans "TIN" %}</dt><dd>{{ customer.tin }}</dd>
+      <dt>{% trans "ID type" %}</dt><dd>{{ customer.id_type }}</dd>
+      <dt>{% trans "ID value" %}</dt><dd>{{ customer.id_value }}</dd>
+    </dl>
+    <p>{% trans "Only the company owner can change the legal name, TIN or ID." %}</p>
+  {% endif %}
+  <h2>{% trans "History" %}</h2>
+  <ol>
+    {% for change in history %}
+      <li>
+        {{ change.changed_at|date:"Y-m-d H:i" }} · {{ change.changed_by_email|default:"—" }}
+        {% if change.before %}
+          <br>{% trans "Before" %}: {% for key, value in change.before.items %}{{ key }}={{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        {% endif %}
+        <br>{% trans "After" %}: {% for key, value in change.after.items %}{{ key }}={{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}
+      </li>
+    {% endfor %}
+  </ol>
+  <p><a href="/companies/{{ company.pk }}/customers/">{% trans "Back to the customers" %}</a></p>
+</body>
+</html>
