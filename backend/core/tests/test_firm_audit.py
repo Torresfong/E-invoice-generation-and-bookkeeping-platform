@@ -4,7 +4,7 @@ import pytest
 from django.core.management import call_command
 from django.db import DatabaseError, connection, transaction
 
-from core import audit, jobs
+from core import audit, jobs, services
 from core.models import AuditEntry, FirmAuditEntry, User
 
 from .factories import PASSWORD
@@ -158,6 +158,30 @@ def test_moving_a_company_writes_the_company_trail_and_both_firms_trails_with_on
         )
     assert len({e.correlation_id for e in moved}) == 1
     assert AuditEntry.objects.filter(company=firms_world["acme"], action=AuditEntry.UPDATE, changed_fields=["firm"]).count() == 1
+
+
+def test_binding_a_firmless_company_writes_only_the_company_and_new_firm_trails_with_one_correlation_id(firms_world):
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+
+    call_command("move_company", company.pk, "Alpha Accounting")
+
+    [firm_entry] = FirmAuditEntry.objects.filter(target_type="company", target_id=str(company.pk))
+    company_entry = AuditEntry.objects.get(company=company, action=AuditEntry.UPDATE, changed_fields=["firm"])
+    assert firm_entry.firm == firms_world["alpha"]
+    assert firm_entry.correlation_id == company_entry.correlation_id
+
+
+def test_ending_a_link_writes_only_the_company_and_old_firm_trails_with_one_correlation_id(firms_world):
+    call_command("unlink_company", firms_world["acme"].pk)
+
+    [firm_entry] = FirmAuditEntry.objects.filter(
+        target_type="company", target_id=str(firms_world["acme"].pk)
+    )
+    company_entry = AuditEntry.objects.get(
+        company=firms_world["acme"], action=AuditEntry.UPDATE, changed_fields=["firm"]
+    )
+    assert firm_entry.firm == firms_world["alpha"]
+    assert firm_entry.correlation_id == company_entry.correlation_id
 
 
 def test_moving_a_company_to_its_own_firm_writes_no_firm_entry(firms_world):

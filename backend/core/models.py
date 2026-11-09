@@ -21,7 +21,7 @@ class UserManager(BaseUserManager):
 
 
 class Firm(models.Model):
-    """An accounting firm (D49). Each company belongs to exactly one firm and each firm accountant to exactly one.
+    """An accounting firm (D49, D67). A company may have no firm; each firm accountant belongs to exactly one.
 
     Created only by the platform operator. The web role can read its own firm and nothing else.
     """
@@ -74,7 +74,7 @@ class Company(models.Model):
     """A tenant: one business whose data is isolated from every other company (D11)."""
 
     name = models.CharField(max_length=200)
-    firm = models.ForeignKey(Firm, on_delete=models.PROTECT, related_name="companies")
+    firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="companies")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -1,4 +1,4 @@
-"""Firms: each company belongs to one firm, and a firm accountant reaches only their own firm's companies (D49)."""
+"""Firms: a company has at most one firm, and accountants reach only their firm's companies (D49, D67)."""
 
 import re
 from importlib import import_module
@@ -25,12 +25,40 @@ def accountant_rows(company):
     )
 
 
-# --- one firm for every company and accountant --------------------------------------------------------------
+# --- a company may have no firm; every accountant has one ---------------------------------------------------
 
 
-def test_a_company_cannot_exist_without_a_firm(db):
-    with pytest.raises(IntegrityError), transaction.atomic():
-        Company.objects.create(name="Orphan Bhd")
+def test_a_company_without_a_firm_is_created_for_its_owner_only(firms_world):
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+
+    company.refresh_from_db()
+    assert company.firm_id is None
+    assert set(CompanyAccess.objects.filter(company=company).values_list("user__email", "role")) == {
+        ("owner@independent.example", CompanyAccess.OWNER)
+    }
+    entry = AuditEntry.objects.get(company=company, action=AuditEntry.CREATE, target_type="company")
+    assert entry.changed_fields == []
+
+
+def test_the_owner_can_open_a_firmless_company_and_no_firms_accountant_can(
+    client, firms_world, as_production_connection
+):
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+    owner = User.objects.get(email="owner@independent.example")
+    page = f"/companies/{company.pk}/"
+
+    with as_production_connection():
+        sign_in(client, owner)
+        owner_status = client.get(page).status_code
+        client.post("/logout/")
+        accountant_statuses = []
+        for accountant in (firms_world["alpha_accountant"], firms_world["beta_accountant"]):
+            sign_in(client, accountant)
+            accountant_statuses.append(client.get(page).status_code)
+            client.post("/logout/")
+
+    assert owner_status == 200
+    assert accountant_statuses == [404, 404]
 
 
 def test_an_accountant_cannot_exist_without_a_firm(db):
@@ -97,6 +125,41 @@ def test_two_firms_cannot_share_a_name_even_in_another_case(firms_world):
 
 
 # --- moving a company ---------------------------------------------------------------------------------------
+
+
+def test_binding_a_firmless_company_gives_access_to_exactly_the_new_firms_accountants(firms_world):
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+
+    call_command("move_company", company.pk, "Alpha Accounting")
+
+    company.refresh_from_db()
+    assert company.firm == firms_world["alpha"]
+    assert accountant_rows(company) == {"acc@alpha.example"}
+
+
+def test_ending_a_link_removes_only_the_old_firms_accountants(firms_world):
+    staff = User.objects.create_user("staff@acme.example")
+    CompanyAccess.objects.create(user=staff, company=firms_world["acme"], role=CompanyAccess.STAFF)
+    client_rows = set(
+        CompanyAccess.objects.filter(company=firms_world["acme"])
+        .exclude(role=CompanyAccess.ACCOUNTANT)
+        .values_list("user_id", "role")
+    )
+    untouched_rows = set(
+        CompanyAccess.objects.filter(company=firms_world["gamma"]).values_list("user_id", "role")
+    )
+
+    call_command("unlink_company", firms_world["acme"].pk)
+
+    firms_world["acme"].refresh_from_db()
+    assert firms_world["acme"].firm_id is None
+    assert accountant_rows(firms_world["acme"]) == set()
+    assert set(
+        CompanyAccess.objects.filter(company=firms_world["acme"])
+        .exclude(role=CompanyAccess.ACCOUNTANT)
+        .values_list("user_id", "role")
+    ) == client_rows
+    assert set(CompanyAccess.objects.filter(company=firms_world["gamma"]).values_list("user_id", "role")) == untouched_rows
 
 
 def test_moving_a_company_swaps_the_accountant_access_in_both_directions(firms_world):
@@ -329,6 +392,58 @@ def test_a_database_with_no_data_gets_no_default_firm():
         MigrationExecutor(connection).migrate(latest)
 
 
+def company_firm_is_nullable():
+    return query(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_schema = current_schema() AND table_name = 'core_company' AND column_name = 'firm_id'"
+    )
+
+
+def firm_company_access_counts():
+    return query(
+        "SELECT (SELECT count(*) FROM core_firm), (SELECT count(*) FROM core_company), "
+        "(SELECT count(*) FROM core_companyaccess)"
+    )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_nullable_firm_migration_preserves_existing_data_and_reverses(firms_world):
+    from django.db.migrations.executor import MigrationExecutor
+
+    latest = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
+    before = firm_company_access_counts()
+    try:
+        MigrationExecutor(connection).migrate([("core", "0036_item_master")])
+        assert company_firm_is_nullable() == [("NO",)]
+
+        MigrationExecutor(connection).migrate(latest)
+        assert company_firm_is_nullable() == [("YES",)]
+        assert firm_company_access_counts() == before
+
+        MigrationExecutor(connection).migrate([("core", "0036_item_master")])
+        assert company_firm_is_nullable() == [("NO",)]
+    finally:
+        MigrationExecutor(connection).migrate(latest)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_nullable_firm_migration_cannot_reverse_while_a_company_has_no_firm(firms_world):
+    from django.db.migrations.executor import MigrationExecutor
+
+    latest = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+    try:
+        with pytest.raises(DatabaseError):
+            MigrationExecutor(connection).migrate([("core", "0036_item_master")])
+        assert company_firm_is_nullable() == [("YES",)]  # the refused reversal changed nothing
+
+        services.move_company(company, firms_world["alpha"])  # resolve the firm-less row, as the PR's rollback note says
+        MigrationExecutor(connection).migrate([("core", "0036_item_master")])
+        assert company_firm_is_nullable() == [("NO",)]
+    finally:
+        MigrationExecutor(connection).migrate(latest)
+
+
 # --- the database keeps an accountant's access rows in their firm -------------------------------------------
 
 accountant_triggers = import_module("core.migrations.0022_accountant_rows_match_firm")
@@ -345,6 +460,22 @@ def test_an_accountant_row_for_a_company_of_another_firm_is_refused(firms_world)
 
     with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
         CompanyAccess.objects.create(user=firms_world["alpha_accountant"], company=firms_world["gamma"], role=CompanyAccess.ACCOUNTANT)
+
+
+def test_an_accountant_row_for_a_company_without_a_firm_is_refused(firms_world):
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+    accountant = User.objects.create_user(
+        "second@alpha.example", is_accountant=True, firm=firms_world["alpha"]
+    )
+    check_now()
+
+    CompanyAccess.objects.create(
+        user=accountant, company=firms_world["acme"], role=CompanyAccess.ACCOUNTANT
+    )
+    with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
+        CompanyAccess.objects.create(
+            user=accountant, company=company, role=CompanyAccess.ACCOUNTANT
+        )
 
 
 def test_an_accountant_row_for_someone_who_is_not_an_accountant_is_refused(firms_world):
