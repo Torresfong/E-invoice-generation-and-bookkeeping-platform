@@ -74,7 +74,7 @@ class Company(models.Model):
     """A tenant: one business whose data is isolated from every other company (D11)."""
 
     name = models.CharField(max_length=200)
-    firm = models.ForeignKey(Firm, on_delete=models.PROTECT, related_name="companies")
+    firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="companies")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

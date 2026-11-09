@@ -53,14 +53,17 @@ def _record_firm(company, action):
 
 
 def _lock_firms(*firms):
-    """Lock the firms' rows, in a fixed order, until the transaction ends, and return them in the order given.
+    """Lock the present firms' rows, in a fixed order, and return the present ones in the order given.
 
     Creating a company or an accountant and moving a company all read one firm's people or companies and then write
     access rows; locking the firm makes them take turns, so a move cannot leave a stale row for the old firm's
     accountant behind.
     """
-    locked = {firm.pk: firm for firm in Firm.objects.select_for_update().filter(pk__in=[f.pk for f in firms]).order_by("pk")}
-    return [locked[firm.pk] for firm in firms]
+    firm_ids = [firm.pk for firm in firms if firm is not None]
+    locked = {
+        firm.pk: firm for firm in Firm.objects.select_for_update().filter(pk__in=firm_ids).order_by("pk")
+    }
+    return [locked[firm.pk] for firm in firms if firm is not None]
 
 
 def _record_firm_event(firm, action, target_type, target_id, changed_fields):
@@ -109,14 +112,16 @@ def create_firm_with_administrator(name, administrator_email):
 
 
 @transaction.atomic
-def create_company_with_owner(name, owner_email, owner_password, firm):
-    """A company of `firm` with its single owner. Only that firm's accountants get access to it."""
+def create_company_with_owner(name, owner_email, owner_password, firm=None):
+    """A company with its single owner. When linked, only that firm's accountants get access to it."""
     _require_new_address(owner_email)
-    [firm] = _lock_firms(firm)
+    if firm is not None:
+        [firm] = _lock_firms(firm)
     company = Company.objects.create(name=name, firm=firm)
     owner = get_user_model().objects.create_user(owner_email, password=owner_password)
     CompanyAccess.objects.create(user=owner, company=company, role=CompanyAccess.OWNER)
-    _open_to_accountants(company)
+    if firm is not None:
+        _open_to_accountants(company)
     _record_firm(company, AuditEntry.CREATE)
     return company
 
@@ -136,9 +141,10 @@ def create_accountant(email, firm):
 
 @transaction.atomic
 def move_company(company, firm):
-    """Move a company to another firm: the old firm's accountants lose access, the new firm's gain it.
+    """Change a company's firm: the old firm's accountants lose access and the new firm's gain it.
 
-    Owners and staff are untouched. Does nothing, and records nothing, if the company is already in that firm.
+    `firm` may be `None` to end the link. Owners and staff are untouched. Does nothing, and records nothing, if the
+    company already has that firm (or already has no firm).
 
     Locks are taken in one order everywhere: the firms first (by id), then the company, then, when the transaction
     commits, the rows the access check reads. `create_accountant` and `create_company_with_owner` take the same
@@ -149,15 +155,18 @@ def move_company(company, firm):
     company = Company.objects.select_for_update().get(pk=company.pk)
     if company.firm_id != current.firm_id:
         raise CompanyChanged
-    if company.firm_id == firm.pk:
+    if company.firm_id == (firm.pk if firm is not None else None):
         return company
     CompanyAccess.objects.filter(company=company, role=CompanyAccess.ACCOUNTANT).delete()
     company.firm = firm
     company.save(update_fields=["firm"])
-    _open_to_accountants(company)
-    # The company's trail and both firms' trails, tied together by one correlation id (D50 (5)).
+    if firm is not None:
+        _open_to_accountants(company)
+    # The company's trail and every firm side that exists, tied together by one correlation id (D50 (5), D67 (5)).
     with audit.correlated():
         _record_firm(company, AuditEntry.UPDATE)
         for side in (current.firm, firm):
+            if side is None:
+                continue
             _record_firm_event(side, AuditEntry.UPDATE, "company", company.pk, ["firm"])
     return company
