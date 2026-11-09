@@ -1,0 +1,58 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ item.name }} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{{ item.name }}</h1>
+  <p>{{ company.name }} · {% if item.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% can "manage_items" company as may_manage %}
+  {% can "change_item_codes" company as may_change_codes %}
+  {% if may_manage %}
+    <form method="post" action="/companies/{{ company.pk }}/items/{{ item.pk }}/">
+      {% csrf_token %}
+      <p><label>{% trans "Name" %} <input name="name" maxlength="200" value="{{ form.name|default:'' }}" required></label></p>
+      {% if may_change_codes %}
+        <p><label>{% trans "LHDN classification code" %}
+          <select name="classification_code" required>
+            {% for code, description in classification_codes %}<option value="{{ code }}" {% if form.classification_code == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
+          </select></label></p>
+        <p><label>{% trans "LHDN unit code" %} <input name="unit_code" maxlength="10" list="unit-codes" value="{{ form.unit_code|default:'' }}" required></label></p>
+        <datalist id="unit-codes">{% for code, name in unit_codes %}<option value="{{ code }}">{{ name }}</option>{% endfor %}</datalist>
+      {% else %}
+        <p>{% trans "LHDN classification code" %}: {{ item.classification_code }}</p>
+        <p>{% trans "LHDN unit code" %}: {{ item.unit_code }}</p>
+        <p>{% trans "Only the company owner can change the LHDN codes." %}</p>
+      {% endif %}
+      <p><label>{% trans "Default tax type" %}
+        <select name="default_tax_type" required>
+          {% for code, description in tax_types %}<option value="{{ code }}" {% if form.default_tax_type == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
+        </select></label></p>
+      <button type="submit">{% trans "Save" %}</button>
+    </form>
+  {% else %}
+    <dl>
+      <dt>{% trans "LHDN classification code" %}</dt><dd>{{ item.classification_code }}</dd>
+      <dt>{% trans "LHDN unit code" %}</dt><dd>{{ item.unit_code }}</dd>
+      <dt>{% trans "Default tax type" %}</dt><dd>{{ item.default_tax_type }}</dd>
+    </dl>
+  {% endif %}
+  <h2>{% trans "History" %}</h2>
+  <ol>
+    {% for change in history %}
+      <li>
+        {{ change.changed_at|date:"Y-m-d H:i" }} · {{ change.changed_by.email|default:"—" }}
+        {% if change.before %}
+          <br>{% trans "Before" %}: {% for key, value in change.before.items %}{{ key }}={{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}
+        {% endif %}
+        <br>{% trans "After" %}: {% for key, value in change.after.items %}{{ key }}={{ value }}{% if not forloop.last %}, {% endif %}{% endfor %}
+      </li>
+    {% endfor %}
+  </ol>
+  <p><a href="/companies/{{ company.pk }}/items/">{% trans "Back to the items" %}</a></p>
+</body>
+</html>

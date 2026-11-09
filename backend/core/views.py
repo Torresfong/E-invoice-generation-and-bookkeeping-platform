@@ -11,8 +11,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, einvoicing, firm_admin, permissions, registration, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, SupplierDetails
+from . import audit, einvoicing, firm_admin, items, permissions, registration, throttle, tokens
+from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, Item, SupplierDetails
 from .signin import complete_sign_in
 
 logger = logging.getLogger(__name__)
@@ -214,6 +214,103 @@ def einvoice_setting(request, pk):
     if request.method not in ("GET", "HEAD"):
         return HttpResponse(status=405)
     return _einvoice_page(request, access)
+
+
+def _items_url(company_id, *rest):
+    return "/".join([f"/companies/{company_id}/items", *map(str, rest), ""])
+
+
+def _item_context(access, **extra):
+    return {
+        "company": access.company,
+        "access": access,
+        "classification_codes": sorted(items.classification_codes().items()),
+        "unit_codes": sorted(items.unit_codes().items()),
+        "tax_types": sorted(items.tax_types().items()),
+        **extra,
+    }
+
+
+def _item_fields(post):
+    """The item form as `items` arguments. Fields that are not posted stay None, meaning unchanged.
+
+    Staff are not shown the code fields, so their form never posts them; a hand-made request that does is judged by
+    `items.update_item`, which refuses a code that differs from the saved one.
+    """
+    names = ("name", "default_tax_type", *items.LHDN_CODE_FIELDS)
+    return {name: post[name].strip() for name in names if name in post}
+
+
+@audit.audited_read("items")
+def item_list(request, pk):
+    """The company's items: everyone with access reads them, the owner and staff add them (D59 (9))."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_items", access.company)
+    page = {"items": items.list_items(access.company), "form": {}}
+    if request.method == "POST":
+        permissions.require(request.user, "manage_items", access.company)
+        submitted = _item_fields(request.POST)
+        try:
+            items.create_item(
+                request.user,
+                access.company,
+                **{name: submitted.get(name, "") for name in ("name", "classification_code", "unit_code", "default_tax_type")},
+            )
+        except items.InvalidItem as problem:
+            return render(request, "items.html", _item_context(access, **{**page, "form": submitted, "error": str(problem)}))
+        return redirect(_items_url(pk) + "?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    if request.GET.get("saved"):
+        page["message"] = _("Item saved.")
+    return render(request, "items.html", _item_context(access, **page))
+
+
+@audit.audited_read("item", id_arg="item_pk")
+def item_detail(request, pk, item_pk):
+    """One item: change its name and default tax type; the owner also changes its LHDN codes."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_items", access.company)
+    item = get_object_or_404(Item, pk=item_pk, company_id=pk)
+    page = {"item": item, "form": item, "history": items.history(item)}
+    if request.method == "POST":
+        permissions.require(request.user, "manage_items", access.company)
+        submitted = _item_fields(request.POST)
+        try:
+            items.update_item(request.user, item, **submitted)
+        except items.InvalidItem as problem:
+            page.update(form={"pk": item.pk, **submitted}, error=str(problem))
+            return render(request, "item.html", _item_context(access, **page))
+        return redirect(_items_url(pk, item_pk) + "?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    if request.GET.get("saved"):
+        page["message"] = _("Item saved.")
+    return render(request, "item.html", _item_context(access, **page))
+
+
+def _set_item_active(request, pk, item_pk, active):
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    item = get_object_or_404(Item, pk=item_pk, company_id=pk)
+    permissions.require(request.user, "manage_items", access.company)
+    (items.reactivate_item if active else items.deactivate_item)(request.user, item)
+    return redirect(_items_url(pk))
+
+
+@require_POST
+def item_deactivate(request, pk, item_pk):
+    return _set_item_active(request, pk, item_pk, False)
+
+
+@require_POST
+def item_activate(request, pk, item_pk):
+    return _set_item_active(request, pk, item_pk, True)
 
 
 def accept_invitation(request, token):

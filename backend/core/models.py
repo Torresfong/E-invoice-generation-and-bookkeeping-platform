@@ -208,6 +208,47 @@ class CompanyEInvoiceSettingChange(SupplierDetails, TenantModel):
         indexes = [models.Index(fields=["company", "effective_from", "id"], name="einvoice_change_lookup")]
 
 
+class Item(TenantModel):
+    """A product or service a company sells, with the LHDN data every invoice line needs (D59 (9), (10)).
+
+    The two LHDN codes and the default tax type are codes from LHDN's published lists (`core.lhdn_codes`). Only the owner
+    changes the codes. An item is deactivated, never deleted, so it stays on every invoice it already appears on
+    (migration 0036 refuses a delete and records each change in `ItemChange`).
+    """
+
+    name = models.CharField(max_length=200)
+    classification_code = models.CharField(max_length=3)
+    unit_code = models.CharField(max_length=10)
+    default_tax_type = models.CharField(max_length=2)
+    is_active = models.BooleanField(default=True, db_default=True)
+    created_at = models.DateTimeField(db_default=Now())
+
+    class Meta:
+        indexes = [models.Index(fields=["company", "is_active", "name"], name="item_company_active_name")]
+        ordering = ["name", "id"]
+
+    def __str__(self):
+        return self.name
+
+
+class ItemChange(TenantModel):
+    """One change to an item with its values before and after, written by a database trigger (ticket #121).
+
+    Append-only. `before` is empty for the row that records the item's creation. `changed_by` is empty for an operator
+    command, which runs with no signed-in user.
+    """
+
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="changes")
+    changed_by = models.ForeignKey(User, null=True, on_delete=models.PROTECT, related_name="+")
+    changed_at = models.DateTimeField(db_default=Now())
+    before = models.JSONField(null=True)
+    after = models.JSONField()
+
+    class Meta:
+        indexes = [models.Index(fields=["item", "id"], name="item_change_lookup")]
+        ordering = ["id"]
+
+
 class Job(models.Model):
     """A queued background job (D10, D36, ADR 0001).
 
