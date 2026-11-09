@@ -45,6 +45,15 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 72. As a client owner, I want an invoice that waited more than 72 hours for submission to come back to me for approval under the same number, so that an expired issue time never goes out unseen (D60).
 73. As a client owner, I want to keep the products and services I sell once, each with its LHDN classification code, unit code and default tax type, and choose them on invoice lines, so that the data LHDN requires per line is never typed again (D59).
 74. As a client owner, I want a customer or an item that appears on a submitted invoice to be deactivated rather than deleted, so that past e-invoices keep their buyer and lines (D59).
+75. As a client owner, I want to fill in a monthly summary of my sales to consumers (rows of receipt-number range, amount and tax), so that one consolidated e-invoice can be submitted for the month (D66).
+76. As a client owner, I want the summary checked against LHDN's consolidation rules before anyone approves it, with each problem named, so that a consolidated e-invoice is not rejected for something I could have fixed (D66).
+77. As a client owner, I want to approve a consolidated e-invoice and authorise its submission myself, and the version I approve to be locked, so that nothing is submitted that I did not see (D17, D19, D66).
+78. As a client owner, I want to choose whether my firm reviews a consolidated e-invoice before I approve it or whether I alone decide, so that the control fits how I work with my firm (D66).
+79. As a client owner, I want an individual e-invoice to need no firm review, so that I can approve and submit it myself without waiting (D17, D66).
+80. As a client owner, I want a sale that a buyer asked to have as an individual e-invoice marked in the summary and taken out of the consolidated total, and, if the month was already submitted, corrected by a credit note, so that the same sale is never reported twice (D66).
+81. As a client owner, I want a notice, not a block, when a single sale is above RM10,000 while LHDN's relaxation applies, so that I am told without being stopped (D66).
+82. As a client owner, I want to register my company myself and start working with no firm yet, including uploading documents, issuing invoices and submitting e-invoices, so that I do not wait for a firm to begin (D67).
+83. As a client owner, I want to invite my accounting firm by email and see where the invitation stands, and to ask in the client portal for the link to end, so that my firm's access follows my choice, with the operator carrying it out (D67).
 
 ### Client staff
 25. As client staff, I want to draft invoices and upload documents, so that the owner only has to approve.
@@ -84,6 +93,11 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 54. As an accountant, I want original currency and amount stored on foreign purchase documents, so that I apply the rate in SQL Account.
 55. As a backup accountant, I want to use the same review queue when the lead is away, so that the pilot does not stall.
 56. As a firm lead, I want weekly time for the pilot commitment written down, so that capacity matches the targets.
+84. As an accountant, I want to review a client's consolidated e-invoice draft against its sales records and either approve it or return it with a reason, and to see it again after any change, so that the owner approves only a version I have checked (D66).
+
+### Firm administrator
+85. As a firm administrator, I want to register my firm with its details and wait for the operator's approval, so that the firm exists on the platform without the operator typing it in (D67).
+86. As a firm administrator, I want to accept a client's invitation, so that the firm can act for that client once the operator grants access, and not before (D67).
 
 ### Platform operator (our team)
 57. As an operator, I want each client company's data isolated by the database itself, so that a coding mistake cannot leak data across companies.
@@ -95,6 +109,8 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 63. As an operator, I want a support channel with business hours, a one-working-day target and a weekly rotation between the two developers, so that pilot clients are never unsupported.
 64. As an operator, I want all MyInvois calls and every LHDN-specific rule behind one module, separate from the invoice generation engine, so that a library or gateway can replace it, and LHDN's changes stay out of invoice logic (D59).
 65. As an operator, I want the AI provider swappable behind one port, so that the provider chosen from the sample test can change without rework.
+87. As an operator, I want to review each firm's registration and approve or refuse it, and to review each company-firm link before the firm's accountants get any access, so that a stranger can never choose whose documents they see (D67).
+88. As an operator, I want to end a company-firm link when the owner asks, with the firm's access removed at once and the change recorded in both trails, so that an owner can always leave a firm (D67).
 
 ## Implementation Decisions
 
@@ -102,7 +118,9 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 
 **Tenancy.** Every business table carries a company identifier. Isolation is enforced by Postgres row-level security from the first migration, not only in application code. The database is designed so that per-accountant assignment and one login across several companies can be added later.
 
-**Roles.** Four: client owner, client staff, firm accountant, and firm administrator (firm-level, manages the firm's accountants, sees no client data, D49). Only the owner approves and submits invoices; there is no delegation. A company has one owner login. Staff may confirm creating a customer; only the owner may change a customer's TIN, legal name or registration number. Several firms, each with several accountants, use the firm portal from day one (D49). A company belongs to exactly one firm, and an accountant has one `CompanyAccess` row for each company of their own firm and none for any other firm, with no bypass role; every read of a company's data is audited (D40, D45). Only the platform operator creates firms, each with a first firm administrator. A firm administrator creates and deactivates the accountants of their own firm and sees no client data (D49). A client owner can sign up only through a link from their own firm. Staff and the assistant may propose a change to those identity fields; the owner approves, and every customer write validates the TIN with MyInvois (D46).
+**Roles.** Four: client owner, client staff, firm accountant, and firm administrator (firm-level, manages the firm's accountants, sees no client data, D49). Only the owner approves and submits invoices; there is no delegation. A company has one owner login. Staff may confirm creating a customer; only the owner may change a customer's TIN, legal name or registration number. Several firms, each with several accountants, use the firm portal from day one (D49). A company belongs to at most one firm at a time, and an accountant has one `CompanyAccess` row for each company of their own firm and none for any other firm, with no bypass role; every read of a company's data is audited (D40, D45). Firms register themselves and the platform operator approves them; a client owner registers a company on their own, invites a firm, and the operator approves the link before the firm's accountants get access (D67). A firm administrator creates and deactivates the accountants of their own firm and sees no client data (D49). Staff and the assistant may propose a change to those identity fields; the owner approves, and every customer write validates the TIN with MyInvois (D46).
+
+**Consolidated e-invoices and onboarding (D66, D67).** A company with e-invoicing on can submit one consolidated e-invoice a month from a summary its owner fills in; when the company has a firm and its policy asks for review, the accountant approves or returns the draft before the owner approves and authorises submission, and a company without a firm uses the owner-only flow. Individual e-invoices never have a firm review. Firms and client owners register themselves, the owner invites a firm, and the operator approves each firm and each company-firm link before access is granted; the owner can ask to end the link and the operator carries it out. A company may exist with no firm, so the company's firm is optional in the data model.
 
 **External ports.** Four boundaries, each a single module with a fake for tests: MyInvois gateway (login on behalf of taxpayers as intermediary, TIN validation, document signing, submission, status polling, cancellation, and reading a buyer's rejection request on our own invoices; the port has no reject call, D58), AI provider, email, object storage.
 
@@ -114,7 +132,7 @@ One platform with two portals. Clients draft, approve and submit LHDN e-invoices
 - A credit, debit or refund note takes the route of the invoice it corrects and does not read the company's setting when approved. Switching e-invoicing off never blocks a correction of an existing e-invoice, and a note cannot be raised on a cancelled or invalid original (D61). Whether a normal note on a normal invoice of a mandatory company needs the acknowledgement below is open (D61 (5)).
 - With e-invoicing on, an approved invoice is submitted to LHDN and is an e-invoice. With it off, the invoice is a normal invoice: same drafting, approval, numbering, PDF and export, but no LHDN submission, validation status or QR code. Normal and e-invoices share one gapless sequence per company and document type.
 - The company owner chooses the status and may switch e-invoicing on or off, including for a company of status mandatory. Each choice is recorded with its date and the person, and an acknowledgement must be accepted when a company of status mandatory switches it off or issues a normal invoice. Whether that is acceptable is put to the paid MyInvois review and the lawyer.
-- With e-invoicing on, a customer needs a TIN and an ID type and value. Consolidated and self-billed e-invoices stay out of scope and are checked at onboarding, together with which system issues e-invoices today and that it is switched off at go-live.
+- With e-invoicing on, a customer needs a TIN and an ID type and value. Self-billed e-invoices stay out of scope, and onboarding checks which system issues e-invoices today and that it is switched off at go-live. Consolidated e-invoices are in scope (D66).
 
 **Intermediary onboarding (story 22, D57).** Torres confirmed on 2026-11-05 that the platform company is registered and its MyTax company portal is set up. This does not establish that the MyInvois intermediary toggle is active, that an ERP is registered in each environment, or that any client has granted representation. Record those separately. The platform company remains the intermediary (D1); the accounting firm's application role does not grant LHDN authority.
 
@@ -177,7 +195,7 @@ CI on GitHub Actions blocks merges when any of these fail. Prior art: none; the 
 
 - Automatic extraction of bank statements, payment vouchers, payroll records and loan documents (stored and searchable only).
 - Account coding inside the platform; the export carries only the firm's default codes (D51), and the accountant recodes in SQL Account.
-- Consolidated e-invoices for consumer sales, and self-billed e-invoices in every circumstance LHDN lists (not only foreign suppliers); onboarding checks that a client has none (D59).
+- Self-billed e-invoices in every circumstance LHDN lists (not only foreign suppliers); onboarding checks that a client has none (D59, D66).
 - A customer-facing request for an e-invoice (a page where a buyer supplies tax details and asks for one), and marking an invoice as already validated in another system, since the platform is the only issuer after go-live (D18, D59).
 - SST returns and automatic tax-rate determination.
 - The platform's own ledger and financial reports; SQL Account stays the books of record.
