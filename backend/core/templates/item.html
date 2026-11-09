@@ -19,6 +19,7 @@
       {% if may_change_codes %}
         <p><label>{% trans "LHDN classification code" %}
           <select name="classification_code" required>
+            {% if kept_classification %}<option value="{{ kept_classification }}" selected>{{ kept_classification }}</option>{% endif %}
             {% for code, description in classification_codes %}<option value="{{ code }}" {% if form.classification_code == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
           </select></label></p>
         <p><label>{% trans "LHDN unit code" %} <input name="unit_code" maxlength="10" list="unit-codes" value="{{ form.unit_code|default:'' }}" required></label></p>
@@ -30,6 +31,7 @@
       {% endif %}
       <p><label>{% trans "Default tax type" %}
         <select name="default_tax_type" required>
+          {% if kept_tax_type %}<option value="{{ kept_tax_type }}" selected>{{ kept_tax_type }}</option>{% endif %}
           {% for code, description in tax_types %}<option value="{{ code }}" {% if form.default_tax_type == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
         </select></label></p>
       <button type="submit">{% trans "Save" %}</button>

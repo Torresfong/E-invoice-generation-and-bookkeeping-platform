@@ -148,6 +148,23 @@ def test_a_changed_code_must_still_be_on_lhdns_list(world):
     assert (item.name, item.classification_code, item.unit_code) == ("Consulting hour", OTHERS, ONE)
 
 
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+def test_a_code_that_lhdn_has_since_retired_does_not_block_other_edits(world, monkeypatch, who):
+    item = create(world["acme_owner"], world["acme"])
+    # LHDN refreshes its list and "022" is gone; the item keeps working and its saved codes are not re-judged.
+    monkeypatch.setattr(items, "classification_codes", lambda: {COMPUTER: "Computer, smartphone or tablet"})
+
+    items.update_item(world[who], item, name="Renamed", default_tax_type=SALES_TAX)
+
+    item.refresh_from_db()
+    assert (item.name, item.classification_code) == ("Renamed", OTHERS)
+    # but a new item, or a changed code, is still checked against the list held today
+    with pytest.raises(items.InvalidItem):
+        create(world["acme_owner"], world["acme"])
+    with pytest.raises(items.InvalidItem):
+        items.update_item(world["acme_owner"], item, classification_code=OTHERS, unit_code="ZZZ")
+
+
 @pytest.mark.parametrize("who", ["accountant", "beta_owner"])
 def test_an_accountant_or_another_companys_owner_cannot_edit_an_item(world, who):
     item = create(world["acme_owner"], world["acme"])

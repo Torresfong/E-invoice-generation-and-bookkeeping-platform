@@ -276,14 +276,21 @@ def item_detail(request, pk, item_pk):
     access = _own_access(request, pk)
     permissions.require(request.user, "view_items", access.company)
     item = get_object_or_404(Item, pk=item_pk, company_id=pk)
-    page = {"item": item, "form": item, "history": items.history(item)}
+    page = {
+        "item": item,
+        "form": item,
+        "history": items.history(item),
+        # Codes LHDN has since retired stay selectable, so saving the form never silently re-codes the item.
+        "kept_classification": item.classification_code if item.classification_code not in items.classification_codes() else "",
+        "kept_tax_type": item.default_tax_type if item.default_tax_type not in items.tax_types() else "",
+    }
     if request.method == "POST":
         permissions.require(request.user, "manage_items", access.company)
         submitted = _item_fields(request.POST)
         try:
             items.update_item(request.user, item, **submitted)
         except items.InvalidItem as problem:
-            page.update(form={"pk": item.pk, **submitted}, error=str(problem))
+            page.update(form=submitted, error=str(problem))
             return render(request, "item.html", _item_context(access, **page))
         return redirect(_items_url(pk, item_pk) + "?saved=1")
     if request.method not in ("GET", "HEAD"):
@@ -297,8 +304,8 @@ def _set_item_active(request, pk, item_pk, active):
     if not request.user.is_authenticated:
         return HttpResponse(status=401)
     access = _own_access(request, pk)
-    item = get_object_or_404(Item, pk=item_pk, company_id=pk)
     permissions.require(request.user, "manage_items", access.company)
+    item = get_object_or_404(Item, pk=item_pk, company_id=pk)
     (items.reactivate_item if active else items.deactivate_item)(request.user, item)
     return redirect(_items_url(pk))
 

@@ -42,7 +42,12 @@ def _labels():
     }
 
 
-def _validate(*, name, classification_code, unit_code, default_tax_type):
+def _validate(*, name, classification_code, unit_code, default_tax_type, unchanged=()):
+    """Refuse a blank name and any code that is not on LHDN's list today.
+
+    A code named in `unchanged` is the one already saved on the item: LHDN may have retired it since, and that must not
+    stop the item being renamed, so it is not checked again.
+    """
     labels = _labels()
     if not name.strip() or len(name) > MAX_NAME_LENGTH:
         raise InvalidItem(_("Check the %(field)s.") % {"field": labels["name"]})
@@ -51,7 +56,7 @@ def _validate(*, name, classification_code, unit_code, default_tax_type):
         ("unit_code", unit_code, unit_codes()),
         ("default_tax_type", default_tax_type, tax_types()),
     ):
-        if value not in known:
+        if field not in unchanged and value not in known:
             raise InvalidItem(_("Check the %(field)s.") % {"field": labels[field]})
 
 
@@ -96,7 +101,8 @@ def update_item(user, item, *, name=None, classification_code=None, unit_code=No
             "unit_code": current.unit_code if unit_code is None else unit_code,
             "default_tax_type": current.default_tax_type if default_tax_type is None else default_tax_type,
         }
-        _validate(**wanted)
+        unchanged = tuple(field for field in LHDN_CODE_FIELDS + ("default_tax_type",) if wanted[field] == getattr(current, field))
+        _validate(**wanted, unchanged=unchanged)
         if any(wanted[field] != getattr(current, field) for field in LHDN_CODE_FIELDS):
             permissions.require(user, "change_item_codes", current.company)
         for field, value in wanted.items():

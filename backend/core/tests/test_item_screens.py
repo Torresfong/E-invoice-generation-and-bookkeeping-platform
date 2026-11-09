@@ -102,6 +102,19 @@ def test_the_owner_changes_the_codes_from_the_edit_screen(client, world, as_prod
     assert (item.classification_code, item.unit_code) == (COMPUTER, KILOGRAM)
 
 
+def test_the_edit_screen_keeps_a_code_that_lhdn_has_since_retired_selected(
+    client, world, as_production_connection, monkeypatch
+):
+    item = make_item(world["acme_owner"], world["acme"])
+    monkeypatch.setattr(items, "classification_codes", lambda: {COMPUTER: "Computer, smartphone or tablet"})
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        page = client.get(items_url(world["acme"], item.pk)).content.decode()
+
+    # otherwise the browser would submit the first option and re-code the item when the owner only meant to rename it
+    assert f'<option value="{OTHERS}" selected>' in page
+
+
 def test_an_item_is_deactivated_and_activated_again_from_the_screen(client, world, as_production_connection):
     item = make_item(world["acme_owner"], world["acme"])
     with as_production_connection():
