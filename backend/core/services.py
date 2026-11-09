@@ -48,8 +48,8 @@ def _open_to_accountants(company):
     )
 
 
-def _record_firm(company, action):
-    audit.record_operator_event(action, company, "company", company.pk, changed_fields=["firm"])
+def _record_firm(company, action, changed_fields=("firm",)):
+    audit.record_operator_event(action, company, "company", company.pk, changed_fields=changed_fields)
 
 
 def _lock_firms(*firms):
@@ -122,7 +122,7 @@ def create_company_with_owner(name, owner_email, owner_password, firm=None):
     CompanyAccess.objects.create(user=owner, company=company, role=CompanyAccess.OWNER)
     if firm is not None:
         _open_to_accountants(company)
-    _record_firm(company, AuditEntry.CREATE)
+    _record_firm(company, AuditEntry.CREATE, changed_fields=["firm"] if firm is not None else [])
     return company
 
 

@@ -36,6 +36,8 @@ def test_a_company_without_a_firm_is_created_for_its_owner_only(firms_world):
     assert set(CompanyAccess.objects.filter(company=company).values_list("user__email", "role")) == {
         ("owner@independent.example", CompanyAccess.OWNER)
     }
+    entry = AuditEntry.objects.get(company=company, action=AuditEntry.CREATE, target_type="company")
+    assert entry.changed_fields == []
 
 
 def test_the_owner_can_open_a_firmless_company_and_no_firms_accountant_can(
