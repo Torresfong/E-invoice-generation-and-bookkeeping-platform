@@ -13,6 +13,8 @@ from django.views.decorators.http import require_POST, require_safe
 
 from . import audit, einvoicing, firm_admin, firm_applications, items, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, Item, SupplierDetails
+from . import audit, customers, einvoicing, firm_admin, items, permissions, registration, throttle, tokens
+from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Item, SupplierDetails
 from .signin import complete_sign_in
 
 logger = logging.getLogger(__name__)
@@ -318,6 +320,95 @@ def item_deactivate(request, pk, item_pk):
 @require_POST
 def item_activate(request, pk, item_pk):
     return _set_item_active(request, pk, item_pk, True)
+
+
+def _customers_url(company_id, *rest):
+    return "/".join([f"/companies/{company_id}/customers", *map(str, rest), ""])
+
+
+def _customer_context(access, **extra):
+    return {"company": access.company, "access": access, "id_types": customers.ID_TYPES, **extra}
+
+
+def _customer_fields(post):
+    """The customer form as `customers` arguments. Fields that are not posted stay out, meaning unchanged.
+
+    Staff are not shown the identity fields, so their form never posts them; a hand-made request that does is judged by
+    `customers.update_customer`, which refuses a value that differs from the saved one.
+    """
+    return {name: post[name].strip() for name in customers.IDENTITY_FIELDS if name in post}
+
+
+@audit.audited_read("customers")
+def customer_list(request, pk):
+    """The company's customers: everyone with access reads them, the owner and staff add them (ticket #7)."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_customers", access.company)
+    page = {"customers": customers.list_customers(access.company), "form": {}}
+    if request.method == "POST":
+        permissions.require(request.user, "manage_customers", access.company)
+        submitted = _customer_fields(request.POST)
+        try:
+            customers.create_customer(
+                request.user, access.company, **{name: submitted.get(name, "") for name in customers.IDENTITY_FIELDS}
+            )
+        except customers.InvalidCustomer as problem:
+            return render(
+                request, "customers.html", _customer_context(access, **{**page, "form": submitted, "error": str(problem)})
+            )
+        return redirect(_customers_url(pk) + "?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    if request.GET.get("saved"):
+        page["message"] = _("Customer saved.")
+    return render(request, "customers.html", _customer_context(access, **page))
+
+
+@audit.audited_read("customer", id_arg="customer_pk")
+def customer_detail(request, pk, customer_pk):
+    """One customer: the owner changes its legal name, TIN and ID; staff see them (D46)."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_customers", access.company)
+    customer = get_object_or_404(Customer, pk=customer_pk, company_id=pk)
+    page = {"customer": customer, "form": customer, "history": customers.history(customer)}
+    if request.method == "POST":
+        permissions.require(request.user, "manage_customers", access.company)
+        submitted = _customer_fields(request.POST)
+        try:
+            customers.update_customer(request.user, customer, **submitted)
+        except customers.InvalidCustomer as problem:
+            page.update(form=submitted, error=str(problem))
+            return render(request, "customer.html", _customer_context(access, **page))
+        return redirect(_customers_url(pk, customer_pk) + "?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    if request.GET.get("saved"):
+        page["message"] = _("Customer saved.")
+    return render(request, "customer.html", _customer_context(access, **page))
+
+
+def _set_customer_active(request, pk, customer_pk, active):
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "manage_customers", access.company)
+    customer = get_object_or_404(Customer, pk=customer_pk, company_id=pk)
+    (customers.reactivate_customer if active else customers.deactivate_customer)(request.user, customer)
+    return redirect(_customers_url(pk))
+
+
+@require_POST
+def customer_deactivate(request, pk, customer_pk):
+    return _set_customer_active(request, pk, customer_pk, False)
+
+
+@require_POST
+def customer_activate(request, pk, customer_pk):
+    return _set_customer_active(request, pk, customer_pk, True)
 
 
 def accept_invitation(request, token):
