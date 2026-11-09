@@ -58,5 +58,5 @@ REVERSE = [
 
 
 class Migration(migrations.Migration):
-    dependencies = [("core", "0038_firm_application")]
+    dependencies = [("core", "0039_firm_application")]
     operations = [migrations.RunSQL(FORWARD, REVERSE)]

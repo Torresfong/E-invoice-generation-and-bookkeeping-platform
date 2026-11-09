@@ -11,9 +11,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, einvoicing, firm_admin, firm_applications, items, permissions, registration, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, Item, SupplierDetails
-from . import audit, customers, einvoicing, firm_admin, items, permissions, registration, throttle, tokens
+from . import audit, customers, einvoicing, firm_admin, firm_applications, items, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Item, SupplierDetails
 from .signin import complete_sign_in
 
