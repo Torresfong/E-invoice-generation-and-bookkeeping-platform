@@ -20,6 +20,9 @@ ACTIONS = {
     "configure_numbering": {OWNER},  # prefix and starting number of the invoice sequence (D18)
     "view_einvoicing": {OWNER, STAFF, ACCOUNTANT},
     "manage_einvoicing": {OWNER},  # status, on/off switch and supplier details of the e-invoice setting (D59 (2))
+    "view_items": {OWNER, STAFF, ACCOUNTANT},
+    "manage_items": {OWNER, STAFF},  # create, rename, change the default tax type, deactivate (D59 (9))
+    "change_item_codes": {OWNER},  # the LHDN classification and unit codes, as only the owner changes a customer's TIN
     "view_audit_trail": {OWNER, ACCOUNTANT},
     "view_own_activity": {OWNER, STAFF, ACCOUNTANT},
 }

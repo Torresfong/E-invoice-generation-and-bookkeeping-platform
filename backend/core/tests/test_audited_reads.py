@@ -18,6 +18,8 @@ NOT_AUDITED = {
     "companies/": "the accountant's own list of companies they may open, not any company's data (owner decision)",
     "companies/<int:pk>/invite/": "owner-only action: an accountant is refused before anything is shown",
     "companies/<int:pk>/activity/": "shows the signed-in user's own activity, not the company's data",
+    "companies/<int:pk>/items/<int:item_pk>/deactivate/": "owner and staff action: an accountant is refused before anything is shown",
+    "companies/<int:pk>/items/<int:item_pk>/activate/": "owner and staff action: an accountant is refused before anything is shown",
 }
 
 
