@@ -90,6 +90,20 @@ def test_adding_an_accountant_gives_them_the_firms_companies_and_no_others_and_e
     assert "Acme Sdn Bhd" in companies and "Gamma Holdings" not in companies
 
 
+def test_an_accountant_an_administrator_adds_gets_no_access_to_a_company_without_a_firm(
+    client, firms, fake_ports, as_production_connection
+):
+    firmless = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+
+    with as_production_connection():
+        sign_in(client, firms["alpha_admin"])
+        assert add(client, "new.person@alpha.example").status_code == 302
+
+    created = User.objects.get(email="new.person@alpha.example")
+    assert not CompanyAccess.objects.filter(user=created, company=firmless).exists()
+    assert CompanyAccess.objects.filter(user=created, company=firms["acme"]).exists()  # positive control: the firm's own
+
+
 def test_the_accountant_an_administrator_adds_is_the_same_as_one_the_operator_adds(client, firms, as_production_connection):
     operator_made = services.create_accountant("op@alpha.example", firms["alpha"])
     with as_production_connection():

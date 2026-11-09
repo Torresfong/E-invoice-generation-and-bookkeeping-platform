@@ -392,37 +392,54 @@ def test_a_database_with_no_data_gets_no_default_firm():
         MigrationExecutor(connection).migrate(latest)
 
 
+def company_firm_is_nullable():
+    return query(
+        "SELECT is_nullable FROM information_schema.columns "
+        "WHERE table_schema = current_schema() AND table_name = 'core_company' AND column_name = 'firm_id'"
+    )
+
+
+def firm_company_access_counts():
+    return query(
+        "SELECT (SELECT count(*) FROM core_firm), (SELECT count(*) FROM core_company), "
+        "(SELECT count(*) FROM core_companyaccess)"
+    )
+
+
 @pytest.mark.django_db(transaction=True)
 def test_the_nullable_firm_migration_preserves_existing_data_and_reverses(firms_world):
     from django.db.migrations.executor import MigrationExecutor
 
     latest = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
-    before = query(
-        "SELECT (SELECT count(*) FROM core_firm), (SELECT count(*) FROM core_company), "
-        "(SELECT count(*) FROM core_companyaccess)"
-    )
+    before = firm_company_access_counts()
     try:
         MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
-        assert query(
-            "SELECT is_nullable FROM information_schema.columns "
-            "WHERE table_schema = current_schema() AND table_name = 'core_company' AND column_name = 'firm_id'"
-        ) == [("NO",)]
+        assert company_firm_is_nullable() == [("NO",)]
 
         MigrationExecutor(connection).migrate(latest)
-        assert query(
-            "SELECT is_nullable FROM information_schema.columns "
-            "WHERE table_schema = current_schema() AND table_name = 'core_company' AND column_name = 'firm_id'"
-        ) == [("YES",)]
-        assert query(
-            "SELECT (SELECT count(*) FROM core_firm), (SELECT count(*) FROM core_company), "
-            "(SELECT count(*) FROM core_companyaccess)"
-        ) == before
+        assert company_firm_is_nullable() == [("YES",)]
+        assert firm_company_access_counts() == before
 
         MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
-        assert query(
-            "SELECT is_nullable FROM information_schema.columns "
-            "WHERE table_schema = current_schema() AND table_name = 'core_company' AND column_name = 'firm_id'"
-        ) == [("NO",)]
+        assert company_firm_is_nullable() == [("NO",)]
+    finally:
+        MigrationExecutor(connection).migrate(latest)
+
+
+@pytest.mark.django_db(transaction=True)
+def test_the_nullable_firm_migration_cannot_reverse_while_a_company_has_no_firm(firms_world):
+    from django.db.migrations.executor import MigrationExecutor
+
+    latest = MigrationExecutor(connection).loader.graph.leaf_nodes("core")
+    company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+    try:
+        with pytest.raises(DatabaseError):
+            MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
+        assert company_firm_is_nullable() == [("YES",)]  # the refused reversal changed nothing
+
+        services.move_company(company, firms_world["alpha"])  # resolve the firm-less row, as the PR's rollback note says
+        MigrationExecutor(connection).migrate([("core", "0035_company_einvoice_setting")])
+        assert company_firm_is_nullable() == [("NO",)]
     finally:
         MigrationExecutor(connection).migrate(latest)
 

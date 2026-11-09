@@ -5,8 +5,9 @@ from core import services
 
 class Command(BaseCommand):
     help = (
-        "Move a company to another firm: the old firm's accountants lose access and the new firm's gain it. "
-        "A company moves between firms only by this operator action (D49)."
+        "Move a company to another firm, or bind a company without a firm to one: the old firm's accountants lose "
+        "access and the new firm's gain it. A company changes firm only by this operator action (D49, D67); "
+        "use unlink_company to end a link."
     )
 
     def add_arguments(self, parser):

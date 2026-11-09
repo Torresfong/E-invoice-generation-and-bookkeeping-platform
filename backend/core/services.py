@@ -59,11 +59,17 @@ def _lock_firms(*firms):
     access rows; locking the firm makes them take turns, so a move cannot leave a stale row for the old firm's
     accountant behind.
     """
-    firm_ids = [firm.pk for firm in firms if firm is not None]
+    present = _present(*firms)
     locked = {
-        firm.pk: firm for firm in Firm.objects.select_for_update().filter(pk__in=firm_ids).order_by("pk")
+        firm.pk: firm
+        for firm in Firm.objects.select_for_update().filter(pk__in=[firm.pk for firm in present]).order_by("pk")
     }
-    return [locked[firm.pk] for firm in firms if firm is not None]
+    return [locked[firm.pk] for firm in present]
+
+
+def _present(*firms):
+    """The firms that exist: a company's old or new side is `None` when it has no firm there."""
+    return [firm for firm in firms if firm is not None]
 
 
 def _record_firm_event(firm, action, target_type, target_id, changed_fields):
@@ -165,8 +171,6 @@ def move_company(company, firm):
     # The company's trail and every firm side that exists, tied together by one correlation id (D50 (5), D67 (5)).
     with audit.correlated():
         _record_firm(company, AuditEntry.UPDATE)
-        for side in (current.firm, firm):
-            if side is None:
-                continue
-            _record_firm_event(side, AuditEntry.UPDATE, "company", company.pk, ["firm"])
+        for side in _present(current.firm, firm):
+            _record_firm_event(side,AuditEntry.UPDATE, "company", company.pk, ["firm"])
     return company
