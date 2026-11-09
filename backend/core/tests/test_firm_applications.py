@@ -8,9 +8,10 @@ import re
 
 import pytest
 from django.core.management import CommandError, call_command
-from django.db import ProgrammingError, transaction
+from django.db import DatabaseError, ProgrammingError, transaction
 from django.test import Client
 
+from core import audit
 from core.models import AuditEntry, Firm, FirmApplication, FirmAuditEntry, User
 
 from .factories import PASSWORD, default_firm, make_company
@@ -282,6 +283,28 @@ def test_an_approval_whose_email_cannot_be_sent_changes_nothing(applying_open, e
         call_command("approve_firm_application", str(application.pk))
 
     application.refresh_from_db()
+    assert (Firm.objects.count(), User.objects.count()) == before and application.status == FirmApplication.PENDING
+
+
+def test_a_database_failure_after_the_decision_is_made_sends_no_email(applying_open, fake_ports, monkeypatch):
+    """The password link goes out last (D53): a write that fails must not leave a link for an account that was rolled back."""
+    application = pending()
+    before = Firm.objects.count(), User.objects.count()
+
+    real_record = audit.record_firm_event
+
+    def failing_trail(action, firm, **details):
+        # Only the decision's own entry fails; creating the firm writes its own entries first.
+        if details.get("target_type") == "firm_application":
+            raise DatabaseError("the trail could not be written")
+        return real_record(action, firm, **details)
+
+    monkeypatch.setattr(audit, "record_firm_event", failing_trail)
+    with pytest.raises(DatabaseError):
+        call_command("approve_firm_application", str(application.pk))
+
+    application.refresh_from_db()
+    assert fake_ports.email.sent == []
     assert (Firm.objects.count(), User.objects.count()) == before and application.status == FirmApplication.PENDING
 
 

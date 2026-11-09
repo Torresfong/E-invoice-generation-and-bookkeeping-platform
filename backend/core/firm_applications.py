@@ -57,7 +57,6 @@ def approve(pk):
     """
     application = _lock_pending(pk)
     administrator = services.create_firm_with_administrator(application.firm_name, application.contact_email)
-    tokens.issue_setup_link(administrator)
     _stamp_decision(application, FirmApplication.APPROVED)
     application.firm = administrator.firm
     application.save()
@@ -65,6 +64,9 @@ def approve(pk):
     audit.record_firm_event(
         AuditEntry.UPDATE, administrator.firm, target_type="firm_application", target_id=application.pk, changed_fields=["status"]
     )
+    # Last, so nothing that can still fail comes after the link is sent (D53): a failed email rolls everything back, and a
+    # failed write sends no link.
+    tokens.issue_setup_link(administrator)
     return administrator
 
 
