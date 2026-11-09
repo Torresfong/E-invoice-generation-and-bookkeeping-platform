@@ -445,11 +445,17 @@ def test_an_accountant_row_for_a_company_of_another_firm_is_refused(firms_world)
 
 def test_an_accountant_row_for_a_company_without_a_firm_is_refused(firms_world):
     company = services.create_company_with_owner("Independent Bhd", "owner@independent.example", PASSWORD)
+    accountant = User.objects.create_user(
+        "second@alpha.example", is_accountant=True, firm=firms_world["alpha"]
+    )
     check_now()
 
+    CompanyAccess.objects.create(
+        user=accountant, company=firms_world["acme"], role=CompanyAccess.ACCOUNTANT
+    )
     with pytest.raises(DatabaseError, match="firm"), transaction.atomic():
         CompanyAccess.objects.create(
-            user=firms_world["alpha_accountant"], company=company, role=CompanyAccess.ACCOUNTANT
+            user=accountant, company=company, role=CompanyAccess.ACCOUNTANT
         )
 
 
