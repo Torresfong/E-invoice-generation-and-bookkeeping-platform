@@ -1,0 +1,68 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "Customers" %} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{% trans "Customers" %}</h1>
+  <p>{{ company.name }}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% can "manage_customers" company as may_manage %}
+  {% if customers %}
+    <table>
+      <thead>
+        <tr>
+          <th>{% trans "Legal name" %}</th>
+          <th>{% trans "TIN" %}</th>
+          <th>{% trans "ID type" %}</th>
+          <th>{% trans "ID value" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for customer in customers %}
+          <tr>
+            <td><a href="/companies/{{ company.pk }}/customers/{{ customer.pk }}/">{{ customer.legal_name }}</a></td>
+            <td>{{ customer.tin }}</td>
+            <td>{{ customer.id_type }}</td>
+            <td>{{ customer.id_value }}</td>
+            <td>{% if customer.is_active %}{% trans "Active" %}{% else %}{% trans "Inactive" %}{% endif %}</td>
+            <td>
+              {% if may_manage %}
+                {% if customer.is_active %}
+                  <form method="post" action="/companies/{{ company.pk }}/customers/{{ customer.pk }}/deactivate/">{% csrf_token %}<button type="submit">{% trans "Deactivate" %}</button></form>
+                {% else %}
+                  <form method="post" action="/companies/{{ company.pk }}/customers/{{ customer.pk }}/activate/">{% csrf_token %}<button type="submit">{% trans "Activate" %}</button></form>
+                {% endif %}
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% trans "No customers yet." %}</p>
+  {% endif %}
+  {% if may_manage %}
+    <h2>{% trans "Add a customer" %}</h2>
+    <form method="post" action="/companies/{{ company.pk }}/customers/">
+      {% csrf_token %}
+      <p><label>{% trans "Legal name" %} <input name="legal_name" maxlength="200" value="{{ form.legal_name|default:'' }}" required></label></p>
+      <p><label>{% trans "TIN" %} <input name="tin" maxlength="20" value="{{ form.tin|default:'' }}"></label></p>
+      <p><label>{% trans "ID type" %}
+        <select name="id_type">
+          <option value="">—</option>
+          {% for type in id_types %}<option value="{{ type }}" {% if form.id_type == type %}selected{% endif %}>{{ type }}</option>{% endfor %}
+        </select></label></p>
+      <p><label>{% trans "ID value" %} <input name="id_value" maxlength="20" value="{{ form.id_value|default:'' }}"></label></p>
+      <p>{% trans "The TIN is checked with MyInvois before the customer is saved." %}</p>
+      <button type="submit">{% trans "Save" %}</button>
+    </form>
+  {% endif %}
+  <p><a href="/companies/{{ company.pk }}/">{% trans "Back to the company" %}</a></p>
+</body>
+</html>

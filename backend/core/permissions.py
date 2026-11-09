@@ -23,6 +23,9 @@ ACTIONS = {
     "view_items": {OWNER, STAFF, ACCOUNTANT},
     "manage_items": {OWNER, STAFF},  # create, rename, change the default tax type, deactivate (D59 (9))
     "change_item_codes": {OWNER},  # the LHDN classification and unit codes, as only the owner changes a customer's TIN
+    "view_customers": {OWNER, STAFF, ACCOUNTANT},
+    "manage_customers": {OWNER, STAFF},  # create, deactivate (D59 (10))
+    "change_customer_identity": {OWNER},  # legal name, TIN, ID type and value (D46, ticket #7)
     "view_audit_trail": {OWNER, ACCOUNTANT},
     "view_own_activity": {OWNER, STAFF, ACCOUNTANT},
 }

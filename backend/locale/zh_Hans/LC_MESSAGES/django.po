@@ -582,3 +582,76 @@ msgid ""
 msgstr ""
 "此开关仅适用于新发票。关闭电子发票不会影响对已提交至 LHDN 的发票开具贷项、借项和退款票据；"
 "开启电子发票也不会把之前的普通发票改为电子发票。"
+
+#: .\core\templates\customers.html
+msgid "Customers"
+msgstr "客户"
+
+#: .\core\templates\customers.html
+msgid "Legal name"
+msgstr "法定名称"
+
+#: .\core\templates\customers.html
+msgid "ID type"
+msgstr "证件类型"
+
+#: .\core\templates\customers.html
+msgid "ID value"
+msgstr "证件号码"
+
+#: .\core\templates\customers.html
+msgid "No customers yet."
+msgstr "还没有客户。"
+
+#: .\core\templates\customers.html
+msgid "Add a customer"
+msgstr "添加客户"
+
+#: .\core\templates\customers.html
+msgid "The TIN is checked with MyInvois before the customer is saved."
+msgstr "保存客户前会先向 MyInvois 核对税务识别号。"
+
+#: .\core\templates\customer.html
+msgid "Only the company owner can change the legal name, TIN or ID."
+msgstr "只有公司所有者可以更改法定名称、税务识别号或证件。"
+
+#: .\core\templates\customer.html
+msgid "Back to the customers"
+msgstr "返回客户列表"
+
+#: .\core\views.py
+msgid "Customer saved."
+msgstr "客户已保存。"
+
+#: .\core\customers.py
+msgid "Check the legal name."
+msgstr "请检查法定名称。"
+
+#: .\core\customers.py
+msgid "Check the TIN."
+msgstr "请检查税务识别号。"
+
+#: .\core\customers.py
+msgid "Check the ID type."
+msgstr "请检查证件类型。"
+
+#: .\core\customers.py
+msgid "Check the ID value."
+msgstr "请检查证件号码。"
+
+#: .\core\customers.py
+#, python-format
+msgid "A customer needs a %(field)s while e-invoicing is on."
+msgstr "开启电子发票后，客户必须填写%(field)s。"
+
+#: .\core\customers.py
+msgid "A TIN is checked together with an ID type and an ID value."
+msgstr "税务识别号需要连同证件类型和证件号码一起核对。"
+
+#: .\core\customers.py
+msgid "MyInvois does not accept the format of this TIN."
+msgstr "MyInvois 不接受该税务识别号的格式。"
+
+#: .\core\customers.py
+msgid "MyInvois has no taxpayer with this TIN and ID."
+msgstr "MyInvois 中没有使用该税务识别号和证件的纳税人。"
