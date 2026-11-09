@@ -59,7 +59,8 @@ def test_every_security_definer_function_pins_a_search_path_that_starts_with_pg_
         "WHERE n.nspname = 'public' AND p.prosecdef"
     )
 
-    assert len(rows) == 21  # a new definer function must be added here on purpose (0033: claim_job -> claim_next_job, +3)
+    # A new definer function must be added here on purpose (0033: claim_job -> claim_next_job, +3; 0039: +1).
+    assert len(rows) == 22
     assert {tuple(config) for _, config in rows} == {("search_path=pg_catalog, public, pg_temp",)}
 
 

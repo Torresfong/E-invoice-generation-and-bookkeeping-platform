@@ -77,6 +77,8 @@ The web role has no direct access to `core_authtoken` or `core_loginfailure`, an
 
 **Not tenant tables.** `core_user`, `core_authtoken` and `core_loginfailure` have no company id. They are reached only through the functions above and, for the user's own row, the policy on `core_user`, so the standard tenant helper does not apply to them. The membership tables hold the company link.
 
+`core_firmapplication` (D67 (1), approved by Torres for ticket #142) is the same kind of table: a firm's application exists before the firm, so it has no company or firm id. The web role has no privilege on it; the one way in is `submit_firm_application()`, which stores an application and creates no firm or user. The operator decides it from commands that run as the table owner (migration 0039; forced RLS with an owner-only policy).
+
 **Deployment settings that matter.** `ENVIRONMENT` must be set to something other than `development` in production: it turns on secure cookies and the `SECRET_KEY` check. HSTS, SSL redirects and the proxy header are not configured yet. All of this is part of the go-live work in #39.
 
 **Firm portal language.** The firm portal is English only (pilot spec, "Languages"), but the sign-in and company pages are shared and follow the browser's language. Fixing an accountant's language belongs with the firm portal screens.

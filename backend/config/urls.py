@@ -3,6 +3,7 @@ from django.urls import path
 from core.views import (
     accept_invitation,
     add_firm_person,
+    apply_as_firm,
     audit_trail,
     companies,
     company,
@@ -46,6 +47,7 @@ urlpatterns = [
     path("firm/add/", add_firm_person),
     path("firm/audit/", firm_audit_trail),
     path("firm/<int:pk>/deactivate/", deactivate_firm_person),
+    path("apply/", apply_as_firm),
     path("signup-links/", signup_links),
     path("signup/<str:token>/", sign_up),
     path("register/<str:token>/", register),
