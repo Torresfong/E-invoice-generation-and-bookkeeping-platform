@@ -42,6 +42,7 @@ ENDPOINTS = [
     ("GET", "/companies/{pk}/", "companies/<int:pk>/"),
     ("GET", "/companies/{pk}/audit/", "companies/<int:pk>/audit/"),
     ("GET", "/companies/{pk}/activity/", "companies/<int:pk>/activity/"),
+    ("POST", "/companies/{pk}/einvoicing/", "companies/<int:pk>/einvoicing/"),
     ("POST", "/companies/{pk}/invite/", "companies/<int:pk>/invite/"),
 ]
 

@@ -1,4 +1,5 @@
 import logging
+from datetime import date
 
 from django.conf import settings
 from django.contrib.auth import authenticate, logout, password_validation
@@ -10,8 +11,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, firm_admin, permissions, registration, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry
+from . import audit, einvoicing, firm_admin, permissions, registration, throttle, tokens
+from .models import AuditEntry, AuthToken, CompanyAccess, FirmAuditEntry, SupplierDetails
 from .signin import complete_sign_in
 
 logger = logging.getLogger(__name__)
@@ -158,6 +159,61 @@ def invite_staff(request, pk):
     except tokens.TooManyInvitations:
         return _company_page(request, access, error=_("Too many invitations today. Try again tomorrow."))
     return redirect(f"/companies/{pk}/?invited=1")
+
+
+def _einvoice_page(request, access, form=None, **extra):
+    setting = einvoicing.current_setting(access.company)
+    context = {
+        "company": access.company,
+        "access": access,
+        "setting": setting,
+        "form": form if form is not None else setting,
+        "statuses": SupplierDetails.STATUS_CHOICES,
+        "acknowledgement_text": einvoicing.ACKNOWLEDGEMENT_TEXT,
+        **extra,
+    }
+    if request.GET.get("saved"):
+        context["message"] = _("E-invoice setting saved.")
+    return render(request, "einvoice_setting.html", context)
+
+
+def _submitted_setting(post):
+    """The owner's form as `update_setting` arguments. A blank status means "not yet checked"."""
+    try:
+        effective_from = date.fromisoformat(post.get("effective_from", "").strip())
+    except ValueError:
+        effective_from = None
+    values = {name: post.get(name, "").strip() for name in einvoicing.SUPPLIER_FIELDS}
+    values["country_code"] = values["country_code"].upper()
+    return {
+        "einvoicing_enabled": "einvoicing_enabled" in post,
+        "status": post.get("status", "").strip() or None,
+        "effective_from": effective_from,
+        "acknowledged": "acknowledged" in post,
+        **values,
+    }
+
+
+@audit.audited_read("einvoice_setting")
+def einvoice_setting(request, pk):
+    """The company's e-invoice setting: every member reads it, only the owner changes it (D59 (2))."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_einvoicing", access.company)
+    if request.method == "POST":
+        permissions.require(request.user, "manage_einvoicing", access.company)
+        submitted = _submitted_setting(request.POST)
+        try:
+            einvoicing.update_setting(request.user, access.company, **submitted)
+        except einvoicing.InvalidSetting as problem:
+            return _einvoice_page(request, access, submitted, error=str(problem))
+        except einvoicing.AcknowledgementRequired:
+            return _einvoice_page(request, access, submitted, needs_acknowledgement=True)
+        return redirect(f"/companies/{pk}/einvoicing/?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    return _einvoice_page(request, access)
 
 
 def accept_invitation(request, token):
