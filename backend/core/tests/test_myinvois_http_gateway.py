@@ -17,11 +17,14 @@ from core.ports.myinvois import (
     PermissionDenied,
     RateLimited,
     TokenCache,
+    UnexpectedResponse,
 )
 
 BASE = "https://preprod-api.example.test"
 CREDENTIALS = IntermediaryCredentials(client_id="erp-client-id", client_secret="erp-client-secret")
 T0 = datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)
+
+pytestmark = pytest.mark.usefixtures("no_network")
 
 
 def token_answer(token="tok-1", expires_in=3600):
@@ -294,11 +297,39 @@ def test_validation_failures_other_than_the_three_answers_are_classified_like_lo
         gateway.validate_tin("C1234567890", "BRN", "1")
 
 
-@pytest.fixture(autouse=True)
-def _no_real_network(monkeypatch):
-    import socket
+# --- answers LHDN's contract does not describe, and a token LHDN no longer honours ------------------------------------
 
-    def refuse(*args):
-        raise AssertionError("a test tried to reach the network")
 
-    monkeypatch.setattr(socket.socket, "connect", refuse)
+@pytest.mark.parametrize("status", [404, 422, 302])
+def test_an_unexpected_status_is_a_permanent_error_the_job_runner_can_classify(status):
+    gateway, _, _ = a_gateway(answer(status, body=b"not json"))
+
+    with pytest.raises(UnexpectedResponse) as raised:
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+    assert isinstance(raised.value, PermanentError)
+
+
+def test_a_login_answer_without_a_token_is_a_permanent_error():
+    gateway, _, _ = a_gateway(answer(200, body=b'{"unexpected": true}'))
+
+    with pytest.raises(UnexpectedResponse):
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+
+def test_a_token_lhdn_no_longer_honours_is_replaced_by_one_fresh_login_and_the_call_retried():
+    gateway, lhdn, _ = a_gateway(token_answer("old"), answer(401), token_answer("new"), answer(404))
+
+    result = gateway.validate_tin("C1234567890", "BRN", "1")
+
+    assert result is TinCheck.NOT_FOUND
+    assert lhdn.requests[3]["headers"]["Authorization"] == "Bearer new"
+
+
+def test_a_second_401_after_a_fresh_login_is_an_authentication_failure():
+    gateway, lhdn, _ = a_gateway(token_answer("old"), answer(401), token_answer("new"), answer(401))
+
+    with pytest.raises(AuthenticationFailed):
+        gateway.validate_tin("C1234567890", "BRN", "1")
+
+    assert len(lhdn.requests) == 4

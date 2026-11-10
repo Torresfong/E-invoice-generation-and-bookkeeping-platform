@@ -45,6 +45,10 @@ class PermissionDenied(PermanentError):
     """
 
 
+class UnexpectedResponse(PermanentError):
+    """LHDN answered with a status or body this contract does not describe. Only the fact is kept, never the body."""
+
+
 class RateLimited(TransientError):
     """LHDN answered 429. `retry_after` is the seconds it asked us to wait, if it said."""
 
@@ -91,6 +95,10 @@ class TokenCache:
             cached = self._tokens.get(self._key(environment, credentials, onbehalf_of))
         return cached if cached is not None and now < cached[1] - RENEW_BEFORE_EXPIRY else None
 
+    def evict(self, environment, credentials, onbehalf_of):
+        with self._lock:
+            self._tokens.pop(self._key(environment, credentials, onbehalf_of), None)
+
     def put(self, environment, credentials, onbehalf_of, token, expires_at):
         with self._lock:
             self._tokens[self._key(environment, credentials, onbehalf_of)] = (token, expires_at)
@@ -130,6 +138,8 @@ class MyInvoisHttpGateway:
             raise AuthenticationFailed(f"MyInvois refused the credentials ({answer.status})")
         if answer.status >= 500:
             raise TransientError(f"MyInvois is unavailable ({answer.status})")
+        if not 200 <= answer.status < 300:
+            raise UnexpectedResponse(f"MyInvois answered {answer.status}, which the contract does not describe")
         return answer
 
     def login_as_taxpayer(self, credentials, company_id, tin, rob=None):
@@ -144,19 +154,31 @@ class MyInvoisHttpGateway:
             {"client_id": credentials.client_id, "client_secret": credentials.client_secret, "grant_type": "client_credentials"}
         )
         requested_at = self._now()
-        token = self._send("POST", "/connect/token", headers, body.encode()).json()
-        expires_at = requested_at + timedelta(seconds=token["expires_in"])
-        self._cache.put(self.environment, credentials, onbehalf_of, token["access_token"], expires_at)
-        return TaxpayerSession(company_id=company_id, tin=tin, token=token["access_token"], expires_at=expires_at, rob=rob)
+        answer = self._send("POST", "/connect/token", headers, body.encode())
+        try:
+            token, lifetime = answer.json()["access_token"], answer.json()["expires_in"]
+            expires_at = requested_at + timedelta(seconds=lifetime)
+        except (KeyError, TypeError, ValueError):
+            raise UnexpectedResponse("MyInvois answered the login without a usable token") from None
+        self._cache.put(self.environment, credentials, onbehalf_of, token, expires_at)
+        return TaxpayerSession(company_id=company_id, tin=tin, token=token, expires_at=expires_at, rob=rob)
+
+    def _validate_once(self, path):
+        own = self.login_as_taxpayer(self.credentials, 0, "")
+        return self._send("GET", path, {"Authorization": f"Bearer {own.token}"}, answers=(400, 404))
 
     def validate_tin(self, tin, id_type, id_value):
         """Looked up under our own login, with no `onbehalfof`: the buyer is not one of our clients."""
         if id_type not in ID_TYPES:
             raise ValueError(f"id_type must be one of {', '.join(ID_TYPES)}")
-        own = self.login_as_taxpayer(self.credentials, 0, "")
         query = urlencode({"idType": id_type, "idValue": id_value}, quote_via=quote)
         path = f"/api/v1.0/taxpayer/validate/{quote(tin, safe='')}?{query}"
-        answer = self._send("GET", path, {"Authorization": f"Bearer {own.token}"}, answers=(400, 404))
+        try:
+            answer = self._validate_once(path)
+        except AuthenticationFailed:
+            # LHDN has stopped honouring the token (it can be lost on their side before it expires): log in once more.
+            self._cache.evict(self.environment, self.credentials, "")
+            answer = self._validate_once(path)
         return {400: TinCheck.BAD_FORMAT, 404: TinCheck.NOT_FOUND}.get(answer.status, TinCheck.VALID)
 
 

@@ -1,3 +1,4 @@
+import socket
 from contextlib import contextmanager
 
 import pytest
@@ -162,3 +163,13 @@ def firms_world(db):
     acme = services.create_company_with_owner("Acme Sdn Bhd", "owner@acme.example", PASSWORD, alpha)
     gamma = services.create_company_with_owner("Gamma Holdings", "owner@gamma.example", PASSWORD, beta)
     return {"alpha": alpha, "beta": beta, "acme": acme, "gamma": gamma, **people}
+
+
+@pytest.fixture
+def no_network(monkeypatch):
+    """A test that reaches for the network fails instead of making a call."""
+
+    def refuse(*args):
+        raise AssertionError("a test tried to reach the network")
+
+    monkeypatch.setattr(socket.socket, "connect", refuse)

@@ -53,7 +53,10 @@ def _sandbox_scenario(env=os.environ):
     gateway = gateway_from_environment("sandbox", env)
     if gateway is None:
         pytest.skip("no MyInvois sandbox credentials in the environment")
-    value = lambda name: env.get(SANDBOX_ENV + name) or None  # noqa: E731
+
+    def value(name):
+        return env.get(SANDBOX_ENV + name) or None
+
     buyer = (value("BUYER_TIN"), value("BUYER_ID_TYPE"), value("BUYER_ID_VALUE"))
     return Scenario(
         "sandbox",
@@ -72,7 +75,7 @@ def scenario(request):
     return _fake_scenario() if request.param == "fake" else _sandbox_scenario()
 
 
-def need(value, name):
+def need(value, name):  # skips the test when its sandbox input is not configured
     if value is None:
         pytest.skip(f"{SANDBOX_ENV}{name} is not set")
     return value

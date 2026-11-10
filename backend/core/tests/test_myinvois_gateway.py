@@ -1,7 +1,6 @@
 import inspect
 import logging
 import os
-import socket
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -29,14 +28,6 @@ DOCUMENT = b'{"invoice": "INV-0001"}'
 DOCUMENT_SHA256 = bytes.fromhex("ea09b11d6dff65b01ee96aa654544fc189f461c97aef42e95308adacab210ad2")
 COMPANY_ID = 7
 OTHER_COMPANY_ID = 8
-
-
-@pytest.fixture
-def no_network(monkeypatch):
-    def refuse(*args):
-        raise AssertionError("a test tried to reach the network")
-
-    monkeypatch.setattr(socket.socket, "connect", refuse)
 
 
 CODE = "INV-0001"
