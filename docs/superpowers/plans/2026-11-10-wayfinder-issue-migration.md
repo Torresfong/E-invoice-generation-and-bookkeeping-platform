@@ -259,4 +259,3 @@
 - Activation has a mandatory human stop.
 - Rollback is additive/reversible and retains audit history.
 - Product implementation, deployment, and issue execution are outside this migration plan.
-
