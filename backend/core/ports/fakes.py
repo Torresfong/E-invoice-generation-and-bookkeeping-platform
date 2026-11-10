@@ -64,6 +64,8 @@ class FakeGateway:
     def __init__(self):
         self.key_provider = FakeKeyProvider()
         self.now = timezone.now  # a test replaces it to move time
+        self.accepted_client_ids = None  # None: any client ID logs in; a set: only these (others get the 401 LHDN gives)
+        self.authorised_tins = None  # None: any taxpayer has authorised us; a set: only these (others get LHDN's 403)
         self.tins_validated = []
         self.unknown_tins = set()  # well-formed TINs that LHDN answers "not found" for
         self.submissions = []
@@ -92,6 +94,12 @@ class FakeGateway:
     # --- the port
 
     def login_as_taxpayer(self, credentials, company_id, tin, rob=None):
+        from core.ports.myinvois import AuthenticationFailed, PermissionDenied  # not at import: they extend the jobs errors
+
+        if self.accepted_client_ids is not None and credentials.client_id not in self.accepted_client_ids:
+            raise AuthenticationFailed("MyInvois refused the credentials (401)")
+        if tin and self.authorised_tins is not None and tin not in self.authorised_tins:
+            raise PermissionDenied("MyInvois refused the operation (403)")
         return TaxpayerSession(
             company_id=company_id,
             tin=tin,
