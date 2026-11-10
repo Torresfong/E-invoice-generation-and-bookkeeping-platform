@@ -1,0 +1,2327 @@
+{
+  "schemaVersion": 1,
+  "snapshotDate": "2026-11-10",
+  "timezone": "Asia/Singapore",
+  "repository": "Torresfong/E-invoice-generation-and-bookkeeping-platform",
+  "summary": {
+    "openIssues": 66,
+    "parentlessOpenIssues": 6,
+    "issuesWithOpenChildren": 13,
+    "leafIssues": 53,
+    "issuesWithOpenBlockers": 41,
+    "openDependencyEdges": 75,
+    "assignedOpenIssues": 0,
+    "readyForAgentIssues": 29,
+    "structuralFrontierCandidates": 15,
+    "qualifiedExistingFrontier": 6
+  },
+  "issues": [
+    {
+      "number": 1,
+      "title": "Pilot: e-invoicing and bookkeeping platform",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/1",
+      "bodySha256": "4039f18400eb5cf594f216216603f4454966b618ea8bd86437f0998cac76d1fd",
+      "updatedAt": "2026-11-08T03:23:17Z",
+      "labels": [],
+      "assignees": [],
+      "parent": null,
+      "subIssues": [
+        {
+          "number": 2,
+          "state": "CLOSED"
+        },
+        {
+          "number": 3,
+          "state": "CLOSED"
+        },
+        {
+          "number": 4,
+          "state": "OPEN"
+        },
+        {
+          "number": 5,
+          "state": "OPEN"
+        },
+        {
+          "number": 6,
+          "state": "OPEN"
+        },
+        {
+          "number": 7,
+          "state": "CLOSED"
+        },
+        {
+          "number": 8,
+          "state": "OPEN"
+        },
+        {
+          "number": 9,
+          "state": "OPEN"
+        },
+        {
+          "number": 10,
+          "state": "OPEN"
+        },
+        {
+          "number": 11,
+          "state": "OPEN"
+        },
+        {
+          "number": 12,
+          "state": "OPEN"
+        },
+        {
+          "number": 13,
+          "state": "OPEN"
+        },
+        {
+          "number": 14,
+          "state": "OPEN"
+        },
+        {
+          "number": 15,
+          "state": "OPEN"
+        },
+        {
+          "number": 16,
+          "state": "OPEN"
+        },
+        {
+          "number": 17,
+          "state": "OPEN"
+        },
+        {
+          "number": 18,
+          "state": "OPEN"
+        },
+        {
+          "number": 19,
+          "state": "OPEN"
+        },
+        {
+          "number": 20,
+          "state": "OPEN"
+        },
+        {
+          "number": 21,
+          "state": "OPEN"
+        },
+        {
+          "number": 22,
+          "state": "OPEN"
+        },
+        {
+          "number": 23,
+          "state": "OPEN"
+        },
+        {
+          "number": 24,
+          "state": "OPEN"
+        },
+        {
+          "number": 27,
+          "state": "CLOSED"
+        },
+        {
+          "number": 39,
+          "state": "OPEN"
+        },
+        {
+          "number": 106,
+          "state": "OPEN"
+        },
+        {
+          "number": 85,
+          "state": "OPEN"
+        },
+        {
+          "number": 100,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 4,
+      "title": "03: MyInvois gateway and sandbox spike",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/4",
+      "bodySha256": "df45ccef01718f9ddc3d6e8602cd2271e8ceb67717449f2f82fc997b3acfe020",
+      "updatedAt": "2026-11-08T01:56:14Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 41,
+          "state": "CLOSED"
+        },
+        {
+          "number": 42,
+          "state": "OPEN"
+        },
+        {
+          "number": 43,
+          "state": "OPEN"
+        },
+        {
+          "number": 108,
+          "state": "CLOSED"
+        },
+        {
+          "number": 119,
+          "state": "CLOSED"
+        },
+        {
+          "number": 120,
+          "state": "OPEN"
+        },
+        {
+          "number": 128,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [
+        {
+          "number": 2,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 5,
+      "title": "04: Malaysian hosting and staging",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/5",
+      "bodySha256": "5f4d654177e93b9c07dff1e2a26809a0dbf2202ffa6594fe1a1b5169141a7cda",
+      "updatedAt": "2026-11-05T10:49:56Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 2,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 6,
+      "title": "05: AI port and extraction regression harness",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/6",
+      "bodySha256": "859fdc97d4809dfdf4e8fc0afc61e845f445c830ee9d16baf39c5a957bc36197",
+      "updatedAt": "2026-11-05T10:51:09Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 2,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 90,
+          "state": "OPEN"
+        },
+        {
+          "number": 54,
+          "state": "OPEN"
+        },
+        {
+          "number": 21,
+          "state": "OPEN"
+        },
+        {
+          "number": 15,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 8,
+      "title": "07: Invoice draft, numbering and owner approval",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/8",
+      "bodySha256": "36d74f5764864183451283afaeff03de6c91ff686d67cb24c4143e8af0429fce",
+      "updatedAt": "2026-10-30T05:01:25Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 44,
+          "state": "OPEN"
+        },
+        {
+          "number": 45,
+          "state": "CLOSED"
+        },
+        {
+          "number": 46,
+          "state": "OPEN"
+        },
+        {
+          "number": 121,
+          "state": "CLOSED"
+        }
+      ],
+      "blockedBy": [
+        {
+          "number": 31,
+          "state": "CLOSED"
+        },
+        {
+          "number": 33,
+          "state": "CLOSED"
+        },
+        {
+          "number": 32,
+          "state": "CLOSED"
+        },
+        {
+          "number": 7,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 9,
+      "title": "08: Invoice submission and live status",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/9",
+      "bodySha256": "39ef8eed1ed81a186b94297d0711a2ca4e5a9261e6cb74c73d5a4534f153600c",
+      "updatedAt": "2026-11-08T01:56:16Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 47,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [
+        {
+          "number": 27,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 10,
+      "title": "09: Invalid invoices and MyInvois outage",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/10",
+      "bodySha256": "caa7a548d108749555354598bad55709ba3b3d5671dbbab1f65acc0d015247d3",
+      "updatedAt": "2026-11-08T01:56:17Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 11,
+      "title": "10: Credit, debit and refund notes, cancellation and buyer rejection",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/11",
+      "bodySha256": "3d0156e53cde5fcbf486d94cfd45b6243ecfd829f382af65fb248d098ff171c8",
+      "updatedAt": "2026-10-30T05:01:00Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 49,
+          "state": "OPEN"
+        },
+        {
+          "number": 50,
+          "state": "OPEN"
+        },
+        {
+          "number": 51,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 12,
+      "title": "11: Invoice PDF and email",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/12",
+      "bodySha256": "87f39f55223c8b4607b5c71308a5b90f5c14a773503a67bb8329f4a8879d7855",
+      "updatedAt": "2026-11-09T03:58:34Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 151,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        },
+        {
+          "number": 27,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 13,
+      "title": "12: SST and foreign currency",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/13",
+      "bodySha256": "3d6e278fe5cf3ff4eb237a4f854cf4e9657154a12b578e8d35d57cb9b4f953e5",
+      "updatedAt": "2026-10-30T05:01:06Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 52,
+          "state": "OPEN"
+        },
+        {
+          "number": 53,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 14,
+      "title": "13: Document upload with instant bounce",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/14",
+      "bodySha256": "99417e61b4019df31408b6e68d5f55aa14578de8fc5584558982c6a8eaecf11e",
+      "updatedAt": "2026-11-05T11:47:17Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 32,
+          "state": "CLOSED"
+        },
+        {
+          "number": 31,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 54,
+          "state": "OPEN"
+        },
+        {
+          "number": 20,
+          "state": "OPEN"
+        },
+        {
+          "number": 18,
+          "state": "OPEN"
+        },
+        {
+          "number": 15,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 15,
+      "title": "14: Classification and extraction",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/15",
+      "bodySha256": "7bfe2f54a3e18fb95fdf1043d1b42388761b7864ba01571b30f2488c955372bc",
+      "updatedAt": "2026-10-30T05:01:12Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 54,
+          "state": "OPEN"
+        },
+        {
+          "number": 55,
+          "state": "OPEN"
+        },
+        {
+          "number": 56,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [
+        {
+          "number": 27,
+          "state": "CLOSED"
+        },
+        {
+          "number": 14,
+          "state": "OPEN"
+        },
+        {
+          "number": 6,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 16,
+      "title": "15: Firm portal and review queue",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/16",
+      "bodySha256": "556084360c8bc160028bd5a6b720c4523239cc05a21db3be42c5b259571fea8c",
+      "updatedAt": "2026-10-30T05:01:17Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 57,
+          "state": "OPEN"
+        },
+        {
+          "number": 58,
+          "state": "OPEN"
+        },
+        {
+          "number": 59,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 17,
+      "title": "16: Document store for other document types",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/17",
+      "bodySha256": "4ccaa4abae95a8c313185e2a7aa14e68f844a847e059c07e4cafca6f5e18e1c8",
+      "updatedAt": "2026-11-05T11:47:19Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 69,
+          "state": "CLOSED"
+        },
+        {
+          "number": 57,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 18,
+      "title": "17: Checklist, requests and reminders",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/18",
+      "bodySha256": "6382d1c18f96067119f5687bb9179180738873c33ab9df4bd5f23325e3df1cad",
+      "updatedAt": "2026-11-05T11:47:22Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 57,
+          "state": "OPEN"
+        },
+        {
+          "number": 27,
+          "state": "CLOSED"
+        },
+        {
+          "number": 14,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 20,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 19,
+      "title": "18: SQL Account monthly export",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/19",
+      "bodySha256": "0636c3960cbcbb6e6f0feed04efd8521e8dda99b539589806685e6cdd1cfac6f",
+      "updatedAt": "2026-11-06T06:49:21Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 60,
+          "state": "OPEN"
+        },
+        {
+          "number": 61,
+          "state": "OPEN"
+        },
+        {
+          "number": 62,
+          "state": "OPEN"
+        },
+        {
+          "number": 63,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 20,
+      "title": "19: Client dashboard",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/20",
+      "bodySha256": "5cee8bb10057b1c87f4c1648537f1cfe1beffc1a125bbd0af990c52fc8dbfc0d",
+      "updatedAt": "2026-11-05T11:47:24Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 48,
+          "state": "OPEN"
+        },
+        {
+          "number": 18,
+          "state": "OPEN"
+        },
+        {
+          "number": 14,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 21,
+      "title": "20: Assistant: search and draft",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/21",
+      "bodySha256": "5c68254e695a748e2e1aa34b7bad7adb5694e849ef73833a3449f56cd6d1d78b",
+      "updatedAt": "2026-11-05T11:47:26Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [
+        {
+          "number": 90,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [
+        {
+          "number": 44,
+          "state": "OPEN"
+        },
+        {
+          "number": 6,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 90,
+          "state": "OPEN"
+        },
+        {
+          "number": 22,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 22,
+      "title": "21: Assistant: propose and confirm customers",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/22",
+      "bodySha256": "dd9a6f9aef35160379ca7f6bf1b2b89a2190e870e491f4d848c139d1c082485c",
+      "updatedAt": "2026-11-05T11:47:29Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 21,
+          "state": "OPEN"
+        },
+        {
+          "number": 7,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 23,
+      "title": "22: Onboarding, legal and production switch",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/23",
+      "bodySha256": "b8736a562c2686f27b57c78ce4acedff5a5fb09e3aa636dee82e327f38e93697",
+      "updatedAt": "2026-11-08T10:22:44Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 85,
+          "state": "OPEN"
+        },
+        {
+          "number": 5,
+          "state": "OPEN"
+        },
+        {
+          "number": 106,
+          "state": "OPEN"
+        },
+        {
+          "number": 43,
+          "state": "OPEN"
+        },
+        {
+          "number": 39,
+          "state": "OPEN"
+        },
+        {
+          "number": 63,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        },
+        {
+          "number": 61,
+          "state": "OPEN"
+        },
+        {
+          "number": 12,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 24,
+      "title": "23: Retention, exit export and pilot measures",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/24",
+      "bodySha256": "addc32dee5c2fa28632680a63215f83f1bb1a1b209c96e148494099df49a2d17",
+      "updatedAt": "2026-11-05T11:47:31Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 57,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 39,
+      "title": "Go-live: production database roles, 2FA and session hardening",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/39",
+      "bodySha256": "85b09bd414e56378c942f3b1f6012334f09d802e42c930820293b359180c1f66",
+      "updatedAt": "2026-11-06T06:49:35Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 2,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 42,
+      "title": "03b: MyInvois sandbox login, TIN validation and contract tests",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/42",
+      "bodySha256": "7a7f3b4a9b0e430a9a37fc70afded5d49ec87d0dcfe62e1f32c2066f98842256",
+      "updatedAt": "2026-11-06T06:48:33Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 4,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 119,
+          "state": "CLOSED"
+        },
+        {
+          "number": 113,
+          "state": "CLOSED"
+        },
+        {
+          "number": 41,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 43,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 43,
+      "title": "03c: MyInvois sign, submit, poll and cancel; accepted sandbox submission",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/43",
+      "bodySha256": "fcda7943e5b9ee2acb04a77a3860d87329d0bb11f2cb602693491c890f85919e",
+      "updatedAt": "2026-11-09T03:36:14Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 4,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 108,
+          "state": "CLOSED"
+        },
+        {
+          "number": 42,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 2,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 44,
+      "title": "07a: Draft an invoice by form from the customer master",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/44",
+      "bodySha256": "8f5d8a852dcb7c3b8266b4054d21eacd7f30a759f91d97e6e6b030daf46c9f6a",
+      "updatedAt": "2026-11-08T01:57:02Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 8,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 121,
+          "state": "CLOSED"
+        },
+        {
+          "number": 7,
+          "state": "CLOSED"
+        },
+        {
+          "number": 32,
+          "state": "CLOSED"
+        },
+        {
+          "number": 31,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 120,
+          "state": "OPEN"
+        },
+        {
+          "number": 21,
+          "state": "OPEN"
+        },
+        {
+          "number": 52,
+          "state": "OPEN"
+        },
+        {
+          "number": 46,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 46,
+      "title": "07c: Owner approval, buyer snapshot and lock",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/46",
+      "bodySha256": "8e8b1f6c6aa1ec9598798c82968954a64b32aeee1c20e38a8907a1b5f8ad3551",
+      "updatedAt": "2026-11-08T02:52:01Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 8,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 33,
+          "state": "CLOSED"
+        },
+        {
+          "number": 44,
+          "state": "OPEN"
+        },
+        {
+          "number": 45,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 148,
+          "state": "OPEN"
+        },
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 47,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 47,
+      "title": "08a: Approve & submit through the MyInvois gateway",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/47",
+      "bodySha256": "7cb1c3a8d5fd43fd351275990f0e5afef3a96986f1607ed0218e5532ef9fbc3a",
+      "updatedAt": "2026-11-08T01:57:39Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 9,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 128,
+          "state": "OPEN"
+        },
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 119,
+          "state": "CLOSED"
+        },
+        {
+          "number": 113,
+          "state": "CLOSED"
+        },
+        {
+          "number": 46,
+          "state": "OPEN"
+        },
+        {
+          "number": 27,
+          "state": "CLOSED"
+        },
+        {
+          "number": 41,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 148,
+          "state": "OPEN"
+        },
+        {
+          "number": 49,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 48,
+      "title": "08b: Poll MyInvois status and show live status",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/48",
+      "bodySha256": "c1cb8baf4b115d4d3eb96f66337a6f01e55c760f0377078120d58ad4e031d70b",
+      "updatedAt": "2026-11-08T01:57:46Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 9,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 47,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 148,
+          "state": "OPEN"
+        },
+        {
+          "number": 49,
+          "state": "OPEN"
+        },
+        {
+          "number": 24,
+          "state": "OPEN"
+        },
+        {
+          "number": 23,
+          "state": "OPEN"
+        },
+        {
+          "number": 20,
+          "state": "OPEN"
+        },
+        {
+          "number": 12,
+          "state": "OPEN"
+        },
+        {
+          "number": 10,
+          "state": "OPEN"
+        },
+        {
+          "number": 60,
+          "state": "OPEN"
+        },
+        {
+          "number": 51,
+          "state": "OPEN"
+        },
+        {
+          "number": 50,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 49,
+      "title": "10a: Credit, debit and refund notes",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/49",
+      "bodySha256": "90e470afa9807521c0acaa366a7e4cf835e48baef89f9f3f3d5c3359320d0a22",
+      "updatedAt": "2026-11-08T03:09:21Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 11,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 48,
+          "state": "OPEN"
+        },
+        {
+          "number": 47,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 150,
+          "state": "OPEN"
+        },
+        {
+          "number": 124,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 50,
+      "title": "10b: Cancel a validated invoice inside the LHDN window",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/50",
+      "bodySha256": "4147089cdc5207e05bd4df0e277410fd03471ee98a8852f9f5ebd1a86523f77d",
+      "updatedAt": "2026-11-08T01:56:22Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 11,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 51,
+      "title": "10c: Surface a buyer rejection request to the owner",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/51",
+      "bodySha256": "52761a7602c84e2cded7500879f2b86a45f05faab0273ff75e438a65d8d1ce4b",
+      "updatedAt": "2026-11-08T01:56:24Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 11,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 52,
+      "title": "12a: Per-line SST type and rate with automatic calculation",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/52",
+      "bodySha256": "8051796c5a078dbcd423e076c5f467c813c31b51aef944aec721460453426075",
+      "updatedAt": "2026-11-08T01:56:25Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 13,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 44,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 125,
+          "state": "OPEN"
+        },
+        {
+          "number": 53,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 53,
+      "title": "12b: Foreign-currency invoices with a proposed rate",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/53",
+      "bodySha256": "944a4ca0cd2813555e402a1d5bf94809717e4490b80604ee6ad32c924e049873",
+      "updatedAt": "2026-11-08T01:56:27Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 13,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 52,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 125,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 54,
+      "title": "14a: Classify uploads and run extraction as a background job",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/54",
+      "bodySha256": "a9dcb724a4d4503b0005b44bf38741a6e7ac7440cf244720a4e7c3cbe2d14f73",
+      "updatedAt": "2026-10-30T04:59:06Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 15,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 27,
+          "state": "CLOSED"
+        },
+        {
+          "number": 14,
+          "state": "OPEN"
+        },
+        {
+          "number": 6,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 57,
+          "state": "OPEN"
+        },
+        {
+          "number": 55,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 55,
+      "title": "14b: Extract fields with schema validation",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/55",
+      "bodySha256": "2457fb31fd438da8b829855747b7431af2ba5554bb4163aa61dc0add34ea36b1",
+      "updatedAt": "2026-10-30T04:59:10Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 15,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 54,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 58,
+          "state": "OPEN"
+        },
+        {
+          "number": 56,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 56,
+      "title": "14c: Multilingual documents and original currency",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/56",
+      "bodySha256": "02ec678ba0ae5613482547f0217dd724fe0a3abb0b8504d87bffa4923abd504c",
+      "updatedAt": "2026-10-30T04:59:13Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 15,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 55,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 57,
+      "title": "15a: Firm portal: all clients' documents per client and month",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/57",
+      "bodySha256": "385903b6bb7b7466e3eb792280f30be3a083ce6601bd1b2cec8618a714bafcef",
+      "updatedAt": "2026-11-01T07:09:10Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 16,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 72,
+          "state": "CLOSED"
+        },
+        {
+          "number": 69,
+          "state": "CLOSED"
+        },
+        {
+          "number": 54,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 18,
+          "state": "OPEN"
+        },
+        {
+          "number": 17,
+          "state": "OPEN"
+        },
+        {
+          "number": 24,
+          "state": "OPEN"
+        },
+        {
+          "number": 58,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 58,
+      "title": "15b: Review queue: correct and verify extracted fields",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/58",
+      "bodySha256": "45befb0eb7a33e115db3f1099d483473aa45c3e03d6c0b4eae6ebf65b5f93348",
+      "updatedAt": "2026-10-30T10:03:54Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 16,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 57,
+          "state": "OPEN"
+        },
+        {
+          "number": 55,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 60,
+          "state": "OPEN"
+        },
+        {
+          "number": 59,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 59,
+      "title": "15c: Return an unreadable document with a reason",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/59",
+      "bodySha256": "7bd4f0580e2f3b3fd76277ccf2e4c9b4c69d5a7d90fb8bbbd9d6df14dafb6e0d",
+      "updatedAt": "2026-10-30T10:03:56Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 16,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 58,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 60,
+      "title": "18a: Export batch assembly",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/60",
+      "bodySha256": "928d5282b459ddf513a1314d4bf518778ed8e52b7f6d93be21e8add900ee39a0",
+      "updatedAt": "2026-10-30T10:03:59Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 19,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 58,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 63,
+          "state": "OPEN"
+        },
+        {
+          "number": 61,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 61,
+      "title": "18b: Confirm import to lock; regenerate or void a batch",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/61",
+      "bodySha256": "b8e568c6126a0b4de8e2c98fdaa7ae6e582afdd98cefcd80dda80ae5399317e3",
+      "updatedAt": "2026-10-30T10:04:01Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 19,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 60,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        },
+        {
+          "number": 62,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 62,
+      "title": "18c: \"Changed after export\" flag in the next batch",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/62",
+      "bodySha256": "16203952fb3ad31a436218ccd41fd37ebec2a28073668c727338cafe319874ff",
+      "updatedAt": "2026-10-30T10:04:03Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 19,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 61,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 63,
+      "title": "18d: SQL Account file writer matching the accepted format",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/63",
+      "bodySha256": "b9c57fd9095dcc6f19925c23d562fc96bb0719ef85370c6e593071961208004c",
+      "updatedAt": "2026-11-03T16:57:11Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 19,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 60,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 85,
+      "title": "Deferred (D56): re-evaluate firm-audit database read restrictions before go-live",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/85",
+      "bodySha256": "55f0a7be69cdaa316821b713d8e25ce458cb5eb75221ad7a8f3148eac3fe8a4e",
+      "updatedAt": "2026-11-05T10:49:46Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 90,
+      "title": "20c: Voice input for the assistant",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/90",
+      "bodySha256": "061c6241d26ad16c9108fce840451fa6da6a2ee86344ccb74f6b8966fe82386a",
+      "updatedAt": "2026-11-03T12:31:51Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 21,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 6,
+          "state": "OPEN"
+        },
+        {
+          "number": 21,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 100,
+      "title": "Security risk register and staged validation for merged PRs",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/100",
+      "bodySha256": "d376ad142043909e305e3a0f8bbaec3ee1d60f49be3bd0c17478007344864179",
+      "updatedAt": "2026-11-04T08:04:50Z",
+      "labels": [],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 106,
+      "title": "Go-live: keep the signing log for 7 years",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/106",
+      "bodySha256": "02a981a66a347380190d6ba4f48b9d8f761f0c1ebb67f090f3dc401faf228edb",
+      "updatedAt": "2026-11-05T10:51:37Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 1,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [
+        {
+          "number": 23,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 120,
+      "title": "03f: MyInvois module: map an invoice to LHDN's JSON document (D59, D60)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/120",
+      "bodySha256": "339ba2ac396f85d41c8d61e2b71be0b65640d88816d45c88e3a1a6a76a15b69e",
+      "updatedAt": "2026-11-08T01:57:41Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 4,
+      "subIssues": [
+        {
+          "number": 122,
+          "state": "OPEN"
+        },
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 124,
+          "state": "OPEN"
+        },
+        {
+          "number": 125,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [
+        {
+          "number": 121,
+          "state": "CLOSED"
+        },
+        {
+          "number": 7,
+          "state": "CLOSED"
+        },
+        {
+          "number": 44,
+          "state": "OPEN"
+        },
+        {
+          "number": 119,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 147,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 1,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 122,
+      "title": "03f-1: LHDN code lists and required-field rules for the document",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/122",
+      "bodySha256": "a997c1eee6bc124fc5befcd611adf7a5f21794b4ee15ad5b872913d640b17f63",
+      "updatedAt": "2026-11-08T01:57:15Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 120,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 119,
+          "state": "CLOSED"
+        },
+        {
+          "number": 121,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 123,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 123,
+      "title": "03f-2: Map a basic invoice to LHDN's JSON document",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/123",
+      "bodySha256": "ff2c4b7b53dc4a3cb7f44f169c3d6ae2d6d22986c1fa12bb31b7e253260d3fdd",
+      "updatedAt": "2026-11-08T01:57:44Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 120,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 128,
+          "state": "OPEN"
+        },
+        {
+          "number": 46,
+          "state": "OPEN"
+        },
+        {
+          "number": 44,
+          "state": "OPEN"
+        },
+        {
+          "number": 122,
+          "state": "OPEN"
+        },
+        {
+          "number": 7,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 43,
+          "state": "OPEN"
+        },
+        {
+          "number": 147,
+          "state": "OPEN"
+        },
+        {
+          "number": 47,
+          "state": "OPEN"
+        },
+        {
+          "number": 125,
+          "state": "OPEN"
+        },
+        {
+          "number": 124,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 124,
+      "title": "03f-3: Map credit, debit and refund notes to LHDN's documents",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/124",
+      "bodySha256": "a6790e81005f826d5c262181aa7b3fe7990249f2be5f5849642bf27a3891f511",
+      "updatedAt": "2026-11-08T02:52:03Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 120,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 49,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 125,
+      "title": "03f-4: Map foreign currency and per-line tax to LHDN's document",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/125",
+      "bodySha256": "4a834fd3b070b605388ae09882411cebbd8e45b9e91070810c3d8b8c3f29736e",
+      "updatedAt": "2026-11-08T01:57:22Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 120,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 52,
+          "state": "OPEN"
+        },
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 53,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 128,
+      "title": "03g: Module boundary: invoice engine and MyInvois module (D59 (1))",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/128",
+      "bodySha256": "cd45f5b1fc9e06cbfc80101d62a2fe4d3fb2c54a3b45c31c058efcfc79a63ef9",
+      "updatedAt": "2026-11-08T03:09:22Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 4,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 47,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 137,
+      "title": "Allow one signing certificate reference for sandbox and production (D65)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/137",
+      "bodySha256": "19dc0b7080d2e3d28f6a1b27e0e8b74d2c87bfa5fa5e0276ac494368717bbe0b",
+      "updatedAt": "2026-11-08T10:24:15Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": null,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 140,
+      "title": "D67: Firm and client onboarding (self-registration, operator-approved links)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/140",
+      "bodySha256": "c604ebe9f2950c708674e23442056befe40d480192694535d185a3352b13654a",
+      "updatedAt": "2026-11-09T03:36:16Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": null,
+      "subIssues": [
+        {
+          "number": 138,
+          "state": "CLOSED"
+        },
+        {
+          "number": 142,
+          "state": "CLOSED"
+        },
+        {
+          "number": 143,
+          "state": "OPEN"
+        },
+        {
+          "number": 144,
+          "state": "OPEN"
+        },
+        {
+          "number": 145,
+          "state": "OPEN"
+        },
+        {
+          "number": 146,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 141,
+      "title": "D66: Consolidated e-invoices",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/141",
+      "bodySha256": "689ad6e02c124cad34dabafd6707dca0a248a30c9b345ffddafadc87474fefe9",
+      "updatedAt": "2026-11-09T03:36:17Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": null,
+      "subIssues": [
+        {
+          "number": 147,
+          "state": "OPEN"
+        },
+        {
+          "number": 148,
+          "state": "OPEN"
+        },
+        {
+          "number": 149,
+          "state": "OPEN"
+        },
+        {
+          "number": 150,
+          "state": "OPEN"
+        }
+      ],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 143,
+      "title": "Client owner registers a company with no firm and starts working (D67)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/143",
+      "bodySha256": "c5609e0e83527b142d333ad0c8642a7a7cd73f18335e65c6c01cc9f99e5f1045",
+      "updatedAt": "2026-11-09T03:15:55Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 140,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 138,
+          "state": "CLOSED"
+        },
+        {
+          "number": 119,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 144,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 144,
+      "title": "Client owner invites a firm and the firm accepts (D67)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/144",
+      "bodySha256": "c8c01c8ff0e955b30322b1812324c465932771069d53cc6a6548f6855b4dd857",
+      "updatedAt": "2026-11-09T12:07:44Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 140,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 143,
+          "state": "OPEN"
+        },
+        {
+          "number": 142,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 145,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 145,
+      "title": "Operator reviews the company-firm link and grants access (D67)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/145",
+      "bodySha256": "f635f435eb6937894d67ea71ee7cc4297f2b718133064c4316c03166e30f3020",
+      "updatedAt": "2026-11-09T12:08:01Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 140,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 138,
+          "state": "CLOSED"
+        },
+        {
+          "number": 144,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 146,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 146,
+      "title": "Client owner asks to end the firm link and the operator ends it (D67)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/146",
+      "bodySha256": "7dec75d351223f19c3c52c6ea55fbbe0d88158993a570399da24371f629a9ecb",
+      "updatedAt": "2026-11-09T12:08:08Z",
+      "labels": [
+        "enhancement",
+        "ready-for-agent"
+      ],
+      "assignees": [],
+      "parent": 140,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 145,
+          "state": "OPEN"
+        },
+        {
+          "number": 138,
+          "state": "CLOSED"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 147,
+      "title": "Monthly consolidated summary, rule check and LHDN document (D66)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/147",
+      "bodySha256": "d43ecd7476721b733611aa26055d44ebc3dabc38ddef7d52e05ed8faea0a1712",
+      "updatedAt": "2026-11-09T03:17:12Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 141,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 123,
+          "state": "OPEN"
+        },
+        {
+          "number": 119,
+          "state": "CLOSED"
+        },
+        {
+          "number": 120,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 148,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 148,
+      "title": "Owner approves, submits and sees the status of a consolidated e-invoice (D66)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/148",
+      "bodySha256": "dbf2a509a30df8fa90d46106d5068bd55cb5491abe4d7df17e57d5ccac6733cc",
+      "updatedAt": "2026-11-09T03:17:16Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 141,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 147,
+          "state": "OPEN"
+        },
+        {
+          "number": 46,
+          "state": "OPEN"
+        },
+        {
+          "number": 48,
+          "state": "OPEN"
+        },
+        {
+          "number": 47,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [
+        {
+          "number": 150,
+          "state": "OPEN"
+        },
+        {
+          "number": 149,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 149,
+      "title": "Firm reviews a consolidated draft before the owner approves (D66)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/149",
+      "bodySha256": "98cbc74dba11cb5cb9cb3b5d59f37271542a5630df0d9ec8fff97d280a77aed4",
+      "updatedAt": "2026-11-09T03:17:21Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 141,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 148,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 150,
+      "title": "Take a separately issued sale out of the consolidated e-invoice (D66)",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/150",
+      "bodySha256": "a38e7f81bfd4937e017c6dca396ecd2894e2d2e3b70a7f868c30427666c49659",
+      "updatedAt": "2026-11-09T03:17:24Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": 141,
+      "subIssues": [],
+      "blockedBy": [
+        {
+          "number": 148,
+          "state": "OPEN"
+        },
+        {
+          "number": 49,
+          "state": "OPEN"
+        }
+      ],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 151,
+      "title": "Real email adapter behind the EmailSender port",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/151",
+      "bodySha256": "01bd27fecf28f1be9d5ecd354cadfac42154ff72aeaf7d35b07ff1675a3cb075",
+      "updatedAt": "2026-11-09T03:44:48Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": null,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [
+        {
+          "number": 12,
+          "state": "OPEN"
+        }
+      ],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    },
+    {
+      "number": 159,
+      "title": "Install the real MyInvois gateway at start-up and handle its outages on the customer screens",
+      "url": "https://github.com/Torresfong/E-invoice-generation-and-bookkeeping-platform/issues/159",
+      "bodySha256": "0695d3cd9e9af416cf64e3588bff654006a7b8b205c3250533acdb972c2d7e12",
+      "updatedAt": "2026-11-09T13:08:01Z",
+      "labels": [
+        "enhancement"
+      ],
+      "assignees": [],
+      "parent": null,
+      "subIssues": [],
+      "blockedBy": [],
+      "blocking": [],
+      "commentCount": 0,
+      "linkedPullRequests": []
+    }
+  ]
+}
+
