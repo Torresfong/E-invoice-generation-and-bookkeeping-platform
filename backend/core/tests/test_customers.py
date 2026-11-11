@@ -14,6 +14,7 @@ from django.db import DatabaseError, transaction
 
 from core import customers, einvoicing
 from core.models import AuditEntry, CompanyAccess, Customer, CustomerChange
+from core.ports.interfaces import TinCheck
 
 from .factories import make_company, make_member
 
@@ -94,6 +95,8 @@ def test_the_two_tin_refusals_say_different_things(world, fake_ports):
     fake_ports.gateway.unknown_tins.add(TIN)
     with pytest.raises(customers.InvalidCustomer) as not_found:
         make(world["acme_owner"], world["acme"])
+    # The sandbox answers 400 only for an empty ID value, which the form already refuses; the answer is still read.
+    fake_ports.gateway.validate_tin = lambda *args: TinCheck.BAD_FORMAT
     with pytest.raises(customers.InvalidCustomer) as bad_format:
         make(world["acme_owner"], world["acme"], tin="bad")
 

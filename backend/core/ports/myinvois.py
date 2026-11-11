@@ -57,6 +57,18 @@ class RateLimited(TransientError):
         self.retry_after = retry_after
 
 
+NOT_AUTHORISED = "MyInvois refused the operation: the taxpayer has not authorised us, or this is the wrong environment"
+
+
+def _oauth_error(answer):
+    """The OAuth `error` code of an answer (`invalid_client`, `unauthorized_client`), the one field read from a body."""
+    try:
+        code = answer.json().get("error")
+    except (ValueError, AttributeError):
+        return None
+    return code if isinstance(code, str) else None
+
+
 def _retry_after(headers):
     value = {name.lower(): v for name, v in headers.items()}.get("retry-after", "")
     return int(value) if value.isdigit() else None
@@ -132,8 +144,9 @@ class MyInvoisHttpGateway:
             return answer
         if answer.status == 429:
             raise RateLimited("MyInvois rate limit reached", _retry_after(answer.headers))
-        if answer.status == 403:
-            raise PermissionDenied("MyInvois refused the operation (403)")
+        if answer.status == 403 or (answer.status == 400 and _oauth_error(answer) == "unauthorized_client"):
+            # The sandbox answers a taxpayer that has not authorised us with 400 and `unauthorized_client`, not 403.
+            raise PermissionDenied(NOT_AUTHORISED)
         if answer.status in (400, 401):
             raise AuthenticationFailed(f"MyInvois refused the credentials ({answer.status})")
         if answer.status >= 500:

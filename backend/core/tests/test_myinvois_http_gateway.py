@@ -110,6 +110,32 @@ def test_wrong_client_credentials_are_an_authentication_failure_that_is_not_retr
     assert len(lhdn.requests) == 1
 
 
+def test_a_400_unauthorized_client_is_a_permission_denial_because_the_taxpayer_has_not_authorised_us():
+    # What the preprod sandbox answers (#42) when the taxpayer has not added us as intermediary: 400, not 403.
+    gateway, lhdn, _ = a_gateway(answer(400, body=b'{"error": "unauthorized_client"}'))
+
+    with pytest.raises(PermissionDenied) as raised:
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+    assert isinstance(raised.value, PermanentError) and not isinstance(raised.value, AuthenticationFailed)
+    assert len(lhdn.requests) == 1
+
+
+def test_a_400_invalid_client_stays_an_authentication_failure():
+    gateway, _, _ = a_gateway(answer(400, body=b'{"error": "invalid_client"}'))
+
+    with pytest.raises(AuthenticationFailed):
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+
+def test_login_asks_for_the_invoicing_scope_without_which_the_sandbox_answers_400():
+    gateway, lhdn, _ = a_gateway(token_answer())
+
+    gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+    assert parse_qs(lhdn.requests[0]["body"].decode())["scope"] == ["InvoicingAPI"]
+
+
 def test_a_403_is_a_permission_denial_not_a_transient_failure():
     # Production credentials in the sandbox, or a taxpayer that has not authorised us: no retry helps (D57 (4)).
     gateway, _, _ = a_gateway(answer(403))

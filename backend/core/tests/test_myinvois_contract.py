@@ -28,7 +28,7 @@ from core.ports.myinvois import PermissionDenied, gateway_from_environment, urll
 SANDBOX_ENV = "MYINVOIS_SANDBOX_"
 
 
-@dataclass
+@dataclass(repr=False)  # a failing test prints its fixtures: the TINs here must not reach a report or a log
 class Scenario:
     kind: str
     gateway: object
@@ -38,6 +38,9 @@ class Scenario:
     unauthorised_tin: str | None
     buyer: tuple | None  # (tin, id_type, id_value)
     unknown_buyer_tin: str | None
+
+    def __repr__(self):
+        return f"<Scenario {self.kind}>"
 
 
 def _fake_scenario():
@@ -138,10 +141,16 @@ def test_a_registered_buyer_has_a_valid_tin(scenario):
     assert scenario.gateway.validate_tin(tin, id_type, id_value) is TinCheck.VALID
 
 
-def test_a_malformed_tin_is_bad_format(scenario):
+def test_a_malformed_tin_is_not_found(scenario):
     _, id_type, id_value = need(scenario.buyer, "BUYER_TIN, _BUYER_ID_TYPE and _BUYER_ID_VALUE")
 
-    assert scenario.gateway.validate_tin("not a tin", id_type, id_value) is TinCheck.BAD_FORMAT
+    assert scenario.gateway.validate_tin("not a tin", id_type, id_value) is TinCheck.NOT_FOUND
+
+
+def test_an_empty_id_value_is_bad_format(scenario):
+    tin, id_type, _ = need(scenario.buyer, "BUYER_TIN, _BUYER_ID_TYPE and _BUYER_ID_VALUE")
+
+    assert scenario.gateway.validate_tin(tin, id_type, "") is TinCheck.BAD_FORMAT
 
 
 def test_a_well_formed_tin_that_lhdn_does_not_know_is_not_found(scenario):
