@@ -1,7 +1,6 @@
 import inspect
 import logging
 import os
-import socket
 import subprocess
 import sys
 from datetime import datetime, timedelta, timezone
@@ -29,14 +28,6 @@ DOCUMENT = b'{"invoice": "INV-0001"}'
 DOCUMENT_SHA256 = bytes.fromhex("ea09b11d6dff65b01ee96aa654544fc189f461c97aef42e95308adacab210ad2")
 COMPANY_ID = 7
 OTHER_COMPANY_ID = 8
-
-
-@pytest.fixture
-def no_network(monkeypatch):
-    def refuse(*args):
-        raise AssertionError("a test tried to reach the network")
-
-    monkeypatch.setattr(socket.socket, "connect", refuse)
 
 
 CODE = "INV-0001"
@@ -150,8 +141,13 @@ def test_a_registered_buyer_has_a_valid_tin(fake_ports):
     assert fake_ports.gateway.validate_tin("C1234567890", "BRN", "201901234567") is TinCheck.VALID
 
 
-def test_a_malformed_tin_is_bad_format(fake_ports):
-    assert fake_ports.gateway.validate_tin("not a tin", "BRN", "201901234567") is TinCheck.BAD_FORMAT
+def test_a_malformed_tin_is_not_found_because_the_sandbox_answers_404_for_it(fake_ports):
+    # Seen in the preprod sandbox (#42): spaces, too short, digits only, lowercase and too long are all 404.
+    assert fake_ports.gateway.validate_tin("not a tin", "BRN", "201901234567") is TinCheck.NOT_FOUND
+
+
+def test_an_empty_id_value_is_bad_format_because_it_is_the_one_input_the_sandbox_answers_400_for(fake_ports):
+    assert fake_ports.gateway.validate_tin("C1234567890", "BRN", "") is TinCheck.BAD_FORMAT
 
 
 def test_a_well_formed_tin_that_lhdn_does_not_know_is_not_found(fake_ports):

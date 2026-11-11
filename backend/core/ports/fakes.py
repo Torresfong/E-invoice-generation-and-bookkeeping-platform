@@ -64,6 +64,8 @@ class FakeGateway:
     def __init__(self):
         self.key_provider = FakeKeyProvider()
         self.now = timezone.now  # a test replaces it to move time
+        self.accepted_client_ids = None  # None: any client ID logs in; a set: only these (others get the 401 LHDN gives)
+        self.authorised_tins = None  # None: any taxpayer has authorised us; a set: only these (others get LHDN's 403)
         self.tins_validated = []
         self.unknown_tins = set()  # well-formed TINs that LHDN answers "not found" for
         self.submissions = []
@@ -92,6 +94,12 @@ class FakeGateway:
     # --- the port
 
     def login_as_taxpayer(self, credentials, company_id, tin, rob=None):
+        from core.ports.myinvois import NOT_AUTHORISED, AuthenticationFailed, PermissionDenied  # not at import: they extend the jobs errors
+
+        if self.accepted_client_ids is not None and credentials.client_id not in self.accepted_client_ids:
+            raise AuthenticationFailed("MyInvois refused the credentials (401)")
+        if tin and self.authorised_tins is not None and tin not in self.authorised_tins:
+            raise PermissionDenied(NOT_AUTHORISED)
         return TaxpayerSession(
             company_id=company_id,
             tin=tin,
@@ -104,9 +112,12 @@ class FakeGateway:
         if id_type not in ID_TYPES:
             raise ValueError(f"id_type must be one of {', '.join(ID_TYPES)}")
         self.tins_validated.append((tin, id_type, id_value))
-        if not self.TIN_SHAPE.match(tin):
+        if not id_value:  # the one input the preprod sandbox answers 400 for (#42)
             return TinCheck.BAD_FORMAT
-        return TinCheck.NOT_FOUND if tin in self.unknown_tins else TinCheck.VALID
+        # The sandbox answers 404 for a malformed TIN, a wrong id value and a mismatched id type alike.
+        if not self.TIN_SHAPE.match(tin) or tin in self.unknown_tins:
+            return TinCheck.NOT_FOUND
+        return TinCheck.VALID
 
     def sign(self, session, document, code_number):
         return Signer(self.key_provider).sign(session, document, code_number)

@@ -134,7 +134,12 @@ class MyInvoisGateway(Protocol):
     def login_as_taxpayer(
         self, credentials: IntermediaryCredentials, company_id: int, tin: str, rob: str | None = None
     ) -> TaxpayerSession:
-        """The session lasts 60 minutes. `tin` and `rob` are read from the company row by the caller."""
+        """The session lasts 60 minutes. `tin` and `rob` are read from the company row by the caller.
+
+        A login proves only that the taxpayer has authorised us as intermediary; it proves no submit, cancel or reject
+        permission (D57 (3)). A 403 raises `PermissionDenied` and wrong client credentials `AuthenticationFailed`, both
+        permanent and never retried; a 429, 5xx or network failure is transient (D57 (4)).
+        """
         ...
 
     def validate_tin(self, tin: str, id_type: str, id_value: str) -> TinCheck:
