@@ -6,9 +6,9 @@ Snapshot date: 2026-11-10, Asia/Singapore. Repository: `Torresfong/E-invoice-gen
 
 ## Executive result
 
-The current `ready-for-agent` system is not a reliable Frontier signal:
+The pre-migration `ready-for-agent` system was not a reliable Frontier signal:
 
-- 29 open issues carry `ready-for-agent`.
+- At the baseline snapshot, 29 open issues carried `ready-for-agent`.
 - Only 2 of those 29 are open leaves with no open blocker and no assignee.
 - 27 labelled issues are false-positive Frontier entries because they have an open child or blocker.
 - 13 open issues lack `ready-for-agent` even though they are structurally eligible.
@@ -173,7 +173,7 @@ Classification and reasons are listed in **Structural candidates held by executi
 
 ## `ready-for-agent` discrepancy
 
-Current label count: 29.
+Pre-migration label count: 29.
 
 Only these two labelled issues are structurally eligible and pass qualification:
 
@@ -310,7 +310,7 @@ Rollback remains available without deleting history:
 3. Remove only the three added blocked-by relations described in **Dependency diff**.
 4. Close the map and both approval gates with a rollback comment; do not delete them.
 5. Re-run the baseline comparison. Expected restored existing-project state: 66 open issues, 75 open dependency edges, 6 parentless open issues, 29 `ready-for-agent` labels and 0 assignees.
-6. If activation has later occurred, first re-add `ready-for-agent` to exactly the 29 issue numbers recorded in the baseline snapshot.
+6. Because activation occurred, first re-add `ready-for-agent` to exactly the 29 issue numbers recorded in the baseline snapshot.
 
 No rollback operation has been executed.
 
