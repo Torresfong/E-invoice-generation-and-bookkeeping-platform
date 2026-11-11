@@ -10,6 +10,10 @@ A port call (email, MyInvois, storage, AI) that must follow a database write goe
 
 Take the firm (or company) lock first, then check that the caller is still allowed. A check made before the lock lets an administrator deactivated while waiting go on to act. The firm or company comes from the caller's own row, never from an argument (migration 0026).
 
+## A guard trigger checks the role before it returns, for every operation
+
+A row-level security policy decides only which company's rows a user can reach; it lets any member of that company delete them. A `BEFORE` trigger that returns early for `DELETE` (`RETURN OLD`) therefore skips the role check, and a firm accountant can delete through the web role with plain SQL, past the 403 of the page (#44, `invoice_guard`). Put the role check ahead of every early return, taking the company from `OLD` on a delete. For each table that allows a write, add a test that attempts that write with direct SQL as a role that may read but not write, beside the positive control of a role that may.
+
 ## Database errors are matched by SQLSTATE
 
 Branch on `error.__cause__.sqlstate`, with the code named as a constant next to the function that raises it. A message string changes with a wording edit and the branch stops firing without a failing test.

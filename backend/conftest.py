@@ -3,10 +3,19 @@ from contextlib import contextmanager
 
 import pytest
 from django.db import connection
+from django.utils import translation
 
 from core import ports
 from core.rls import IDENTITY_SETTING, WEB_ROLE
 from core.ports.fakes import FakePorts
+
+
+@pytest.fixture(autouse=True)
+def english():
+    """Every test starts in English. A request sent with `accept-language: zh-hans` leaves Chinese active on the thread,
+    so without this a later test that reads a message fails or passes depending on the order the tests run in."""
+    with translation.override("en"):
+        yield
 
 
 @pytest.fixture(autouse=True)

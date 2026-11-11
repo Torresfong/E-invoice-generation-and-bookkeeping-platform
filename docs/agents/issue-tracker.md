@@ -11,6 +11,7 @@ Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all o
 - **Comment on an issue**: `gh issue comment <number> --body "..."`
 - **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
 - **Close**: `gh issue close <number> --comment "..."`
+- **Hand a duty to a later ticket**: when a doc or a PR says a later ticket must do something (for example `tenancy.md`: "the draft screen (#44) must check customers when it picks one"), comment that duty on the later ticket with a link to the doc section. A ticket's agent brief is what the implementing agent reads; a duty written only in the earlier ticket's doc is found by review instead (#44).
 
 Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
