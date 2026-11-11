@@ -13,7 +13,7 @@ from django.utils import translation
 from core import jobs
 from core.models import Job
 from core.ports.interfaces import IntermediaryCredentials, Submission, SubmissionUid
-from core.submission import DocumentRejected, StaleDocument, submit_invoice
+from myinvois.submission import DocumentRejected, StaleDocument, submit_invoice
 
 DOCUMENT = b'{"invoice": "INV-0001"}'
 CODE = "INV-0001"
@@ -123,7 +123,8 @@ def test_a_document_lhdn_refuses_for_another_reason_stops_the_job_with_its_code_
 def test_a_document_issued_over_72_hours_ago_is_not_signed_nor_submitted_and_the_owner_is_told(gateway, fake_ports):
     attempts = Attempts(gateway)
 
-    with pytest.raises(StaleDocument) as stale:
+    # Pinned to English: a request test elsewhere can leave another language active on the thread.
+    with translation.override("en"), pytest.raises(StaleDocument) as stale:
         run(gateway, attempts, issued_at=NOW - timedelta(hours=72, seconds=1))
 
     assert isinstance(stale.value, jobs.PermanentError)
