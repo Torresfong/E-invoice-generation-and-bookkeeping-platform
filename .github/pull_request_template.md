@@ -39,7 +39,8 @@ Closes #
 
 ## Independent review
 - [ ] Pre-PR independent review completed, if tenancy/MyInvois/signing/money changed
-- [ ] Fresh Codex PR review requested on current HEAD
-- [ ] Actionable findings resolved, and updated HEAD re-reviewed
+- [ ] Fresh independent `COMMENT` review published on current HEAD (Codex preferred; fallback approved by Torres)
+- [ ] Actionable PR review comments resolved on the feature branch, and updated HEAD freshly re-reviewed until no actionable findings remain
+- [ ] Any finding still unresolved after three fix attempts is documented, the PR is Draft, and Torres has been asked to inspect it
 
 > Do not merge automatically. Torres makes the final merge decision.

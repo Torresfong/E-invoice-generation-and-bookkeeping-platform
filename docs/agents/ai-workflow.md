@@ -1,12 +1,21 @@
 # Dual-AI Development and Handoff Workflow
 
 ## Assignment and isolation
-1. Select an unblocked `ready-for-agent` issue, do not select blocked without permission; read issue, acceptance criteria, relevant decisions, specs and code.
-2. Either Claude Code or Codex can be the implementing developer. Create `ticket-NN-<slug>` from current `main`; do not push directly to `main`.
+1. Read the active Wayfinder map #160 and evaluate recursive tickets against all five live Frontier conditions: the issue is open, has no open child, every native blocker is closed, it has no assignee, and it passes the type-specific execution-qualification check in `docs/agents/issue-tracker.md`. Do not route work by `ready-for-agent`; that label is retired. Frontier membership does not authorize or start work.
+2. For implementation, select a qualified `wayfinder:task`, read its acceptance criteria, relevant decisions, specs and code, then claim it by assigning the driving developer. Assignment is the only claim. Either Claude Code or Codex can implement. Create `ticket-NN-<slug>` from current `main`; do not push directly to `main`.
 3. If working simultaneously on separate tasks, use separate branches and worktrees. Do not let two agents edit the same checkout or push to one branch at the same time.
 4. Test first; implement surgically; run the **full** test suite before claiming completion (`python manage.py check`, migration drift check, `pytest` from `backend/`). Every acceptance-criteria checkbox must be satisfied and backed by evidence. If an external prerequisite or environment blocker prevents a required check, use the fake port when appropriate, record the blocked command and reason in the PR, and do not claim completed verification.
-5. For tenancy, MyInvois, signing, or money changes, retain the pre-PR independent review required by the project rules.
-6. Open a PR against `main` with `Closes #N`, evidence for **every** acceptance criterion, D-number decisions, test commands/results, deployment/migration risks and any missing external validation. Under D37, `main` is protected for administrators too; both `backend` and `image` checks must pass before merge. Do not merge, force-push or delete the protected branch.
+5. For tenancy, MyInvois, signing, or money changes, retain any pre-PR independent review required by the project rules. It supplements, and never replaces, the fresh post-PR review loop below.
+6. Open a PR against `main` using `.github/pull_request_template.md`. Fill every applicable section, include `Closes #N`, evidence for **every** acceptance criterion, D-number decisions, test commands/results, deployment/migration risks and any missing external validation. Under D37, `main` is protected for administrators too; both `backend` and `image` checks must pass before merge. Do not merge, force-push or delete the protected branch.
+
+## Explicit implementation authorization
+When Torres explicitly instructs an agent to implement issue #N—including but not limited to invoking `/implement #N`—that single instruction authorizes the driving developer to complete the normal delivery path for a qualified `wayfinder:task`: assign the issue, create the feature branch, implement and test, commit, push the feature branch, automatically open or update its PR against `main`, and initiate and repeat the required independent-review/update loop. Do not ask for a separate confirmation before pushing the feature branch, creating the PR or requesting each review round.
+
+- Use the existing PR template and put `Closes #N` in the PR body.
+- Open a Draft PR when required verification or acceptance criteria are incomplete, or when a disclosed external blocker makes a reviewable partial result appropriate. Record the exact blocked command, result and remaining work; do not claim completion.
+- Planning, diagnosis, discussion and review-only requests do not authorize implementation, assignment, branch creation, commits, pushes or PR creation.
+- Any code review performed inside the implementing session—including one invoked by `/implement`—is a developer self-check only. It cannot satisfy the independent fresh-context PR review gate.
+- The authorization stops at the PR and review-update loop. It never authorizes automatic merge, deployment, production setting/credential changes, real client data use, bypassing CI or branch protection, or crossing a human-decision/ADR gate.
 
 ## Shared TDD test boundaries
 Claude Code using Matt Pocock's TDD skill and Codex using its own TDD workflow **must follow the same project-defined test seams**. Tool- or skill-specific preferences do not override the repository's testing contract:
@@ -33,10 +42,20 @@ When switching from Claude Code to Codex or the reverse, update the issue or PR 
 The incoming developer must independently inspect current Git diff/status, code and issue. A handoff is navigation context, not proof that changes are correct.
 
 ## Fresh PR review gate
-1. After implementation and CI, start a **new, separate Codex review task** for the PR. Do not continue the implementation chat.
-2. Reviewer uses `docs/agents/code-review.md`; reads the PR base/head/diff, issue acceptance criteria and relevant source/ADR/tests. Reviewer is read-only and does not fix findings or merge.
-3. Developer addresses actionable findings on the feature branch and reruns checks. After new commits, request another fresh review of the updated HEAD.
-4. Torres checks CI (`backend` and `image`), review findings and exceptions, then decides whether to merge. A reviewer saying “no findings” is not an automatic approval gate.
+1. After the PR is open, record its URL and current HEAD SHA, then dispatch Codex GitHub Code Review as described below. The GitHub reviewer is a **new, separate review task** for the PR; do not continue the implementation chat or pass it the development conversation. Initial CI may run concurrently, and any exact blocker must be disclosed. If Codex review is unavailable, use another genuinely independent fresh-context reviewer only with Torres's approval.
+2. The reviewer follows `docs/agents/code-review.md`, reads the exact PR base and current HEAD SHA, diff, issue acceptance criteria and relevant source/ADR/tests, and remains code-read-only. It publishes each specific actionable finding as a GitHub PR review comment, using a `COMMENT` review rather than approval or self-certification; non-inline limitations and evidence belong in the review summary.
+3. The implementing developer retrieves all review summaries, inline comments and unresolved threads from the PR, addresses actionable findings on the **same feature branch**, reruns appropriate checks, commits, and pushes the updated HEAD to the **same PR**. The developer may explain or challenge a finding with evidence but does not certify its own fix.
+4. For every updated HEAD, confirm that automatic Codex review has queued for that SHA. If it has not, post `@codex review` again. The new fresh-context reviewer verifies prior findings against the actual code, reviews the new diff for regressions, and publishes resolved, remaining or new findings on the PR. Repeat steps 3–4 until a fresh review of current HEAD reports no actionable findings, subject to the three-attempt escalation limit below.
+5. Track unsuccessful fix attempts separately for each actionable finding. An attempt counts when the developer pushes a change intended to resolve that finding and a fresh review reports that the same underlying defect remains. After the third unsuccessful attempt on one finding, stop the automatic fix/review loop: keep or convert the PR to Draft, publish an escalation note linking the finding and the three reviewed HEAD SHAs, summarize each attempted fix and its test evidence, and ask Torres to inspect and decide the next action. Do not make a fourth attempt, dismiss the finding, broaden scope, merge or deploy without Torres's direction.
+6. Torres checks final-HEAD CI (`backend` and `image`), review comments, unresolved exceptions and human gates, then decides whether to merge. A comment-only review or “no findings” report is evidence, not an approval or automatic merge gate.
 
-## Optional GitHub integration
-Codex GitHub code review must be enabled for the repository separately. If available, request it from the PR conversation with `@codex review`. The prompt and shared documents guide the reviewer; they do not technically enforce read-only permissions or branch protections.
+## GitHub review dispatch
+Codex GitHub Code Review must remain connected and enabled for this repository. The repository is configured to run automatic review on every push, but the initial branch push normally precedes PR creation, so the implementing agent must dispatch the first review from the open PR:
+
+1. Record the PR number and current HEAD SHA.
+2. Post a PR conversation comment containing exactly `@codex review`, unless GitHub already shows a Codex review queued for that exact SHA.
+3. Confirm the eyes reaction or other GitHub indication that the review is queued or in progress. Posting the comment alone is not proof that review started.
+4. After each later push, confirm automatic review queues for the new HEAD SHA; if it does not, post `@codex review` again.
+5. If review cannot be dispatched or the GitHub connection is unavailable, keep or convert the PR to Draft, disclose the blocker, and do not claim the independent review gate is complete.
+
+The prompt and shared documents guide the reviewer; they do not technically enforce code-read-only behavior, branch protection or the human merge decision.
