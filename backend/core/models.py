@@ -337,6 +337,53 @@ class CustomerChange(TenantModel):
         ordering = ["id"]
 
 
+class Invoice(TenantModel):
+    """An invoice a company is drafting (D44, D59 (1); ticket #44).
+
+    The invoice generation engine owns it and it holds nothing specific to LHDN: whether it becomes an e-invoice or a
+    normal invoice is decided at approval from the company's e-invoice setting (D59 (3)). A draft has no number, so
+    deleting one cannot leave a gap (D44); the number is taken at approval (D62, #45). Migration 0041 lets a draft be
+    deleted and refuses to change or delete anything else, so an approved invoice stays locked (D17, D19).
+    """
+
+    DRAFT = "draft"
+
+    customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="+")
+    status = models.CharField(max_length=10, default=DRAFT, db_default=DRAFT)
+    number = models.CharField(max_length=20, null=True, blank=True)
+    created_at = models.DateTimeField(db_default=Now())
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(status="draft"), name="invoice_status_known"),
+            models.CheckConstraint(
+                condition=~models.Q(status="draft") | models.Q(number__isnull=True), name="invoice_draft_has_no_number"
+            ),
+        ]
+        indexes = [models.Index(fields=["company", "-created_at"], name="invoice_company_created")]
+        ordering = ["-created_at", "-id"]
+
+
+class InvoiceLine(TenantModel):
+    """One line of an invoice: an item from the item master, a quantity and a unit price (D59 (9)).
+
+    The LHDN codes come from the item. Money is NUMERIC in the database and Decimal in code, never a float.
+    """
+
+    invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
+    item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="+")
+    quantity = models.DecimalField(max_digits=18, decimal_places=4)
+    unit_price = models.DecimalField(max_digits=18, decimal_places=4)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(condition=models.Q(quantity__gt=0), name="invoiceline_quantity_positive"),
+            models.CheckConstraint(condition=models.Q(unit_price__gte=0), name="invoiceline_price_not_negative"),
+        ]
+        indexes = [models.Index(fields=["invoice", "id"], name="invoiceline_lookup")]
+        ordering = ["id"]
+
+
 class Job(models.Model):
     """A queued background job (D10, D36, ADR 0001).
 

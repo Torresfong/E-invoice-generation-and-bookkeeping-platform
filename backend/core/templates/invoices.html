@@ -1,0 +1,42 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "Invoices" %} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{% trans "Invoices" %}</h1>
+  <p>{{ company.name }}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% can "manage_invoices" company as may_manage %}
+  {% if invoices %}
+    <table>
+      <thead>
+        <tr>
+          <th>{% trans "Customer" %}</th>
+          <th>{% trans "Number" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Started" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+          <tr>
+            <td><a href="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/">{{ invoice.customer.legal_name }}</a></td>
+            <td>{% if invoice.number %}{{ invoice.number }}{% else %}—{% endif %}</td>
+            <td>{% trans "Draft" %}</td>
+            <td>{{ invoice.created_at|date:"Y-m-d" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% trans "No invoices yet." %}</p>
+  {% endif %}
+  {% if may_manage %}
+    <p><a href="/companies/{{ company.pk }}/invoices/new/">{% trans "Draft an invoice" %}</a></p>
+  {% endif %}
+  <p><a href="/companies/{{ company.pk }}/">{% trans "Back to the company" %}</a></p>
+</body>
+</html>

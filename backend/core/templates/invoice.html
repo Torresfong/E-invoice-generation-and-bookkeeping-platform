@@ -1,0 +1,61 @@
+{% load i18n permissions %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if invoice %}{% trans "Draft invoice" %}{% else %}{% trans "Draft an invoice" %}{% endif %} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{% if invoice %}{% trans "Draft invoice" %}{% else %}{% trans "Draft an invoice" %}{% endif %}</h1>
+  <p>{{ company.name }}</p>
+  {% if message %}<p role="status">{{ message }}</p>{% endif %}
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% can "manage_invoices" company as may_manage %}
+  {% if invoice and not may_manage %}
+    <p>{{ invoice.customer.legal_name }}</p>
+    <table>
+      <thead>
+        <tr><th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th></tr>
+      </thead>
+      <tbody>
+        {% for line in invoice.lines.all %}
+          <tr><td>{{ line.item.name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <form method="post" action="/companies/{{ company.pk }}/invoices/{% if invoice %}{{ invoice.pk }}/{% else %}new/{% endif %}">
+      {% csrf_token %}
+      <p><label>{% trans "Customer" %}
+        <select name="customer" required>
+          <option value="">—</option>
+          {% for customer in customers %}<option value="{{ customer.pk }}" {% if form.customer_id|stringformat:"s" == customer.pk|stringformat:"s" %}selected{% endif %}>{{ customer.legal_name }}</option>{% endfor %}
+        </select></label></p>
+      <table>
+        <thead>
+          <tr><th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th></tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td>
+                <select name="item" aria-label="{% trans 'Item' %}">
+                  <option value="">—</option>
+                  {% for item in items %}<option value="{{ item.pk }}" {% if row.item|stringformat:"s" == item.pk|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
+                </select>
+              </td>
+              <td><input name="quantity" inputmode="decimal" value="{{ row.quantity|default_if_none:'' }}" aria-label="{% trans 'Quantity' %}"></td>
+              <td><input name="unit_price" inputmode="decimal" value="{{ row.unit_price|default_if_none:'' }}" aria-label="{% trans 'Unit price' %}"></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <button type="submit">{% trans "Save draft" %}</button>
+    </form>
+    {% if invoice %}
+      <form method="post" action="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/delete/">{% csrf_token %}<button type="submit">{% trans "Delete draft" %}</button></form>
+    {% endif %}
+  {% endif %}
+  <p><a href="/companies/{{ company.pk }}/invoices/">{% trans "Back to the invoices" %}</a></p>
+</body>
+</html>
