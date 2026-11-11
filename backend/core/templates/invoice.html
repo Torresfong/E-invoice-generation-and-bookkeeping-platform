@@ -44,8 +44,8 @@
                   {% for item in items %}<option value="{{ item.pk }}" {% if row.item|stringformat:"s" == item.pk|stringformat:"s" %}selected{% endif %}>{{ item.name }}</option>{% endfor %}
                 </select>
               </td>
-              <td><input name="quantity" inputmode="decimal" value="{{ row.quantity|default:'' }}" aria-label="{% trans 'Quantity' %}"></td>
-              <td><input name="unit_price" inputmode="decimal" value="{{ row.unit_price|default:'' }}" aria-label="{% trans 'Unit price' %}"></td>
+              <td><input name="quantity" inputmode="decimal" value="{{ row.quantity|default_if_none:'' }}" aria-label="{% trans 'Quantity' %}"></td>
+              <td><input name="unit_price" inputmode="decimal" value="{{ row.unit_price|default_if_none:'' }}" aria-label="{% trans 'Unit price' %}"></td>
             </tr>
           {% endfor %}
         </tbody>

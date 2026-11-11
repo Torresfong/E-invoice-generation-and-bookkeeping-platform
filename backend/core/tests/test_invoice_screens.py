@@ -4,6 +4,7 @@ The drafting rules are tested in test_invoices.py and the database guards in tes
 the pages apply them, hide what a role may not do, and never show or touch another company's drafts (D11, D44).
 """
 
+import re
 from decimal import Decimal
 
 import pytest
@@ -12,6 +13,7 @@ from core import customers, invoices, items
 from core.models import Invoice, InvoiceLine
 
 from .factories import PASSWORD, make_accountant
+from .test_customers import switch_einvoicing_on
 
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
 
@@ -248,3 +250,35 @@ def test_the_company_page_links_to_the_invoices(client, world, as_production_con
 
     assert f'href="{invoices_url(world["acme"])}"' in page
     assert "发票" in chinese
+
+
+def test_a_free_line_survives_opening_and_saving_the_draft_unchanged(client, world, stock, as_production_connection):
+    free = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk,
+        lines=[{"item": stock["item"].pk, "quantity": "1", "unit_price": "0"}],
+    )
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        page = client.get(invoices_url(world["acme"], free.pk)).content.decode()
+        # The form as the browser sends it back: the shown value of the unit price, untouched.
+        shown = re.search(r'name="unit_price"[^>]*value="([^"]*)"', page).group(1)
+        saved = client.post(invoices_url(world["acme"], free.pk), draft_form(stock["customer"], (stock["item"], "1", shown)))
+
+    assert shown != "" and Decimal(shown) == 0
+    assert saved.status_code == 302
+    assert free.lines.get().unit_price == Decimal("0")
+
+
+def test_a_customer_without_an_identity_is_refused_in_chinese_once_einvoicing_is_on(
+    client, world, stock, as_production_connection
+):
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+    form = draft_form(stock["customer"], (stock["item"], "1", "5"))
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        english = client.post(invoices_url(world["acme"], "new"), form).content.decode()
+        chinese = client.post(invoices_url(world["acme"], "new"), form, headers={"accept-language": "zh-hans"}).content.decode()
+
+    assert "needs a TIN" in english and "e-invoicing is on" in english
+    assert "TIN" in chinese and "电子发票" in chinese and "needs a TIN" not in chinese
+    assert not Invoice.objects.exists()

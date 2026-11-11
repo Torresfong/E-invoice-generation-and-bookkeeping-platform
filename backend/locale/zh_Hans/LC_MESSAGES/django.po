@@ -753,3 +753,7 @@ msgstr "请检查第 %(line)s 行的%(field)s。"
 #, python-format
 msgid "Choose an item on line %(line)s."
 msgstr "请选择第 %(line)s 行的商品。"
+
+#: .\core\invoices.py
+msgid "This customer needs a TIN, an ID type and an ID value while e-invoicing is on. Update the customer first."
+msgstr "开启电子发票后，该客户必须有 TIN、证件类型和证件号。请先更新客户资料。"
