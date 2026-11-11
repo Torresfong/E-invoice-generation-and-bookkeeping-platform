@@ -151,7 +151,12 @@ class MyInvoisHttpGateway:
         if onbehalf_of:
             headers["onbehalfof"] = onbehalf_of
         body = urlencode(
-            {"client_id": credentials.client_id, "client_secret": credentials.client_secret, "grant_type": "client_credentials"}
+            {
+                "client_id": credentials.client_id,
+                "client_secret": credentials.client_secret,
+                "grant_type": "client_credentials",
+                "scope": "InvoicingAPI",
+            }
         )
         requested_at = self._now()
         answer = self._send("POST", "/connect/token", headers, body.encode())

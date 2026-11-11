@@ -72,6 +72,7 @@ def test_login_posts_our_erp_credentials_and_the_taxpayers_tin_as_onbehalfof():
         "client_id": ["erp-client-id"],
         "client_secret": ["erp-client-secret"],
         "grant_type": ["client_credentials"],
+        "scope": ["InvoicingAPI"],  # the request that worked in the sandbox by hand sent it (#42 sandbox findings)
     }
     assert (session.company_id, session.token, session.onbehalf_of) == (7, "tok-1", "C1234567890")
     assert session.expires_at == T0 + timedelta(seconds=3600)
