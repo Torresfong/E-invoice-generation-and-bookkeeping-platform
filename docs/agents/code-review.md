@@ -3,7 +3,7 @@
 ## Independence
 - Start a new Codex task/session for every review round; do not reuse the implementing developer's conversation or conclusions.
 - Review the exact PR base and current HEAD commit, issue/spec and relevant code. Do not assume handoff notes are correct.
-- Code-read-only: no code edits, pushes, GitHub approvals, merges, or destructive actions. Publishing a GitHub `COMMENT` review and specific review comments is required; it is reporting, not approval.
+- Code-read-only: no code edits, pushes, GitHub approvals, merges, or destructive actions. When findings exist, publishing specific GitHub review comments is required; it is reporting, not approval. When none exist, the Codex integration may publish only its completed review receipt/summary.
 - If the implementation was written by Codex, the fresh review reduces shared-context bias but does not provide cross-model independence.
 
 ## Check in priority order
@@ -19,10 +19,10 @@
 - Compare PR acceptance criteria, commit history, handoff notes and test evidence against actual diff/HEAD. Flag missing or misleading handoff evidence when it could cause rework or hide an incomplete requirement; do not trust the handoff as a source of truth.
 
 ## Review report
-- Publish findings on the GitHub PR, not only in the reviewer chat. Attach each actionable finding to the relevant changed line when GitHub permits; otherwise put it in the `COMMENT` review summary. Record the reviewed HEAD SHA.
+- Publish findings on the GitHub PR, not only in the reviewer chat. Attach each actionable finding to the relevant changed line when GitHub permits; otherwise put it in the review summary. Record the reviewed HEAD SHA.
 - List findings first, ranked `Critical`, `High`, `Medium`, `Low`, with file/path and line, trigger scenario, consequence, and smallest safe fix.
 - Distinguish verified bug from plausible risk or missing evidence; do not report stylistic nits as bugs.
 - Then state test/CI evidence inspected, unresolved limitations, and any relevant go-live-only risks.
-- If no actionable findings, publish that explicitly in the `COMMENT` review summary but do not imply the PR is guaranteed safe or approved.
-- Any fixes belong to the implementing developer on the same feature branch. After the developer pushes, a new fresh-context reviewer checks the updated HEAD, verifies prior findings against actual code, and publishes resolved, remaining and new findings. If the same underlying defect remains, identify the unsuccessful attempt number in the PR review. Follow the three-attempt escalation limit in `docs/agents/ai-workflow.md`; a fourth automatic fix attempt is not allowed without Torres's direction.
+- If no actionable findings, a Codex receipt/summary is sufficient only when it records `status: completed`, the reviewed commit SHA equals the current PR HEAD, `has_any_findings: false`, and `has_unresolved_findings: false`. Do not wait for or fabricate a separate `COMMENT` review in that case. The absence of comments or threads without this receipt is inconclusive. A no-findings result does not imply the PR is guaranteed safe or approved.
+- Any fixes belong to the implementing developer on the same feature branch. After the developer pushes, a new fresh-context reviewer checks the updated HEAD and verifies prior findings against actual code. It publishes remaining or new findings; when none remain, the exact-HEAD completed receipt records that result without a separate comment. If the same underlying defect remains, identify the unsuccessful attempt number in the PR review. Follow the three-attempt escalation limit in `docs/agents/ai-workflow.md`; a fourth automatic fix attempt is not allowed without Torres's direction.
 - The implementing developer may reply with evidence but cannot mark its own work independently reviewed. Review comments, thread resolution and a “no findings” report are not GitHub approval; Torres retains the merge decision.

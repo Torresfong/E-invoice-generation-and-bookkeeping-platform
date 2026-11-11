@@ -39,7 +39,7 @@ Closes #
 
 ## Independent review
 - [ ] Pre-PR independent review completed, if tenancy/MyInvois/signing/money changed
-- [ ] Fresh independent `COMMENT` review published on current HEAD (Codex preferred; fallback approved by Torres)
+- [ ] Fresh independent review completed on current HEAD: actionable findings are published as PR comments, or an exact-HEAD completed receipt explicitly reports no findings and no unresolved findings
 - [ ] Actionable PR review comments resolved on the feature branch, and updated HEAD freshly re-reviewed until no actionable findings remain
 - [ ] Any finding still unresolved after three fix attempts is documented, the PR is Draft, and Torres has been asked to inspect it
 
