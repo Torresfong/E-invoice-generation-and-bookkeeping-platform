@@ -11,12 +11,15 @@ value. Anything specific to LHDN (the codes on a line, the document mapping) is 
 """
 
 import re
+from collections import Counter
 from decimal import Decimal
 
 from django.db import transaction
+from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from . import customers, items, permissions
+from .einvoicing import einvoicing_enabled
 from .models import Customer, Invoice, InvoiceLine, Item
 
 # The column sizes of InvoiceLine: NUMERIC(18, 4), so at most 14 digits before the point and 4 after it.
@@ -57,20 +60,33 @@ def _amount(raw, label, line_number, *, allow_zero):
 
 
 def _customer(company, customer_id, *, current=None):
-    """The customer the draft names. A customer deactivated since the draft was started may stay on it."""
+    """The customer the draft names. A customer deactivated since the draft was started may stay on it.
+
+    With e-invoicing on the customer must have a TIN, an ID type and an ID value (D59 (7)). The customer master checks
+    that only when a customer is saved, so one saved while e-invoicing was off is caught here, when the draft picks it.
+    """
     pk = _pk(customer_id)
     try:
         if current is not None and pk == current.pk:
-            return Customer.objects.get(company=company, pk=pk)
-        return customers.customer_for_new_draft(company, pk)
+            customer = Customer.objects.get(company=company, pk=pk)
+        else:
+            customer = customers.customer_for_new_draft(company, pk)
     except (Customer.DoesNotExist, customers.CustomerNotAvailable):
         raise InvalidInvoice(_("Choose a customer.")) from None
+    if not (customer.tin and customer.id_type and customer.id_value) and einvoicing_enabled(company, timezone.localdate()):
+        raise InvalidInvoice(
+            _("This customer needs a TIN, an ID type and an ID value while e-invoicing is on. Update the customer first.")
+        )
+    return customer
 
 
 def _item(company, item_id, line_number, *, kept):
+    """The item of a line. `kept` counts how often each item is already on the draft: a deactivated item may stay on
+    the lines it already has, but every further line with it must pass the active check like any new line."""
     pk = _pk(item_id)
     try:
-        if pk in kept:
+        if kept[pk] > 0:
+            kept[pk] -= 1
             return Item.objects.get(company=company, pk=pk)
         return items.item_for_new_draft(company, pk)
     except (Item.DoesNotExist, items.ItemNotAvailable):
@@ -82,7 +98,7 @@ def _resolve(company, customer_id, lines, *, current=None):
     customer = _customer(company, customer_id, current=current.customer if current else None)
     if not lines:
         raise InvalidInvoice(_("Add at least one line."))
-    kept = set(current.lines.values_list("item_id", flat=True)) if current else set()
+    kept = Counter(current.lines.values_list("item_id", flat=True)) if current else Counter()
     resolved = []
     for number, line in enumerate(lines, start=1):
         item = _item(company, line.get("item"), number, kept=kept)

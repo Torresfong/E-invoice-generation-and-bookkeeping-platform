@@ -11,7 +11,7 @@ import pytest
 from core import customers, invoices, items
 from core.models import Invoice, InvoiceLine
 
-from .factories import PASSWORD
+from .factories import PASSWORD, make_accountant
 
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
 
@@ -81,12 +81,13 @@ def make_draft(user, company, stock, customer="customer", item="item"):
     )
 
 
-def test_the_owner_edits_a_draft_and_its_lines_are_replaced(client, world, stock, as_production_connection):
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+def test_the_owner_and_staff_edit_a_draft_and_its_lines_are_replaced(client, world, stock, as_production_connection, who):
     draft = make_draft(world["acme_owner"], world["acme"], stock)
     other = make_customer(world["acme_owner"], world["acme"], "Second Buyer")
     other_item = make_item(world["acme_owner"], world["acme"], "Second service")
     with as_production_connection():
-        sign_in(client, world["acme_owner"])
+        sign_in(client, world[who])
         edited = client.post(invoices_url(world["acme"], draft.pk), draft_form(other, (other_item, "3", "7.25")))
         page = client.get(invoices_url(world["acme"], draft.pk)).content.decode()
 
@@ -99,15 +100,14 @@ def test_the_owner_edits_a_draft_and_its_lines_are_replaced(client, world, stock
     assert "Second Buyer" in page
 
 
-def test_the_owner_and_staff_delete_a_draft_with_its_lines(client, world, stock, as_production_connection):
-    first = make_draft(world["acme_owner"], world["acme"], stock)
-    second = make_draft(world["acme_staff"], world["acme"], stock)
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+def test_the_owner_and_staff_delete_a_draft_with_its_lines(client, world, stock, as_production_connection, who):
+    draft = make_draft(world["acme_owner"], world["acme"], stock)
     with as_production_connection():
-        sign_in(client, world["acme_staff"])
-        deleted = client.post(invoices_url(world["acme"], first.pk, "delete"))
-        sign_in_again = client.post(invoices_url(world["acme"], second.pk, "delete"))
+        sign_in(client, world[who])
+        deleted = client.post(invoices_url(world["acme"], draft.pk, "delete"))
 
-    assert deleted.status_code == 302 and sign_in_again.status_code == 302
+    assert deleted.status_code == 302 and deleted["Location"] == invoices_url(world["acme"]) + "?deleted=1"
     assert not Invoice.objects.filter(company=world["acme"]).exists()
     assert not InvoiceLine.objects.filter(company=world["acme"]).exists()
 
@@ -218,3 +218,33 @@ def test_the_draft_pages_and_their_errors_read_in_chinese_on_request(client, wor
     assert "发票" in listing and "开具发票草稿" in listing
     assert "保存草稿" in form and "单价" in form
     assert "请检查第 1 行的数量。" in refused
+
+
+def test_an_accountant_of_one_company_cannot_reach_another_companys_drafts(client, world, stock, as_production_connection):
+    draft = make_draft(world["acme_owner"], world["acme"], stock)
+    only_beta = make_accountant("beta-only@firm.example", world["beta"])
+    form = draft_form(stock["customer"], (stock["item"], "9", "9"))
+    with as_production_connection():
+        sign_in(client, only_beta)
+        attempts = [
+            client.get(invoices_url(world["acme"])),
+            client.get(invoices_url(world["acme"], draft.pk)),
+            client.get(invoices_url(world["acme"], "new")),
+            client.post(invoices_url(world["acme"], "new"), form),
+            client.post(invoices_url(world["acme"], draft.pk), form),
+            client.post(invoices_url(world["acme"], draft.pk, "delete")),
+        ]
+
+    assert [r.status_code for r in attempts] == [404] * 6
+    assert Invoice.objects.count() == 1 and draft.lines.get().quantity == Decimal("1")
+
+
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff", "accountant"])
+def test_the_company_page_links_to_the_invoices(client, world, as_production_connection, who):
+    with as_production_connection():
+        sign_in(client, world[who])
+        page = client.get(f"/companies/{world['acme'].pk}/").content.decode()
+        chinese = client.get(f"/companies/{world['acme'].pk}/", headers={"accept-language": "zh-hans"}).content.decode()
+
+    assert f'href="{invoices_url(world["acme"])}"' in page
+    assert "发票" in chinese

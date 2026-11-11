@@ -30,6 +30,16 @@ BEGIN
     IF TG_OP IN ('UPDATE', 'DELETE') AND OLD.status <> 'draft' THEN
         RAISE EXCEPTION 'an invoice that is no longer a draft cannot be changed or deleted';
     END IF;
+    -- The role is checked before the delete returns: row-level security lets any member of the company delete a row,
+    -- so an accountant would otherwise delete a draft (and, by cascade, its lines) straight through the web role.
+    IF app_user_id() IS NOT NULL THEN
+        SELECT role INTO v_role FROM core_companyaccess
+        WHERE user_id = app_user_id()
+          AND company_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END;
+        IF v_role IS NULL OR v_role NOT IN ('owner', 'staff') THEN
+            RAISE EXCEPTION 'only the owner and staff of the company may change its invoices' USING ERRCODE = '42501';
+        END IF;
+    END IF;
     IF TG_OP = 'DELETE' THEN
         RETURN OLD;
     END IF;
@@ -38,13 +48,6 @@ BEGIN
     END IF;
     IF (SELECT company_id FROM core_customer WHERE id = NEW.customer_id) IS DISTINCT FROM NEW.company_id THEN
         RAISE EXCEPTION 'the customer of an invoice must belong to the same company';
-    END IF;
-    IF app_user_id() IS NOT NULL THEN
-        SELECT role INTO v_role FROM core_companyaccess
-        WHERE user_id = app_user_id() AND company_id = NEW.company_id;
-        IF v_role IS NULL OR v_role NOT IN ('owner', 'staff') THEN
-            RAISE EXCEPTION 'only the owner and staff of the company may change its invoices' USING ERRCODE = '42501';
-        END IF;
     END IF;
     RETURN NEW;
 END
@@ -68,6 +71,14 @@ BEGIN
     IF v_status <> 'draft' THEN
         RAISE EXCEPTION 'the lines of an invoice that is no longer a draft cannot be changed';
     END IF;
+    IF app_user_id() IS NOT NULL THEN
+        SELECT role INTO v_role FROM core_companyaccess
+        WHERE user_id = app_user_id()
+          AND company_id = CASE WHEN TG_OP = 'DELETE' THEN OLD.company_id ELSE NEW.company_id END;
+        IF v_role IS NULL OR v_role NOT IN ('owner', 'staff') THEN
+            RAISE EXCEPTION 'only the owner and staff of the company may change its invoices' USING ERRCODE = '42501';
+        END IF;
+    END IF;
     IF TG_OP = 'DELETE' THEN
         RETURN OLD;
     END IF;
@@ -79,13 +90,6 @@ BEGIN
     END IF;
     IF (SELECT company_id FROM core_item WHERE id = NEW.item_id) IS DISTINCT FROM NEW.company_id THEN
         RAISE EXCEPTION 'the item of a line must belong to the same company';
-    END IF;
-    IF app_user_id() IS NOT NULL THEN
-        SELECT role INTO v_role FROM core_companyaccess
-        WHERE user_id = app_user_id() AND company_id = NEW.company_id;
-        IF v_role IS NULL OR v_role NOT IN ('owner', 'staff') THEN
-            RAISE EXCEPTION 'only the owner and staff of the company may change its invoices' USING ERRCODE = '42501';
-        END IF;
     END IF;
     RETURN NEW;
 END

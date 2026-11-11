@@ -147,3 +147,24 @@ def test_an_invoice_that_has_left_the_draft_state_is_locked_with_its_lines(world
     with pytest.raises(invoices.InvoiceLocked):
         invoices.update_draft(world["acme_owner"], invoice, customer_id=books["acme_customer"].pk, lines=[])
     assert Invoice.objects.filter(pk=invoice.pk).exists() and InvoiceLine.objects.filter(pk=line.pk).exists()
+
+
+def test_an_accountant_cannot_delete_a_draft_or_a_line_through_the_web_role_but_staff_can(world, books, as_user):
+    # Row-level security lets any member of the company delete a row, so the guards must refuse the accountant.
+    empty = Invoice.objects.create(company=world["acme"], customer=books["acme_customer"])
+    line = books["acme_draft"].lines.get()
+
+    def raw_delete(table, pk):
+        with connection.cursor() as cursor:
+            cursor.execute(f"DELETE FROM {table} WHERE id = %s", [pk])
+
+    with as_user(world["accountant"]):
+        attempt(lambda: raw_delete("core_invoice", empty.pk))
+        attempt(lambda: raw_delete("core_invoiceline", line.pk))
+        attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).delete())
+    assert Invoice.objects.filter(pk=empty.pk).exists() and InvoiceLine.objects.filter(pk=line.pk).exists()
+
+    with as_user(world["acme_staff"]):
+        raw_delete("core_invoice", empty.pk)
+        raw_delete("core_invoiceline", line.pk)
+    assert not Invoice.objects.filter(pk=empty.pk).exists() and not InvoiceLine.objects.filter(pk=line.pk).exists()

@@ -12,6 +12,8 @@ from django.utils import translation
 from core import customers, invoices, items
 from core.models import Invoice, InvoiceLine
 
+from .test_customers import BRN_VALUE, TIN, switch_einvoicing_on
+
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
 
 
@@ -174,3 +176,42 @@ def test_only_the_owner_and_staff_of_the_company_may_draft_edit_or_delete(world,
     assert Invoice.objects.count() == 1 and saved.lines.get().quantity == Decimal("1")
     draft(world, stock, user="acme_staff")
     assert Invoice.objects.count() == 2
+
+
+def test_a_customer_saved_without_an_identity_cannot_be_drafted_once_einvoicing_is_on(world, stock):
+    # The customer master checks the identity when a customer is saved, so this one was saved while e-invoicing was off.
+    started = draft(world, stock)
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+
+    with pytest.raises(invoices.InvalidInvoice) as new:
+        draft(world, stock)
+    with pytest.raises(invoices.InvalidInvoice) as edit:
+        invoices.update_draft(world["acme_owner"], started, customer_id=stock["customer"].pk, lines=[line(stock, "4")])
+
+    for refused in (new, edit):
+        assert "TIN" in str(refused.value) and "e-invoicing" in str(refused.value)
+    assert Invoice.objects.count() == 1 and started.lines.get().quantity == Decimal("1")
+
+
+def test_a_customer_with_a_full_identity_can_be_drafted_while_einvoicing_is_on(world, stock):
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+    identified = customers.create_customer(
+        world["acme_owner"], world["acme"], legal_name="Identified Sdn Bhd", tin=TIN, id_type="BRN", id_value=BRN_VALUE
+    )
+
+    saved = invoices.create_draft(world["acme_owner"], world["acme"], customer_id=identified.pk, lines=[line(stock)])
+
+    assert saved.customer == identified
+
+
+def test_one_retained_line_of_a_deactivated_item_cannot_become_two(world, stock):
+    saved = draft(world, stock)
+    items.deactivate_item(world["acme_owner"], stock["item"])
+
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        invoices.update_draft(
+            world["acme_owner"], saved, customer_id=stock["customer"].pk, lines=[line(stock), line(stock, "2")]
+        )
+
+    assert "line 2" in str(refused.value)
+    assert saved.lines.count() == 1
