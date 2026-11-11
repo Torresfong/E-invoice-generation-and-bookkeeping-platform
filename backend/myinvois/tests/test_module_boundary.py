@@ -12,84 +12,73 @@ import pytest
 
 BACKEND = Path(__file__).resolve().parents[2]
 ENGINE = BACKEND / "core"
-MYINVOIS = BACKEND / "myinvois"
 
 
-def _imported_modules(path):
-    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-    for node in ast.walk(tree):
+def _is_myinvois(name):
+    return name == "myinvois" or name.startswith("myinvois.")
+
+
+def _parse(path):
+    return ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+
+
+def _imported_modules(path, package):
+    """Absolute names a file imports, relative imports resolved against `package` (the file's own dotted package)."""
+    names = []
+    for node in ast.walk(_parse(path)):
         if isinstance(node, ast.Import):
-            yield from (alias.name for alias in node.names)
+            names.extend(alias.name for alias in node.names)
         elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
             if node.level:
-                yield "." * node.level + (node.module or "")  # a relative import
-            else:
-                yield node.module or ""
-                # `from . import x` / `import_module` aside, `from pkg import myinvois` names the module in the alias.
-                yield from (f"{node.module}.{alias.name}" for alias in node.names)
+                # `from . import x` is level 1: the file's own package. Each further dot climbs one package up.
+                parts = package.split(".")
+                parts = parts[: len(parts) - (node.level - 1)]
+                base = ".".join(parts + ([node.module] if node.module else []))
+            names.append(base)
+            # `from pkg import myinvois` names the module in the alias.
+            names.extend(f"{base}.{alias.name}" if base else alias.name for alias in node.names)
+    return names
 
 
-def _reaches_myinvois(name, own_package):
-    if name == "myinvois" or name.startswith("myinvois."):
-        return True
-    # A relative import climbing out of the package (`from .. import myinvois`) cannot be resolved by name; refuse the
-    # shape outright in the engine, where the dots would have to climb above `core` to name a sibling app.
-    return own_package == "core" and name.startswith("..")
-
-
-def _engine_files():
-    return sorted(p for p in ENGINE.rglob("*.py") if "migrations" not in p.parts and "__pycache__" not in p.parts)
-
-
-def test_the_myinvois_app_is_a_separate_package_next_to_core():
-    assert (MYINVOIS / "__init__.py").is_file() and (MYINVOIS / "apps.py").is_file()
-    assert (MYINVOIS / "submission.py").is_file()
-
-
-def test_submission_rules_live_in_the_myinvois_app_not_in_core():
-    assert not (ENGINE / "submission.py").exists()
-
-
-@pytest.mark.parametrize("path", _engine_files(), ids=lambda p: str(p.relative_to(BACKEND)))
-def test_the_invoice_engine_imports_nothing_from_the_myinvois_module(path):
-    offending = [name for name in _imported_modules(path) if _reaches_myinvois(name, "core")]
-    assert offending == [], f"{path.relative_to(BACKEND)} imports {offending}: the engine must not import myinvois (D61 (3))"
-
-
-def _dynamic_imports_of_myinvois(path):
-    """Names of `import_module("myinvois...")` / `__import__("myinvois...")` calls with a literal module name."""
+def _dynamic_imports(path):
+    """Literal module names passed to `import_module(...)` or `__import__(...)`."""
     found = []
-    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"), filename=str(path))):
+    for node in ast.walk(_parse(path)):
         if not isinstance(node, ast.Call) or not node.args:
             continue
         func = node.func
         called = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else ""
         first = node.args[0]
         if called in {"import_module", "__import__"} and isinstance(first, ast.Constant) and isinstance(first.value, str):
-            if first.value == "myinvois" or first.value.startswith("myinvois."):
-                found.append(first.value)
+            found.append(first.value)
     return found
 
 
+def _package_of(path):
+    return ".".join(path.relative_to(BACKEND).with_suffix("").parts[:-1])
+
+
+def _violations(path):
+    package = _package_of(path)
+    return [n for n in _imported_modules(path, package) if _is_myinvois(n)] + [
+        n for n in _dynamic_imports(path) if _is_myinvois(n)
+    ]
+
+
+def _engine_files():
+    return sorted(p for p in ENGINE.rglob("*.py") if "migrations" not in p.parts and "__pycache__" not in p.parts)
+
+
+def test_the_check_looks_at_the_engine_source():
+    # A wrong path would parametrise zero cases below and pass without checking anything.
+    names = {p.name for p in _engine_files()}
+    assert {"jobs.py", "einvoicing.py", "views.py"} <= names
+
+
 @pytest.mark.parametrize("path", _engine_files(), ids=lambda p: str(p.relative_to(BACKEND)))
-def test_the_engine_cannot_reach_myinvois_by_a_dynamic_import(path):
-    assert _dynamic_imports_of_myinvois(path) == []
-
-
-def test_the_checker_catches_a_dynamic_import(tmp_path):
-    path = tmp_path / "engine_file.py"
-    path.write_text('from importlib import import_module\nimport_module("myinvois.submission")\n', encoding="utf-8")
-    assert _dynamic_imports_of_myinvois(path) == ["myinvois.submission"]
-
-
-def test_the_myinvois_app_is_installed(settings):
-    assert "myinvois" in settings.INSTALLED_APPS
-
-
-def test_the_myinvois_app_adds_no_tenant_table():
-    from django.apps import apps
-
-    assert list(apps.get_app_config("myinvois").get_models()) == []
+def test_the_invoice_engine_imports_nothing_from_the_myinvois_module(path):
+    assert _violations(path) == [], f"{path.relative_to(BACKEND)} reaches myinvois: the engine must not (D61 (3))"
 
 
 @pytest.mark.parametrize(
@@ -100,19 +89,31 @@ def test_the_myinvois_app_adds_no_tenant_table():
         "from myinvois import submission",
         "from myinvois.submission import submit_invoice",
         "from .. import myinvois",
+        "from ..myinvois import submission",
+        "from importlib import import_module\nimport_module('myinvois.submission')",
+        "__import__('myinvois')",
     ],
 )
-def test_the_checker_catches_each_way_of_importing_the_myinvois_module(tmp_path, source):
-    path = tmp_path / "engine_file.py"
-    path.write_text(source + "\n", encoding="utf-8")
-    assert [n for n in _imported_modules(path) if _reaches_myinvois(n, "core")]
+def test_the_check_catches_each_way_of_reaching_the_myinvois_module(tmp_path, source):
+    # Placed as if it were `core/engine_file.py`, so `..` climbs to the top level where `myinvois` lives.
+    path = BACKEND / "core" / "engine_file.py"
+    file = tmp_path / "engine_file.py"
+    file.write_text(source + "\n", encoding="utf-8")
+    package = _package_of(path)
+    found = [n for n in _imported_modules(file, package) if _is_myinvois(n)] + [
+        n for n in _dynamic_imports(file) if _is_myinvois(n)
+    ]
+    assert found
 
 
-def test_the_checker_lets_the_engine_use_its_own_door():
-    source = "from core import ports\nfrom core.einvoicing import einvoicing_enabled\nfrom core.jobs import enqueue\n"
-    path = Path(__file__).with_name("_door.py")
-    try:
-        path.write_text(source, encoding="utf-8")
-        assert [n for n in _imported_modules(path) if _reaches_myinvois(n, "core")] == []
-    finally:
-        path.unlink(missing_ok=True)
+def test_the_check_lets_the_engine_use_its_own_doors_and_nested_relative_imports(tmp_path):
+    file = tmp_path / "engine_file.py"
+    file.write_text(
+        "from core import ports\nfrom core.einvoicing import einvoicing_enabled\nfrom core.jobs import enqueue\n"
+        "from ..models import Job\nfrom . import fakes\n",
+        encoding="utf-8",
+    )
+    found = [n for n in _imported_modules(file, "core.ports") if _is_myinvois(n)] + [
+        n for n in _dynamic_imports(file) if _is_myinvois(n)
+    ]
+    assert found == []

@@ -8,8 +8,9 @@ Decisions: D59 (1), D61 (3), D61 (4). Ticket: #128. This note says which side of
 - **`backend/myinvois/` is a separate Django app** that owns everything LHDN-specific. It reads `core`; **`core` imports nothing from `myinvois`**, not even in a function body or through `importlib`.
 - The engine reaches the MyInvois side by only these doors, all of which live in `core`:
   1. the **gateway port** (`core.ports`, `ports.get().gateway`);
-  2. the **job runner** (`core.jobs`): the engine enqueues a job by name with an identifier-only payload; the MyInvois app registers the handler with `core.jobs.register` from `myinvois/jobs.py`, imported in its `AppConfig.ready()`. Company context comes from the job row (D36, D40);
+  2. the **job runner** (`core.jobs`): the engine enqueues a job by name with an identifier-only payload; the MyInvois app registers the handler with `core.jobs.register` from a `myinvois/jobs.py` that its `AppConfig.ready()` will import (planned: no handler exists yet, the first comes with #47). Company context comes from the job row (D36, D40);
   3. **one question**, `core.einvoicing.einvoicing_enabled(company, on_date)` (#119): is e-invoicing on for this company on this date? The setting is one table in `core`; the MyInvois app reads it, never the reverse.
+- **The "engine-facing interface" is therefore not a module inside `myinvois`.** Under D61 (4) the engine imports nothing from `myinvois`, so the interface is the three doors above, all in `core`: the gateway port, the job runner and `einvoicing_enabled`. `myinvois` exposes nothing to the engine by import; the boundary test enforces that "nothing else".
 - The MyInvois app only reads the invoice, the buyer snapshot and the company's e-invoice setting. It does not reach into other tables.
 - `myinvois/tests/test_module_boundary.py` enforces the import direction on every file under `core/` (tests included, migrations excluded), by static and dynamic import.
 
@@ -32,7 +33,7 @@ Because the engine cannot import the MyInvois app, an engine feature that needs 
 | Cancellation inside the LHDN window | #50 | `myinvois` |
 | Buyer rejection request | #51 | `myinvois` reads it; the owner's notice goes through the engine's email port |
 | Representation checks (D57) | #23 | `myinvois` |
-| Company e-invoice setting model and `einvoicing_enabled` (#119) | `core/einvoicing.py` | `core` |
+| Company e-invoice setting model and `einvoicing_enabled` (exists in `core/einvoicing.py`) | #119 | `core` |
 | Item and customer master (hold LHDN codes as plain data) | #7, #121 | `core` |
 
 The item and customer masters and the LHDN code-list loader that items use today (`core/lhdn_codes.py`) stay in `core`: they are master data the engine edits. Rules that interpret a code (#122) go to `myinvois`.
