@@ -21,6 +21,7 @@ from django.db import DatabaseError, connection, transaction
 from core import jobs, ports
 from core.models import Job
 from core.ports.interfaces import DuplicateSubmission, IntermediaryCredentials, SignedDocument, WrongCompany
+from core.ports.myinvois import RateLimited
 
 from .test_tenancy import query
 
@@ -144,6 +145,41 @@ def test_a_permanent_error_fails_the_job_at_once(registry, clock):
     job = Job.objects.get()
     assert (job.status, job.attempts, job.error) == (Job.FAILED, 1, "PermanentError")
     assert job.finished_at == clock.now
+
+
+def _fail_once_with(registry, error):
+    def handler(**payload):
+        raise error
+
+    jobs.register("limited")(handler)
+    jobs.enqueue("limited")
+    assert jobs.run_pending() == 1
+    return Job.objects.get()
+
+
+def test_a_rate_limit_that_asks_for_a_longer_wait_than_the_backoff_is_waited_out(registry, clock):
+    job = _fail_once_with(registry, RateLimited("slow down", retry_after=120))  # the backoff alone would be 30
+
+    assert (job.status, job.error) == (Job.PENDING, "RateLimited")
+    assert job.run_after == clock.now + timedelta(seconds=120)
+
+
+def test_a_rate_limit_never_shortens_the_backoff(registry, clock):
+    job = _fail_once_with(registry, RateLimited("slow down", retry_after=5))
+
+    assert job.run_after == clock.now + timedelta(seconds=30)
+
+
+def test_a_rate_limit_without_a_retry_after_uses_the_backoff(registry, clock):
+    job = _fail_once_with(registry, RateLimited("slow down"))
+
+    assert job.run_after == clock.now + timedelta(seconds=30)
+
+
+def test_an_absurd_retry_after_is_capped_so_a_job_is_never_parked_for_days(registry, clock):
+    job = _fail_once_with(registry, RateLimited("slow down", retry_after=10**7))
+
+    assert job.run_after == clock.now + timedelta(seconds=jobs.MAX_RETRY_AFTER_SECONDS)
 
 
 def test_an_unknown_error_is_retried_but_fewer_times_than_a_transient_one(registry, clock):

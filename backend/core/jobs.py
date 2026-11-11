@@ -34,6 +34,8 @@ BACKOFF_SECONDS = 30
 MAX_ATTEMPTS = 5
 # An error the handler did not classify may be a bug that no retry will fix, so it gets fewer attempts.
 UNKNOWN_ERROR_MAX_ATTEMPTS = 3
+# The longest a service's Retry-After can park a job: a bad or hostile header must not hold a job for days.
+MAX_RETRY_AFTER_SECONDS = 3600
 
 # Time as the job runner sees it. Tests replace it with a clock they move by hand.
 clock = timezone.now
@@ -55,7 +57,15 @@ class JobPayloadError(ValueError):
 
 
 class TransientError(Exception):
-    """A handler raises this when a retry may succeed: a timeout, a 5xx, a service that is briefly down."""
+    """A handler raises this when a retry may succeed: a timeout, a 5xx, a service that is briefly down.
+
+    `retry_after` is the seconds a service asked us to wait (LHDN's 429 `Retry-After`). The retry waits at least that
+    long, never less than the backoff, and never more than `MAX_RETRY_AFTER_SECONDS`.
+    """
+
+    def __init__(self, message="", retry_after=None):
+        super().__init__(message)
+        self.retry_after = retry_after
 
 
 class PermanentError(Exception):
@@ -217,6 +227,8 @@ def _after_failure(job, exc):
     if job.attempts >= cap:
         return {**outcome, "status": Job.FAILED, "finished_at": clock()}
     delay = timedelta(seconds=BACKOFF_SECONDS * 2 ** (job.attempts - 1))
+    if isinstance(exc, TransientError) and exc.retry_after:
+        delay = max(delay, timedelta(seconds=min(exc.retry_after, MAX_RETRY_AFTER_SECONDS)))
     return {**outcome, "status": Job.PENDING, "run_after": clock() + delay}
 
 
