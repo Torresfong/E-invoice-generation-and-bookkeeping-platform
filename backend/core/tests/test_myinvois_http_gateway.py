@@ -391,6 +391,24 @@ def test_a_token_lhdn_no_longer_honours_is_replaced_by_one_fresh_login_and_the_c
     assert lhdn.requests[3]["headers"]["Authorization"] == "Bearer new"
 
 
+def test_a_login_the_credentials_fail_is_not_repeated_when_validating_a_tin():
+    # Only a 401 on the validation request itself means "token no longer honoured". A refused login is permanent, and
+    # logging in again with the same credentials could meet a 429 and turn it into a retryable error.
+    gateway, lhdn, _ = a_gateway(answer(400, body=b'{"error": "invalid_client"}'))
+
+    with pytest.raises(AuthenticationFailed):
+        gateway.validate_tin("C1234567890", "BRN", "1")
+
+    assert len(lhdn.requests) == 1
+
+
+def test_a_refused_login_is_not_masked_by_a_rate_limit_on_a_second_try():
+    gateway, _, _ = a_gateway(answer(400, body=b'{"error": "invalid_client"}'), answer(429, {"Retry-After": "3"}))
+
+    with pytest.raises(AuthenticationFailed):
+        gateway.validate_tin("C1234567890", "BRN", "1")
+
+
 def test_a_second_401_after_a_fresh_login_is_an_authentication_failure():
     gateway, lhdn, _ = a_gateway(token_answer("old"), answer(401), token_answer("new"), answer(401))
 

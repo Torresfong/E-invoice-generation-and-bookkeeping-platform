@@ -190,9 +190,17 @@ class MyInvoisHttpGateway:
         self._cache.put(self.environment, credentials, onbehalf_of, token, expires_at)
         return TaxpayerSession(company_id=company_id, tin=tin, token=token, expires_at=expires_at, rob=rob)
 
-    def _validate_once(self, path):
+    def _validate(self, path):
+        """The validation request under our own login. A login that fails is permanent and propagates untouched; only a
+        401 on the validation request itself means LHDN no longer honours the token (it can lose one before it
+        expires), and then the token is dropped and one fresh login and one more request are made."""
         own = self.login_as_taxpayer(self.credentials, 0, "")
-        return self._send("GET", path, {"Authorization": f"Bearer {own.token}"}, answers=(400, 404))
+        try:
+            return self._send("GET", path, {"Authorization": f"Bearer {own.token}"}, answers=(400, 404))
+        except AuthenticationFailed:
+            self._cache.evict(self.environment, self.credentials, "")
+            fresh = self.login_as_taxpayer(self.credentials, 0, "")
+            return self._send("GET", path, {"Authorization": f"Bearer {fresh.token}"}, answers=(400, 404))
 
     def validate_tin(self, tin, id_type, id_value):
         """Looked up under our own login, with no `onbehalfof`: the buyer is not one of our clients."""
@@ -200,12 +208,7 @@ class MyInvoisHttpGateway:
             raise ValueError(f"id_type must be one of {', '.join(ID_TYPES)}")
         query = urlencode({"idType": id_type, "idValue": id_value}, quote_via=quote)
         path = f"/api/v1.0/taxpayer/validate/{quote(tin, safe='')}?{query}"
-        try:
-            answer = self._validate_once(path)
-        except AuthenticationFailed:
-            # LHDN has stopped honouring the token (it can be lost on their side before it expires): log in once more.
-            self._cache.evict(self.environment, self.credentials, "")
-            answer = self._validate_once(path)
+        answer = self._validate(path)
         return {400: TinCheck.BAD_FORMAT, 404: TinCheck.NOT_FOUND}.get(answer.status, TinCheck.VALID)
 
 
