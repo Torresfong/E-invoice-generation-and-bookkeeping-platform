@@ -321,6 +321,10 @@ def item_activate(request, pk, item_pk):
     return _set_item_active(request, pk, item_pk, True)
 
 
+# The draft form always offers at least this many line rows, and never fewer than two blank ones.
+MIN_LINE_ROWS, MIN_BLANK_ROWS = 3, 2
+
+
 def _invoices_url(company_id, *rest):
     return "/".join([f"/companies/{company_id}/invoices", *map(str, rest), ""])
 
@@ -352,7 +356,7 @@ def _invoice_context(access, invoice=None, **extra):
             if invoice
             else [],
         }
-    blanks = max(2, 3 - len(form["lines"]))
+    blanks = max(MIN_BLANK_ROWS, MIN_LINE_ROWS - len(form["lines"]))
     return {
         "company": company,
         "access": access,
@@ -391,16 +395,12 @@ def invoice_new(request, pk):
         try:
             invoice = invoices.create_draft(request.user, access.company, **submitted)
         except invoices.InvalidInvoice as problem:
-            context = _invoice_context(access, form=_form_of(submitted), error=str(problem))
+            context = _invoice_context(access, form=submitted, error=str(problem))
             return render(request, "invoice.html", context)
         return redirect(_invoices_url(pk, invoice.pk) + "?saved=1")
     if request.method not in ("GET", "HEAD"):
         return HttpResponse(status=405)
     return render(request, "invoice.html", _invoice_context(access))
-
-
-def _form_of(submitted):
-    return {"customer_id": submitted["customer_id"], "lines": submitted["lines"]}
 
 
 @audit.audited_read("invoice", id_arg="invoice_pk")
@@ -417,7 +417,7 @@ def invoice_detail(request, pk, invoice_pk):
         try:
             invoices.update_draft(request.user, invoice, **submitted)
         except invoices.InvalidInvoice as problem:
-            context = _invoice_context(access, invoice, form=_form_of(submitted), error=str(problem))
+            context = _invoice_context(access, invoice, form=submitted, error=str(problem))
             return render(request, "invoice.html", context)
         except invoices.InvoiceLocked:
             raise PermissionDenied from None
