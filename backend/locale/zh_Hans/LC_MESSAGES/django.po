@@ -663,3 +663,93 @@ msgstr "MyInvois 不接受该税务识别号的格式。"
 #: .\core\customers.py
 msgid "MyInvois has no taxpayer with this TIN and ID."
 msgstr "MyInvois 中没有使用该税务识别号和证件的纳税人。"
+
+#: .\core\templates\invoices.html
+msgid "Invoices"
+msgstr "发票"
+
+#: .\core\templates\invoices.html .\core\templates\invoice.html
+msgid "Customer"
+msgstr "客户"
+
+#: .\core\templates\invoices.html
+msgid "Number"
+msgstr "编号"
+
+#: .\core\templates\invoices.html
+msgid "Started"
+msgstr "创建日期"
+
+#: .\core\templates\invoices.html
+msgid "Draft"
+msgstr "草稿"
+
+#: .\core\templates\invoices.html
+msgid "No invoices yet."
+msgstr "暂无发票。"
+
+#: .\core\templates\invoices.html .\core\templates\invoice.html
+msgid "Draft an invoice"
+msgstr "开具发票草稿"
+
+#: .\core\templates\invoice.html
+msgid "Draft invoice"
+msgstr "发票草稿"
+
+#: .\core\templates\invoice.html
+msgid "Item"
+msgstr "商品"
+
+#: .\core\templates\invoice.html
+msgid "Quantity"
+msgstr "数量"
+
+#: .\core\templates\invoice.html
+msgid "Unit price"
+msgstr "单价"
+
+#: .\core\templates\invoice.html
+msgid "Save draft"
+msgstr "保存草稿"
+
+#: .\core\templates\invoice.html
+msgid "Delete draft"
+msgstr "删除草稿"
+
+#: .\core\templates\invoice.html
+msgid "Back to the invoices"
+msgstr "返回发票列表"
+
+#: .\core\views.py
+msgid "Draft deleted."
+msgstr "草稿已删除。"
+
+#: .\core\views.py
+msgid "Draft saved."
+msgstr "草稿已保存。"
+
+#: .\core\invoices.py
+msgid "Choose a customer."
+msgstr "请选择客户。"
+
+#: .\core\invoices.py
+msgid "Add at least one line."
+msgstr "请至少添加一行。"
+
+#: .\core\invoices.py
+msgid "quantity"
+msgstr "数量"
+
+#: .\core\invoices.py
+msgid "unit price"
+msgstr "单价"
+
+#: .\core\invoices.py
+#, python-format
+msgid "Check the %(field)s on line %(line)s."
+msgstr "请检查第 %(line)s 行的%(field)s。"
+
+#: .\core\invoices.py
+#, python-format
+msgid "Choose an item on line %(line)s."
+msgstr "请选择第 %(line)s 行的商品。"

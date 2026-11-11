@@ -1,9 +1,10 @@
 import logging
 from datetime import date
+from itertools import zip_longest
 
 from django.conf import settings
 from django.contrib.auth import authenticate, logout, password_validation
-from django.core.exceptions import ValidationError
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.validators import validate_email
 from django.db import connection
 from django.http import Http404, HttpResponse, JsonResponse
@@ -11,8 +12,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, customers, einvoicing, firm_admin, firm_applications, items, permissions, registration, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Item, SupplierDetails
+from . import audit, customers, einvoicing, firm_admin, firm_applications, invoices, items, permissions, registration, throttle, tokens
+from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Invoice, Item, SupplierDetails
 from .signin import complete_sign_in
 
 logger = logging.getLogger(__name__)
@@ -318,6 +319,129 @@ def item_deactivate(request, pk, item_pk):
 @require_POST
 def item_activate(request, pk, item_pk):
     return _set_item_active(request, pk, item_pk, True)
+
+
+def _invoices_url(company_id, *rest):
+    return "/".join([f"/companies/{company_id}/invoices", *map(str, rest), ""])
+
+
+def _invoice_fields(post):
+    """The draft form as `invoices` arguments: the customer and one dict per line that has anything typed in it."""
+    rows = [
+        {"item": item.strip(), "quantity": quantity.strip(), "unit_price": price.strip()}
+        for item, quantity, price in zip_longest(
+            post.getlist("item"), post.getlist("quantity"), post.getlist("unit_price"), fillvalue=""
+        )
+    ]
+    return {"customer_id": post.get("customer", "").strip(), "lines": [row for row in rows if any(row.values())]}
+
+
+def _invoice_context(access, invoice=None, **extra):
+    """The draft form: the customers and items that may be chosen, and the typed (or saved) lines plus blank rows."""
+    company = access.company
+    kept_items = set(invoice.lines.values_list("item_id", flat=True)) if invoice else set()
+    chosen = invoice.customer_id if invoice else None
+    form = extra.pop("form", None)
+    if form is None:
+        form = {
+            "customer_id": chosen or "",
+            "lines": [
+                {"item": line.item_id, "quantity": line.quantity, "unit_price": line.unit_price}
+                for line in invoice.lines.all()
+            ]
+            if invoice
+            else [],
+        }
+    blanks = max(2, 3 - len(form["lines"]))
+    return {
+        "company": company,
+        "access": access,
+        "invoice": invoice,
+        "customers": [c for c in customers.list_customers(company) if c.is_active or c.pk == chosen],
+        "items": [i for i in items.list_items(company) if i.is_active or i.pk in kept_items],
+        "form": form,
+        "rows": [*form["lines"], *({} for _ in range(blanks))],
+        **extra,
+    }
+
+
+@audit.audited_read("invoices")
+def invoice_list(request, pk):
+    """The company's invoices; for now every one is a draft (ticket #44)."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_invoices", access.company)
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    page = {"company": access.company, "access": access, "invoices": invoices.list_invoices(access.company)}
+    if request.GET.get("deleted"):
+        page["message"] = _("Draft deleted.")
+    return render(request, "invoices.html", page)
+
+
+def invoice_new(request, pk):
+    """Start a draft: the owner and staff pick a customer and add lines from the item master."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "manage_invoices", access.company)
+    if request.method == "POST":
+        submitted = _invoice_fields(request.POST)
+        try:
+            invoice = invoices.create_draft(request.user, access.company, **submitted)
+        except invoices.InvalidInvoice as problem:
+            context = _invoice_context(access, form=_form_of(submitted), error=str(problem))
+            return render(request, "invoice.html", context)
+        return redirect(_invoices_url(pk, invoice.pk) + "?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    return render(request, "invoice.html", _invoice_context(access))
+
+
+def _form_of(submitted):
+    return {"customer_id": submitted["customer_id"], "lines": submitted["lines"]}
+
+
+@audit.audited_read("invoice", id_arg="invoice_pk")
+def invoice_detail(request, pk, invoice_pk):
+    """One draft: the owner and staff change its customer and lines; an accountant reads it."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_invoices", access.company)
+    invoice = get_object_or_404(Invoice.objects.select_related("customer"), pk=invoice_pk, company_id=pk)
+    if request.method == "POST":
+        permissions.require(request.user, "manage_invoices", access.company)
+        submitted = _invoice_fields(request.POST)
+        try:
+            invoices.update_draft(request.user, invoice, **submitted)
+        except invoices.InvalidInvoice as problem:
+            context = _invoice_context(access, invoice, form=_form_of(submitted), error=str(problem))
+            return render(request, "invoice.html", context)
+        except invoices.InvoiceLocked:
+            raise PermissionDenied from None
+        return redirect(_invoices_url(pk, invoice_pk) + "?saved=1")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    context = _invoice_context(access, invoice)
+    if request.GET.get("saved"):
+        context["message"] = _("Draft saved.")
+    return render(request, "invoice.html", context)
+
+
+@require_POST
+def invoice_delete(request, pk, invoice_pk):
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "manage_invoices", access.company)
+    invoice = get_object_or_404(Invoice, pk=invoice_pk, company_id=pk)
+    try:
+        invoices.delete_draft(request.user, invoice)
+    except invoices.InvoiceLocked:
+        raise PermissionDenied from None
+    return redirect(_invoices_url(pk) + "?deleted=1")
 
 
 def _customers_url(company_id, *rest):
