@@ -155,6 +155,44 @@ def test_a_429_is_transient_and_carries_retry_after():
     assert isinstance(raised.value, TransientError) and raised.value.retry_after == 12
 
 
+def test_a_429_without_retry_after_waits_until_the_rate_limit_resets():
+    # The preprod sandbox sends no Retry-After on a 429: it sends X-Rate-Limit-Reset, an ISO time (seen in #42).
+    reset = {"X-Rate-Limit-Limit": "12", "X-Rate-Limit-Reset": "2026-11-10T09:00:20.4286288Z"}
+    gateway, _, _ = a_gateway(answer(429, reset))  # the clock says 09:00:00
+
+    with pytest.raises(RateLimited) as raised:
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+    assert raised.value.retry_after == 21  # 20.43 seconds, rounded up
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"X-Rate-Limit-Reset": "2026-11-10T08:59:00Z"},  # already past
+        {"X-Rate-Limit-Reset": "soon"},
+        {"X-Rate-Limit-Reset": "2026-11-10T09:00:20"},  # no zone: not trusted
+        {},
+    ],
+)
+def test_a_reset_time_that_is_past_unreadable_or_missing_gives_no_retry_after(headers):
+    gateway, _, _ = a_gateway(answer(429, headers))
+
+    with pytest.raises(RateLimited) as raised:
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+    assert raised.value.retry_after is None
+
+
+def test_retry_after_wins_over_the_reset_time_when_both_are_sent():
+    gateway, _, _ = a_gateway(answer(429, {"Retry-After": "7", "X-Rate-Limit-Reset": "2026-11-10T09:00:20Z"}))
+
+    with pytest.raises(RateLimited) as raised:
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+    assert raised.value.retry_after == 7
+
+
 @pytest.mark.parametrize("failure", [answer(500), answer(503), TimeoutError("timed out"), ConnectionError("reset")])
 def test_a_server_error_or_a_network_failure_is_transient(failure):
     gateway, _, _ = a_gateway(failure)

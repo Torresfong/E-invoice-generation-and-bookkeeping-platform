@@ -9,12 +9,14 @@ and never put in an exception message.
 
 import hashlib
 import json
+import math
 import os
+import re
 import threading
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime, timedelta
 from urllib.parse import quote, urlencode
 
 from django.utils import timezone
@@ -50,11 +52,7 @@ class UnexpectedResponse(PermanentError):
 
 
 class RateLimited(TransientError):
-    """LHDN answered 429. `retry_after` is the seconds it asked us to wait, if it said."""
-
-    def __init__(self, message, retry_after=None):
-        super().__init__(message)
-        self.retry_after = retry_after
+    """LHDN answered 429. `retry_after` is the seconds it asked us to wait, if it said; the job runner honours it."""
 
 
 NOT_AUTHORISED = "MyInvois refused the operation: the taxpayer has not authorised us, or this is the wrong environment"
@@ -69,9 +67,20 @@ def _oauth_error(answer):
     return code if isinstance(code, str) else None
 
 
-def _retry_after(headers):
-    value = {name.lower(): v for name, v in headers.items()}.get("retry-after", "")
-    return int(value) if value.isdigit() else None
+def _retry_after(headers, now):
+    """Seconds to wait after a 429: `Retry-After` if sent, else until `X-Rate-Limit-Reset`, which is what the preprod
+    sandbox sends instead (an ISO time, seen in #42). None when neither is usable, so the job's own backoff applies."""
+    sent = {name.lower(): value for name, value in headers.items()}
+    if sent.get("retry-after", "").isdigit():
+        return int(sent["retry-after"])
+    try:
+        reset = datetime.fromisoformat(re.sub(r"(\.\d{6})\d+", lambda match: match.group(1), sent.get("x-rate-limit-reset", "")))
+    except ValueError:
+        return None
+    if reset.tzinfo is None:
+        return None
+    wait = (reset - now).total_seconds()
+    return math.ceil(wait) if wait > 0 else None
 
 
 def urllib_transport(method, url, headers, body, timeout=30):
@@ -143,7 +152,7 @@ class MyInvoisHttpGateway:
         if answer.status in answers:
             return answer
         if answer.status == 429:
-            raise RateLimited("MyInvois rate limit reached", _retry_after(answer.headers))
+            raise RateLimited("MyInvois rate limit reached", _retry_after(answer.headers, self._now()))
         if answer.status == 403 or (answer.status == 400 and _oauth_error(answer) == "unauthorized_client"):
             # The sandbox answers a taxpayer that has not authorised us with 400 and `unauthorized_client`, not 403.
             raise PermissionDenied(NOT_AUTHORISED)

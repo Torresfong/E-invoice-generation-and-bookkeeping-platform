@@ -17,8 +17,10 @@ reject permission is concluded from these tests (D57 (3)); those are proved only
 
 import os
 from dataclasses import dataclass
+from datetime import timedelta
 
 import pytest
+from django.utils import timezone
 
 from core.jobs import PermanentError, TransientError
 from core.ports.fakes import FakeGateway
@@ -52,10 +54,17 @@ def _fake_scenario():
     return Scenario("fake", gateway, credentials, "C2222222222", None, "C3333333333", ("C1234567890", "BRN", "201901234567"), "C9999999999")
 
 
-def _sandbox_scenario(env=os.environ):
-    gateway = gateway_from_environment("sandbox", env)
+@pytest.fixture(scope="module")
+def sandbox_gateway():
+    """One gateway for the whole module, so its token cache is shared: the sandbox allows 12 logins a minute per client
+    ID, and a fresh login in every test runs the quota out within a few runs (seen in #42)."""
+    gateway = gateway_from_environment("sandbox", os.environ)
     if gateway is None:
         pytest.skip("no MyInvois sandbox credentials in the environment")
+    return gateway
+
+
+def _sandbox_scenario(gateway, env=os.environ):
 
     def value(name):
         return env.get(SANDBOX_ENV + name) or None
@@ -75,7 +84,9 @@ def _sandbox_scenario(env=os.environ):
 
 @pytest.fixture(params=["fake", "sandbox"])
 def scenario(request):
-    return _fake_scenario() if request.param == "fake" else _sandbox_scenario()
+    if request.param == "fake":
+        return _fake_scenario()
+    return _sandbox_scenario(request.getfixturevalue("sandbox_gateway"))
 
 
 def need(value, name):  # skips the test when its sandbox input is not configured
@@ -91,6 +102,15 @@ def test_our_own_company_logs_in_as_a_taxpayer_with_no_onbehalfof(scenario):
     session = scenario.gateway.login_as_taxpayer(scenario.credentials, 1, "")
 
     assert session.token and session.onbehalf_of == ""
+
+
+def test_a_session_lasts_sixty_minutes(scenario):
+    # Expiry itself is not observable without waiting an hour; its length is, and the cache renews before it (D60 (5)).
+    before = timezone.now()
+    session = scenario.gateway.login_as_taxpayer(scenario.credentials, 1, "")
+    after = timezone.now()
+
+    assert before + timedelta(minutes=59) <= session.expires_at <= after + timedelta(minutes=60)
 
 
 def test_a_protected_call_succeeds_with_our_own_login(scenario):
