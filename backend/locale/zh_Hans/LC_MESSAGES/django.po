@@ -664,6 +664,203 @@ msgstr "MyInvois 不接受该税务识别号的格式。"
 msgid "MyInvois has no taxpayer with this TIN and ID."
 msgstr "MyInvois 中没有使用该税务识别号和证件的纳税人。"
 
+#: .\myinvois\field_rules.py
+msgid "company's name"
+msgstr "公司名称"
+
+#: .\myinvois\field_rules.py
+msgid "company's TIN"
+msgstr "公司税务识别号"
+
+#: .\myinvois\field_rules.py
+msgid "company's BRN"
+msgstr "公司商业注册号"
+
+#: .\myinvois\field_rules.py
+msgid "company's SST registration number"
+msgstr "公司SST注册号"
+
+#: .\myinvois\field_rules.py
+msgid "company's tourism tax registration number"
+msgstr "公司旅游税注册号"
+
+#: .\myinvois\field_rules.py
+msgid "company's MSIC code"
+msgstr "公司MSIC代码"
+
+#: .\myinvois\field_rules.py
+msgid "company's phone number"
+msgstr "公司电话"
+
+#: .\myinvois\field_rules.py
+msgid "company's address"
+msgstr "公司地址"
+
+#: .\myinvois\field_rules.py
+msgid "company's address line 2"
+msgstr "公司地址第2行"
+
+#: .\myinvois\field_rules.py
+msgid "company's address line 3"
+msgstr "公司地址第3行"
+
+#: .\myinvois\field_rules.py
+msgid "company's city"
+msgstr "公司城市"
+
+#: .\myinvois\field_rules.py
+msgid "company's postcode"
+msgstr "公司邮编"
+
+#: .\myinvois\field_rules.py
+msgid "company's state code"
+msgstr "公司州属代码"
+
+#: .\myinvois\field_rules.py
+msgid "company's country code"
+msgstr "公司国家代码"
+
+#: .\myinvois\field_rules.py
+msgid "customer's name"
+msgstr "客户名称"
+
+#: .\myinvois\field_rules.py
+msgid "customer's TIN"
+msgstr "客户税务识别号"
+
+#: .\myinvois\field_rules.py
+msgid "customer's ID type"
+msgstr "客户证件类型"
+
+#: .\myinvois\field_rules.py
+msgid "customer's ID value"
+msgstr "客户证件号码"
+
+#: .\myinvois\field_rules.py
+msgid "customer's SST registration number"
+msgstr "客户SST注册号"
+
+#: .\myinvois\field_rules.py
+msgid "customer's phone number"
+msgstr "客户电话"
+
+#: .\myinvois\field_rules.py
+msgid "customer's address"
+msgstr "客户地址"
+
+#: .\myinvois\field_rules.py
+msgid "customer's address line 2"
+msgstr "客户地址第2行"
+
+#: .\myinvois\field_rules.py
+msgid "customer's address line 3"
+msgstr "客户地址第3行"
+
+#: .\myinvois\field_rules.py
+msgid "customer's city"
+msgstr "客户城市"
+
+#: .\myinvois\field_rules.py
+msgid "customer's postcode"
+msgstr "客户邮编"
+
+#: .\myinvois\field_rules.py
+msgid "customer's state code"
+msgstr "客户州属代码"
+
+#: .\myinvois\field_rules.py
+msgid "customer's country code"
+msgstr "客户国家代码"
+
+#: .\myinvois\field_rules.py
+msgid "item name"
+msgstr "项目名称"
+
+#: .\myinvois\field_rules.py
+msgid "tax type"
+msgstr "税种"
+
+#: .\myinvois\field_rules.py
+msgid "description"
+msgstr "商品或服务说明"
+
+#: .\myinvois\field_rules.py .\core\invoices.py
+msgid "unit price"
+msgstr "单价"
+
+#: .\myinvois\field_rules.py
+msgid "tax amount"
+msgstr "税额"
+
+#: .\myinvois\field_rules.py
+msgid "subtotal"
+msgstr "小计"
+
+#: .\myinvois\field_rules.py
+msgid "total excluding tax"
+msgstr "不含税总额"
+
+#: .\myinvois\field_rules.py
+msgid "currency code"
+msgstr "货币代码"
+
+#: .\myinvois\field_rules.py
+msgid "invoice number"
+msgstr "发票号码"
+
+#: .\myinvois\field_rules.py
+msgid "tax exemption details"
+msgstr "免税说明"
+
+#: .\myinvois\field_rules.py
+msgid "amount exempted from tax"
+msgstr "免税金额"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s must be %(limit)s characters or fewer."
+msgstr "%(field)s不能超过%(limit)s个字符。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s must be 8 to 20 characters, with an optional + at the start and no spaces."
+msgstr "%(field)s须为8到20个字符，开头可以有一个+，中间不能有空格。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s must be 5 digits."
+msgstr "%(field)s须为5位数字。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s is not on LHDN's list."
+msgstr "%(field)s不在LHDN的代码表中。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s is not a valid LHDN state."
+msgstr "%(field)s不是有效的LHDN州属代码。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "Enter the %(field)s, or NA if there is none."
+msgstr "请填写%(field)s；如果没有，请填NA。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s can only use letters, digits, a dash, and one semicolon between two numbers."
+msgstr "%(field)s只能使用字母、数字、连字符，以及一个分号来分隔两个号码。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s can only use letters, digits and a dash."
+msgstr "%(field)s只能使用字母、数字和连字符。"
+
+#: .\myinvois\field_rules.py
+#, python-format
+msgid "The %(field)s must be a decimal amount."
+msgstr "%(field)s须为十进制金额。"
+
 #: .\core\templates\invoices.html
 msgid "Invoices"
 msgstr "发票"
@@ -739,10 +936,6 @@ msgstr "请至少添加一行。"
 #: .\core\invoices.py
 msgid "quantity"
 msgstr "数量"
-
-#: .\core\invoices.py
-msgid "unit price"
-msgstr "单价"
 
 #: .\core\invoices.py
 #, python-format

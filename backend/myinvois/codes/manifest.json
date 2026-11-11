@@ -1,0 +1,47 @@
+{
+  "taken_on": "2026-11-11",
+  "lists": {
+    "classification": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/classification-codes/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/ClassificationCodes.json",
+      "filename": "ClassificationCodes.json",
+      "label": "Description"
+    },
+    "unit": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/unit-types/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/UnitTypes.json",
+      "filename": "UnitTypes.json",
+      "label": "Name"
+    },
+    "state": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/state-codes/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/StateCodes.json",
+      "filename": "StateCodes.json",
+      "label": "State"
+    },
+    "country": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/countries/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/CountryCodes.json",
+      "filename": "CountryCodes.json",
+      "label": "Country"
+    },
+    "tax_type": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/tax-types/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/TaxTypes.json",
+      "filename": "TaxTypes.json",
+      "label": "Description"
+    },
+    "msic": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/msic-codes/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/MSICSubCategoryCodes.json",
+      "filename": "MSICSubCategoryCodes.json",
+      "label": "Description"
+    },
+    "currency": {
+      "page": "https://sdk.myinvois.hasil.gov.my/codes/currencies/",
+      "file": "https://sdk.myinvois.hasil.gov.my/files/CurrencyCodes.json",
+      "filename": "CurrencyCodes.json",
+      "label": "Currency"
+    }
+  }
+}
