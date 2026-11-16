@@ -100,7 +100,8 @@ def einvoice_gaps(customer):
     existed, is incomplete here although the customer master accepted it. Names only; never a value.
     """
     fields = {name: getattr(customer, name) for name in EDITABLE_FIELDS}
-    wrong = {name for name in ("tin", "id_type", "id_value", *REQUIRED_CONTACT_FIELDS) if not fields[name]}
+    # Stripped first: a row written directly can hold " ", and LHDN's rules (#122) treat that as blank.
+    wrong = {name for name in ("tin", "id_type", "id_value", *REQUIRED_CONTACT_FIELDS) if not fields[name].strip()}
     wrong.update(_invalid_contact(fields))
     labels = _labels()
     return [labels[name] for name in EDITABLE_FIELDS if name in wrong]

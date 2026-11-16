@@ -238,6 +238,12 @@ def test_a_customer_with_no_phone_or_address_cannot_be_drafted_while_einvoicing_
         ({"phone": ""}, "phone number"),
         ({"address_line1": ""}, "address line 1"),
         ({"city": ""}, "city"),
+        # Whitespace only is as good as blank: LHDN's rules strip before they look (#122).
+        ({"address_line1": " "}, "address line 1"),
+        ({"city": " "}, "city"),
+        ({"phone": " "}, "phone number"),
+        ({"state_code": " ", "country_code": "SGP"}, "state code"),
+        ({"country_code": " "}, "country code"),
         ({"state_code": ""}, "state code"),
         ({"country_code": ""}, "country code"),
         ({"postal_zone": "1234"}, "postcode"),
@@ -255,7 +261,7 @@ def test_one_missing_or_invalid_buyer_field_stops_the_draft_and_is_named(world, 
         invoices.create_draft(world["acme_owner"], world["acme"], customer_id=buyer.pk, lines=[line(stock)])
 
     assert field in str(refused.value)
-    assert not any(value and value in str(refused.value) for value in broken.values())
+    assert not any(value.strip() and value in str(refused.value) for value in broken.values())
     assert Invoice.objects.count() == 0
 
 
