@@ -6,6 +6,7 @@
 """
 
 import ast
+import json
 from pathlib import Path
 
 import pytest
@@ -119,8 +120,33 @@ def test_the_check_lets_the_engine_use_its_own_doors_and_nested_relative_imports
     assert found == []
 
 
-def test_myinvois_holds_no_second_copy_of_the_lhdn_code_lists():
-    """The code-list JSON lives only in `core/lhdn_codes/`, so a refresh has one target and the copies cannot drift (#173)."""
-    stray = sorted(path.relative_to(BACKEND).as_posix() for path in (BACKEND / "myinvois").rglob("*.json"))
+def _stray_code_list_files(root):
+    """Files under `root` named like one of the code lists in `core/lhdn_codes/`, in any format (#173).
 
-    assert stray == []
+    The names come from the Core manifest, so a refreshed or added list is covered, and an unrelated JSON fixture is not.
+    """
+    sources = json.loads((ENGINE / "lhdn_codes" / "manifest.json").read_text(encoding="utf-8"))
+    stems = {Path(entry["filename"]).stem.lower() for entry in sources["lists"].values()} | {"manifest"}
+    return sorted(
+        path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file() and path.stem.lower() in stems
+    )
+
+
+def test_myinvois_holds_no_second_copy_of_the_lhdn_code_lists():
+    """The code-list data lives only in `core/lhdn_codes/`, so a refresh has one target and copies cannot drift (#173)."""
+    assert _stray_code_list_files(BACKEND / "myinvois") == []
+
+
+@pytest.mark.parametrize("name", ["TaxTypes.json", "taxtypes.csv", "manifest.json", "CountryCodes.JSON"])
+def test_the_copy_check_names_a_code_list_in_any_format(tmp_path, name):
+    (tmp_path / "codes").mkdir()
+    (tmp_path / "codes" / name).write_text("[]", encoding="utf-8")
+
+    assert _stray_code_list_files(tmp_path) == [f"codes/{name}"]
+
+
+def test_the_copy_check_lets_an_unrelated_fixture_stand(tmp_path):
+    (tmp_path / "fixtures").mkdir()
+    (tmp_path / "fixtures" / "gateway_response.json").write_text("{}", encoding="utf-8")
+
+    assert _stray_code_list_files(tmp_path) == []

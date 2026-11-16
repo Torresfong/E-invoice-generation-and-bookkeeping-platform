@@ -5,7 +5,7 @@ module (D61), so the data sits on the `core` side and this module only re-export
 is decided in `myinvois.field_rules`, not here.
 """
 
-from core.lhdn_codes import (  # noqa: F401
+from core.lhdn_codes import (
     classification_codes,
     code_list_sources,
     country_codes,
@@ -15,3 +15,14 @@ from core.lhdn_codes import (  # noqa: F401
     tax_types,
     unit_codes,
 )
+
+__all__ = [
+    "classification_codes",
+    "code_list_sources",
+    "country_codes",
+    "currency_codes",
+    "msic_codes",
+    "state_codes",
+    "tax_types",
+    "unit_codes",
+]
