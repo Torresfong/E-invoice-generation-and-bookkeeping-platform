@@ -11,3 +11,7 @@ class CoreConfig(AppConfig):
         from django.contrib.auth.models import update_last_login
 
         user_logged_in.disconnect(update_last_login, dispatch_uid="update_last_login")
+
+        from core.ports.startup import install_configured_ports
+
+        install_configured_ports()
