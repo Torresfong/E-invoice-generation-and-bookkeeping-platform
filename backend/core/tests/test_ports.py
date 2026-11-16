@@ -1,6 +1,7 @@
 import pytest
 
 from core import ports
+from core.jobs import TransientError
 from core.ports import startup
 from core.ports.fakes import FakeEmail
 from core.ports.myinvois import MyInvoisHttpGateway
@@ -79,6 +80,23 @@ def test_another_port_can_be_installed_beside_the_gateway_and_each_keeps_its_own
     assert isinstance(ports.get().gateway, MyInvoisHttpGateway)
     with pytest.raises(ports.PortsNotConfigured):
         ports.get().ai
+
+
+def test_a_hung_lhdn_is_given_up_on_after_ten_seconds_on_the_request_path(monkeypatch):
+    waited = []
+
+    def hung(request, timeout=None):
+        waited.append(timeout)
+        raise OSError("timed out")
+
+    monkeypatch.setattr("urllib.request.urlopen", hung)
+    ports.uninstall()
+    startup.install_configured_ports(SANDBOX)  # the real transport, as at start-up
+
+    with pytest.raises(TransientError):
+        ports.get().gateway.validate_tin("C1234567890", "BRN", "201901234567")
+
+    assert waited == [10]
 
 
 def test_the_app_start_up_itself_installs_the_gateway_from_the_environment(monkeypatch):
