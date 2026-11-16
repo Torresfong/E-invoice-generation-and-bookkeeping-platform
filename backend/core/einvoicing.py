@@ -39,9 +39,12 @@ SUPPLIER_FIELDS = (
     "legal_name", "phone", "sst_number", "tourism_tax_number",
     "tin", "brn", "rob", "msic_code", "address_line1", "address_line2", "city", "postal_zone", "state_code", "country_code",
 )
-# Needed before a company can e-invoice; a company may be saved off with these empty (D63: not yet checked). The legal
-# name and phone are not here: LHDN needs them on the document, and #122 names them when the document is mapped.
-REQUIRED_WHEN_ON = ("tin", "brn", "msic_code", "address_line1", "city", "postal_zone", "state_code", "country_code")
+# Needed before a company can e-invoice; a company may be saved off with these empty (D63: not yet checked). LHDN lists
+# the supplier's name and telephone among the required fields (e-Invoice Guideline v4.8, Appendix 1). The SST and
+# tourism-tax numbers are not here: a blank one means "none" and the mapper sends NA (#123).
+REQUIRED_WHEN_ON = (
+    "legal_name", "phone", "tin", "brn", "msic_code", "address_line1", "city", "postal_zone", "state_code", "country_code",
+)
 MAX_LENGTH = {
     "legal_name": 200, "phone": 20, "sst_number": 35, "tourism_tax_number": 17,
     "tin": 20, "brn": 20, "rob": 20, "address_line1": 150, "address_line2": 150, "city": 50,

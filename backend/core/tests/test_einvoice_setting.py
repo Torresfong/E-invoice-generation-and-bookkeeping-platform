@@ -382,6 +382,8 @@ def test_staying_off_or_switching_on_needs_no_acknowledgement(world):
     "bad",
     [
         {"status": "unknown"},
+        {"legal_name": ""},
+        {"phone": ""},
         {"tin": ""},
         {"brn": ""},
         {"msic_code": "8219"},
@@ -402,7 +404,9 @@ def test_switching_on_needs_complete_valid_supplier_details(world, bad):
 def test_a_company_can_be_saved_off_before_its_details_are_known(world):
     einvoicing.update_setting(
         world["acme_owner"], world["acme"], einvoicing_enabled=False, status=None, effective_from=D1,
-        **supplier(tin="", brn="", msic_code="", address_line1="", city="", postal_zone="", state_code=""),
+        **supplier(
+            legal_name="", phone="", tin="", brn="", msic_code="", address_line1="", city="", postal_zone="", state_code=""
+        ),
     )
 
     assert einvoicing.einvoicing_enabled(world["acme"], D3) is False

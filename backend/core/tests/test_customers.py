@@ -48,6 +48,8 @@ def switch_einvoicing_on(owner, company):
         einvoicing_enabled=True,
         status="voluntary",
         effective_from=date(2020, 1, 1),
+        legal_name="Acme Registered Name Sdn Bhd",
+        phone="+60312345678",
         tin="C9999999999",
         brn="200001000001",
         msic_code="82193",
