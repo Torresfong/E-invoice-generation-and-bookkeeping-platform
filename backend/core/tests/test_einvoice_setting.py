@@ -424,6 +424,8 @@ def test_a_company_can_be_saved_off_before_its_details_are_known(world):
         {"sst_number": "na"},
         {"sst_number": "A" * 36},
         {"sst_number": "W10 1234"},
+        {"sst_number": "A1;B2;C3"},  # at most two numbers
+        {"tourism_tax_number": "TX/0001"},  # a dash only, never a slash
         {"tourism_tax_number": "NA"},
         {"tourism_tax_number": "A" * 18},
         {"tourism_tax_number": "TX 0001"},

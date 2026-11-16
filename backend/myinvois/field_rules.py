@@ -16,6 +16,18 @@ from decimal import Decimal
 
 from django.utils.translation import gettext as _
 
+from core.lhdn_fields import (
+    MALAYSIA,
+    PHONE_MAX,
+    PHONE_MIN,
+    PHONE_PATTERN,
+    POSTCODE_MAX,
+    SST_MAX,
+    SST_PATTERN,
+    STATE_MAX,
+    TTX_MAX,
+    TTX_PATTERN,
+)
 from core.ports.interfaces import ID_TYPES
 
 from .code_lists import classification_codes, country_codes, currency_codes, msic_codes, state_codes, tax_types, unit_codes
@@ -28,20 +40,15 @@ ID_MAX = {"NRIC": 12, "PASSPORT": 12, "BRN": 20, "ARMY": 12}
 NAME_MAX = 300
 ADDRESS_MAX = 150
 CITY_MAX = 50
-STATE_MAX = 50
-POSTCODE_MAX = 50
-PHONE_MIN, PHONE_MAX = 8, 20
-SST_MAX = 35
-TTX_MAX = 17
 INVOICE_NUMBER_MAX = 50
 EXEMPTION_MAX = 300
-MALAYSIA = "MYS"
 EXEMPT = "E"
 
-# FAQ: letters and digits, a dash, and for SST one semicolon between two numbers. "NA" is accepted before this.
-_SST = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:;[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)?")
-_TTX = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
-_PHONE = re.compile(r"\+?[0-9]+")
+# The phone, SST, tourism-tax, postcode and state limits and patterns (MALAYSIA, PHONE_*, SST_*, TTX_*, POSTCODE_MAX,
+# STATE_MAX) are the ones Core checks when it stores these values (`core.lhdn_fields`, #172). They are imported, not
+# copied, so what Core accepts and what this mapper accepts cannot drift apart. FAQ: letters and digits, a dash, and for
+# SST one semicolon between two numbers. "NA" is accepted before the pattern here; Core refuses it, because it only
+# ever stores a blank.
 
 
 @dataclass(frozen=True)
@@ -229,7 +236,7 @@ def _code(problems, field, value, known, labels):
 def _phone(problems, field, value, labels):
     if _blank(value):
         problems.append(_missing(field, labels))
-    elif not _PHONE.fullmatch(value) or not PHONE_MIN <= len(value) <= PHONE_MAX:
+    elif not PHONE_PATTERN.fullmatch(value) or not PHONE_MIN <= len(value) <= PHONE_MAX:
         problems.append(FieldError(
             field,
             _("The %(field)s must be 8 to 20 characters, with an optional + at the start and no spaces.")
@@ -244,7 +251,7 @@ def _sst(problems, field, value, labels):
         return
     elif len(value) > SST_MAX:
         problems.append(_too_long(field, SST_MAX, labels))
-    elif not _SST.fullmatch(value):
+    elif not SST_PATTERN.fullmatch(value):
         problems.append(FieldError(
             field,
             _("The %(field)s can only use letters, digits, a dash, and one semicolon between two numbers.")
@@ -259,7 +266,7 @@ def _ttx(problems, field, value, labels):
         return
     elif len(value) > TTX_MAX:
         problems.append(_too_long(field, TTX_MAX, labels))
-    elif not _TTX.fullmatch(value):
+    elif not TTX_PATTERN.fullmatch(value):
         problems.append(FieldError(
             field, _("The %(field)s can only use letters, digits and a dash.") % {"field": labels[field]}
         ))

@@ -124,10 +124,13 @@ def test_another_companys_user_is_refused_every_screen(client, world, as_product
             client.post(url(world["acme"]), form(legal_name="Planted")).status_code,
             client.get(url(world["acme"], customer.pk)).status_code,
             client.post(url(world["acme"], customer.pk, "deactivate")).status_code,
+            client.post(url(world["acme"], customer.pk), {"phone": "+60199999999", "city": "Ipoh"}).status_code,
         ]
 
     assert all(status in (403, 404) for status in statuses)
     assert Customer.objects.filter(company=world["acme"]).count() == 1
+    customer.refresh_from_db()
+    assert (customer.phone, customer.city) == ("", "")
 
 
 def test_the_screens_read_in_chinese_with_the_refusal_too(client, world, as_production_connection, fake_ports):

@@ -18,9 +18,9 @@ PHONE_MIN, PHONE_MAX = 8, 20
 SST_MAX, TTX_MAX = 35, 17
 POSTCODE_MAX, STATE_MAX = 50, 50
 
-_SST = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:;[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)?")
-_TTX = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
-_PHONE = re.compile(r"\+?[0-9]+")
+SST_PATTERN = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*(?:;[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*)?")
+TTX_PATTERN = re.compile(r"[A-Za-z0-9]+(?:-[A-Za-z0-9]+)*")
+PHONE_PATTERN = re.compile(r"\+?[0-9]+")
 _MALAYSIAN_POSTCODE = re.compile(r"[0-9]{5}")
 
 
@@ -30,15 +30,15 @@ def _is_na(value):
 
 def phone_ok(value):
     """8 to 20 characters: digits with an optional + at the start and no spaces (#122)."""
-    return bool(_PHONE.fullmatch(value)) and PHONE_MIN <= len(value) <= PHONE_MAX
+    return bool(PHONE_PATTERN.fullmatch(value)) and PHONE_MIN <= len(value) <= PHONE_MAX
 
 
 def sst_ok(value):
-    return len(value) <= SST_MAX and bool(_SST.fullmatch(value)) and not _is_na(value)
+    return len(value) <= SST_MAX and bool(SST_PATTERN.fullmatch(value)) and not _is_na(value)
 
 
 def ttx_ok(value):
-    return len(value) <= TTX_MAX and bool(_TTX.fullmatch(value)) and not _is_na(value)
+    return len(value) <= TTX_MAX and bool(TTX_PATTERN.fullmatch(value)) and not _is_na(value)
 
 
 def country_ok(value):

@@ -36,7 +36,7 @@ Because the engine cannot import the MyInvois app, an engine feature that needs 
 | Company e-invoice setting model and `einvoicing_enabled` (exists in `core/einvoicing.py`) | #119 | `core` |
 | Item and customer master (hold LHDN codes as plain data) | #7, #121 | `core` |
 
-The item and customer masters stay in `core`: they are master data the engine edits. So do the seven LHDN code lists and their plain loader (`core/lhdn_codes.py` with the JSON and `manifest.json` in `core/lhdn_codes/`): `core` is the one canonical place for the data, and a refresh replaces files there only (#173). `myinvois.code_lists` re-exports the loader, and the rules that interpret a code (#122) go to `myinvois`. `myinvois` holds no copy of the data, and a test fails if one appears.
+The item and customer masters stay in `core`: they are master data the engine edits. So do the seven LHDN code lists and their plain loader (`core/lhdn_codes.py` with the JSON and `manifest.json` in `core/lhdn_codes/`): `core` is the one canonical place for the data, and a refresh replaces files there only (#173). `myinvois.code_lists` re-exports the loader, and the rules that interpret a code (#122) go to `myinvois`. `myinvois` holds no copy of the data, and a test fails if one appears. One exception, by necessity (#172): the format limits and patterns for phone, SST, tourism-tax, postcode and state live in `core/lhdn_fields.py`, because Core must refuse a bad value when it stores it and `core` cannot import `myinvois`. `myinvois.field_rules` imports them from there, so there is one copy.
 
 ## Where an invoice's LHDN fields are stored
 

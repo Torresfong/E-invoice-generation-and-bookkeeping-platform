@@ -502,6 +502,7 @@ def test_a_customer_without_the_new_fields_is_saved_with_blank_values_while_einv
         ({"sst_number": "na"}, "SST registration number"),
         ({"sst_number": "A" * 36}, "SST registration number"),
         ({"sst_number": "W10 1234"}, "SST registration number"),
+        ({"sst_number": "A1;B2;C3"}, "SST registration number"),  # at most two numbers
         ({"address_line1": "x" * 151}, "address line 1"),
         ({"address_line2": "x" * 151}, "address line 2"),
         ({"city": "x" * 51}, "city"),
