@@ -1,6 +1,10 @@
+from io import StringIO
+
 import pytest
+from django.core.management import call_command
 
 from core import ports
+from core.jobs import TransientError
 from core.ports import startup
 from core.ports.fakes import FakeEmail
 from core.ports.myinvois import MyInvoisHttpGateway
@@ -81,6 +85,23 @@ def test_another_port_can_be_installed_beside_the_gateway_and_each_keeps_its_own
         ports.get().ai
 
 
+def test_a_hung_lhdn_is_given_up_on_after_ten_seconds_on_the_request_path(monkeypatch):
+    waited = []
+
+    def hung(request, timeout=None):
+        waited.append(timeout)
+        raise OSError("timed out")
+
+    monkeypatch.setattr("urllib.request.urlopen", hung)
+    ports.uninstall()
+    startup.install_configured_ports(SANDBOX)  # the real transport, as at start-up
+
+    with pytest.raises(TransientError):
+        ports.get().gateway.validate_tin("C1234567890", "BRN", "201901234567")
+
+    assert waited == [10]
+
+
 def test_the_app_start_up_itself_installs_the_gateway_from_the_environment(monkeypatch):
     from django.apps import apps
 
@@ -93,3 +114,36 @@ def test_the_app_start_up_itself_installs_the_gateway_from_the_environment(monke
     assert isinstance(ports.get().gateway, MyInvoisHttpGateway)
     with pytest.raises(ports.PortsNotConfigured):
         ports.get().email
+
+
+# --- a missing gateway is reported at deploy, not at the first customer save (#180, D14) ---------------------------------
+
+
+def deploy_check_output():
+    out, err = StringIO(), StringIO()
+    call_command("check", "--deploy", stdout=out, stderr=err)
+    return out.getvalue() + err.getvalue()
+
+
+def test_the_deploy_check_reports_a_missing_gateway_and_does_not_fail_it():
+    ports.uninstall()
+
+    report = deploy_check_output()  # a warning: call_command would raise on an error
+
+    assert "no MyInvois gateway installed" in report
+
+
+def test_the_deploy_check_is_quiet_when_the_gateway_is_installed():
+    ports.uninstall()
+    startup.install_configured_ports(SANDBOX, transport=no_answer)
+
+    assert "no MyInvois gateway installed" not in deploy_check_output()
+
+
+def test_a_plain_check_passes_without_credentials_and_says_nothing_about_the_gateway():
+    ports.uninstall()
+    out, err = StringIO(), StringIO()
+
+    call_command("check", stdout=out, stderr=err)
+
+    assert "MyInvois" not in out.getvalue() + err.getvalue()

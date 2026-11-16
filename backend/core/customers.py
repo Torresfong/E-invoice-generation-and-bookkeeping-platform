@@ -17,15 +17,19 @@ sentinel `NA`; a blank SST number is mapped to it by the MyInvois mapper (#123).
 TIN, ID values, phone and SST numbers never appear in an exception message: errors name the field, not its value.
 """
 
+import logging
+
 from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
 from . import lhdn_fields, permissions, ports
 from .einvoicing import einvoicing_enabled
-from .jobs import TransientError
+from .jobs import PermanentError, TransientError
 from .models import Customer, CustomerChange
 from .ports.interfaces import ID_TYPES, TinCheck
+
+logger = logging.getLogger(__name__)
 
 MAX_NAME_LENGTH = Customer._meta.get_field("legal_name").max_length
 MAX_TIN_LENGTH = Customer._meta.get_field("tin").max_length
@@ -135,6 +139,9 @@ def _check_identity(fields, *, einvoicing_on):
         raise InvalidCustomer(
             _("MyInvois cannot be reached right now, so the TIN could not be checked. Nothing was saved. Try again in a few minutes.")
         ) from None
+    except PermanentError as error:  # a 403, a rejected client ID or an undocumented status: not an outage, so not its text (D57 (4))
+        logger.warning("MyInvois TIN check refused: %s", type(error).__name__)  # the class only: a message may echo a TIN or secret
+        raise InvalidCustomer(_("MyInvois refused the TIN check. Nothing was saved. Contact support.")) from None
     if outcome is TinCheck.BAD_FORMAT:
         raise InvalidCustomer(_("MyInvois does not accept the format of this TIN."))
     if outcome is TinCheck.NOT_FOUND:

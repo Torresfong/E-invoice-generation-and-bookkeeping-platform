@@ -668,6 +668,10 @@ msgstr "MyInvois 中没有使用该税务识别号和证件的纳税人。"
 msgid "MyInvois cannot be reached right now, so the TIN could not be checked. Nothing was saved. Try again in a few minutes."
 msgstr "暂时无法连接 MyInvois，无法核对税务识别号，未保存任何内容。请几分钟后再试。"
 
+#: .\core\customers.py
+msgid "MyInvois refused the TIN check. Nothing was saved. Contact support."
+msgstr "MyInvois 拒绝了税务识别号核对，未保存任何内容。请联系支持。"
+
 #: .\myinvois\field_rules.py
 msgid "company's name"
 msgstr "公司名称"
