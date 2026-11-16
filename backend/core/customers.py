@@ -17,6 +17,7 @@ from django.utils.translation import gettext as _
 
 from . import permissions, ports
 from .einvoicing import einvoicing_enabled
+from .jobs import TransientError
 from .models import Customer, CustomerChange
 from .ports.interfaces import ID_TYPES, TinCheck
 
@@ -60,7 +61,12 @@ def _check(fields, *, einvoicing_on):
         return
     if not id_type:
         raise InvalidCustomer(_("A TIN is checked together with an ID type and an ID value."))
-    outcome = ports.get().gateway.validate_tin(tin, id_type, id_value)
+    try:
+        outcome = ports.get().gateway.validate_tin(tin, id_type, id_value)
+    except TransientError:  # a network failure, a 429 or a 5xx (D57 (4)): not an answer about this TIN, so nothing is saved
+        raise InvalidCustomer(
+            _("MyInvois cannot be reached right now, so the TIN could not be checked. Nothing was saved. Try again in a few minutes.")
+        ) from None
     if outcome is TinCheck.BAD_FORMAT:
         raise InvalidCustomer(_("MyInvois does not accept the format of this TIN."))
     if outcome is TinCheck.NOT_FOUND:

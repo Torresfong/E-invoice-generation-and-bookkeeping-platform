@@ -664,6 +664,10 @@ msgstr "MyInvois 不接受该税务识别号的格式。"
 msgid "MyInvois has no taxpayer with this TIN and ID."
 msgstr "MyInvois 中没有使用该税务识别号和证件的纳税人。"
 
+#: .\core\customers.py
+msgid "MyInvois cannot be reached right now, so the TIN could not be checked. Nothing was saved. Try again in a few minutes."
+msgstr "暂时无法连接 MyInvois，无法核对税务识别号，未保存任何内容。请几分钟后再试。"
+
 #: .\myinvois\field_rules.py
 msgid "company's name"
 msgstr "公司名称"

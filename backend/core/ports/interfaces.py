@@ -143,7 +143,11 @@ class MyInvoisGateway(Protocol):
         ...
 
     def validate_tin(self, tin: str, id_type: str, id_value: str) -> TinCheck:
-        """`id_type` is one of NRIC, PASSPORT, BRN, ARMY."""
+        """`id_type` is one of NRIC, PASSPORT, BRN, ARMY.
+
+        The three `TinCheck` outcomes are LHDN's answers about the TIN. When LHDN gives no answer (a network failure, a
+        429 or a 5xx) it raises `core.jobs.TransientError`, which a caller must not read as any of the three.
+        """
         ...
 
     def sign(self, session: TaxpayerSession, document: bytes, code_number: str) -> SignedDocument:

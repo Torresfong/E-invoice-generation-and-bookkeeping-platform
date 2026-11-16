@@ -7,7 +7,9 @@ do, refuse another company's user, and read in Chinese.
 import pytest
 
 from core import customers
+from core.jobs import TransientError
 from core.models import AuditEntry, Customer
+from core.ports.myinvois import RateLimited
 
 from .factories import PASSWORD
 
@@ -71,6 +73,65 @@ def test_a_tin_that_lhdn_refuses_shows_an_error_keeps_what_was_typed_and_saves_n
     body = response.content.decode()
     assert response.status_code == 200 and "no taxpayer with this TIN" in body and "Typed name" in body
     assert Customer.objects.count() == 0
+
+
+def gateway_down(fake_ports, error):
+    """MyInvois cannot answer the TIN check, as in a network failure, a 429 or a 5xx (D57 (4))."""
+
+    def refuse(*args):
+        raise error
+
+    fake_ports.gateway.validate_tin = refuse
+
+
+OUTAGES = [TransientError("MyInvois could not be reached"), RateLimited("MyInvois rate limit reached", 30)]
+OUTAGE_ENGLISH = "MyInvois cannot be reached right now, so the TIN could not be checked. Nothing was saved. Try again in a few minutes."
+OUTAGE_CHINESE = "暂时无法连接 MyInvois，无法核对税务识别号，未保存任何内容。请几分钟后再试。"
+
+
+@pytest.mark.parametrize("outage", OUTAGES, ids=type)
+def test_a_gateway_outage_on_the_create_screen_shows_a_message_keeps_what_was_typed_and_saves_nothing(
+    client, world, as_production_connection, fake_ports, outage
+):
+    gateway_down(fake_ports, outage)
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        english = client.post(url(world["acme"]), form(legal_name="Typed name"))
+        chinese = client.post(url(world["acme"]), form(legal_name="Typed name"), headers=CHINESE)
+
+    assert english.status_code == 200 and OUTAGE_ENGLISH in english.content.decode()
+    assert "Typed name" in english.content.decode()
+    assert chinese.status_code == 200 and OUTAGE_CHINESE in chinese.content.decode()
+    assert Customer.objects.count() == 0
+
+
+def test_a_gateway_outage_on_the_edit_screen_shows_a_message_and_changes_nothing(
+    client, world, as_production_connection, fake_ports
+):
+    customer = make(world["acme_owner"], world["acme"])
+    gateway_down(fake_ports, OUTAGES[0])
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = client.post(url(world["acme"], customer.pk), form(tin=OTHER_TIN))
+        chinese = client.post(url(world["acme"], customer.pk), form(tin=OTHER_TIN), headers=CHINESE)
+
+    assert response.status_code == 200 and OUTAGE_ENGLISH in response.content.decode()
+    assert OUTAGE_CHINESE in chinese.content.decode()
+    customer.refresh_from_db()
+    assert customer.tin == TIN
+
+
+def test_a_gateway_outage_does_not_stop_a_customer_without_a_tin_or_an_unchanged_save(
+    client, world, as_production_connection, fake_ports
+):
+    customer = make(world["acme_owner"], world["acme"])
+    gateway_down(fake_ports, OUTAGES[0])
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        no_tin = client.post(url(world["acme"]), form(legal_name="No TIN", tin="", id_type="", id_value=""))
+        unchanged = client.post(url(world["acme"], customer.pk), form())
+
+    assert (no_tin.status_code, unchanged.status_code) == (302, 302)
 
 
 def test_staff_see_the_identity_but_cannot_change_it_from_the_edit_screen(client, world, as_production_connection):
