@@ -117,3 +117,10 @@ def test_the_check_lets_the_engine_use_its_own_doors_and_nested_relative_imports
         n for n in _dynamic_imports(file) if _is_myinvois(n)
     ]
     assert found == []
+
+
+def test_myinvois_holds_no_second_copy_of_the_lhdn_code_lists():
+    """The code-list JSON lives only in `core/lhdn_codes/`, so a refresh has one target and the copies cannot drift (#173)."""
+    stray = sorted(path.relative_to(BACKEND).as_posix() for path in (BACKEND / "myinvois").rglob("*.json"))
+
+    assert stray == []
