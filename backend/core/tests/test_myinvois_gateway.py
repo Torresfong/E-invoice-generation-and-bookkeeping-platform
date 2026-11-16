@@ -396,7 +396,7 @@ def test_nothing_is_signed_when_the_environment_has_no_certificate(environment, 
     assert "signing" not in caplog.text
 
 
-# --- sandbox and production certificates are configured separately, as references and never as keys -------------------
+# --- sandbox and production certificates are configured as references and never as keys; they may be the same (D65) ----
 
 
 def start_django(code, **env):
@@ -437,12 +437,33 @@ def test_the_app_will_not_start_in_an_environment_it_does_not_know(environment):
     assert result.returncode != 0 and "ENVIRONMENT" in result.stderr and result.stdout == ""
 
 
-def test_the_app_will_not_start_with_one_certificate_for_sandbox_and_production():
-    same = {"MYINVOIS_SANDBOX_CERTIFICATE_REF": "vault/one", "MYINVOIS_PRODUCTION_CERTIFICATE_REF": "vault/one"}
+SHARED = {"MYINVOIS_SANDBOX_CERTIFICATE_REF": "vault/one", "MYINVOIS_PRODUCTION_CERTIFICATE_REF": "vault/one"}
 
-    result = start_django("", ENVIRONMENT="production", **same)
 
-    assert result.returncode != 0 and "certificate" in result.stderr
+@pytest.mark.parametrize("environment, expected", [("development", "sandbox vault/one"), ("production", "production vault/one")])
+def test_the_app_starts_with_one_certificate_for_sandbox_and_production(environment, expected):
+    """D65: one certificate reference may serve both environments."""
+    result = start_django(CHOSEN, ENVIRONMENT=environment, **SHARED)
+
+    assert result.returncode == 0 and result.stdout.strip() == expected
+
+
+@pytest.mark.parametrize("environment", ["sandbox", "production"])
+def test_one_certificate_reference_signs_in_both_environments_and_the_log_names_the_environment(environment, fake_ports, settings, caplog):
+    settings.MYINVOIS_ENVIRONMENT = environment
+    settings.MYINVOIS_CERTIFICATES = {"sandbox": "vault/one", "production": "vault/one"}
+
+    ports.get().gateway.sign(a_session(), DOCUMENT, CODE)
+
+    assert fake_ports.gateway.key_provider.signings == [("vault/one", DOCUMENT_SHA256)]
+    [line] = [r.getMessage() for r in caplog.records if r.name == "core.ports.signing"]
+    assert f"environment={environment}" in line and "vault/one" in line
+
+
+def test_a_misspelt_environment_still_refuses_to_start_when_one_certificate_is_shared():
+    result = start_django(CHOSEN, ENVIRONMENT="prod", **SHARED)
+
+    assert result.returncode != 0 and "ENVIRONMENT" in result.stderr and result.stdout == ""
 
 
 def test_the_app_starts_with_no_certificates_configured():

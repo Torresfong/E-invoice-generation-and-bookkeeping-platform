@@ -110,8 +110,8 @@ MYINVOIS_CERTIFICATES = {
     "sandbox": os.environ.get("MYINVOIS_SANDBOX_CERTIFICATE_REF", ""),
     "production": os.environ.get("MYINVOIS_PRODUCTION_CERTIFICATE_REF", ""),
 }
-if MYINVOIS_CERTIFICATES["sandbox"] and MYINVOIS_CERTIFICATES["sandbox"] == MYINVOIS_CERTIFICATES["production"]:
-    raise RuntimeError("Sandbox and production must use different MyInvois certificates")
+# D65: the two references may be equal, so one certificate can serve both environments. An environment whose reference
+# is empty still signs nothing (CertificateNotConfigured), and every signing is logged with its environment and reference.
 
 # Finished background jobs (done or failed) are purged this many days after they finish (ticket #27). A failed job's
 # count is what the alert watches, so keep this longer than the time it takes someone to look.
