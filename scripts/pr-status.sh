@@ -3,6 +3,9 @@
 # summaries land), inline comments, and which commit each one reviewed. Nothing notifies the agent, so run this after every
 # push and at the start of each later turn (docs/agents/ai-workflow.md, "Fresh PR review gate").
 #
+# Each section is one `gh` call, so a section never contradicts itself while a bot is posting. Codex receipts are read
+# in the same call as the comments they come from.
+#
 # Usage: scripts/pr-status.sh [pr-number]   (default: the PR of the current branch)
 set -euo pipefail
 
@@ -16,32 +19,29 @@ gh pr view "$pr" --json state,isDraft --jq '"state: \(.state)  draft: \(.isDraft
 echo
 echo "== CI"
 gh pr view "$pr" --json statusCheckRollup \
-  --jq '.statusCheckRollup[] | "\(.name): \(if .status == "COMPLETED" then .conclusion else .status end)"'
+  --jq '.statusCheckRollup | if length == 0 then "(none)" else .[] | "\(.name): \(if .status == "COMPLETED" then .conclusion else .status end)" end'
 
 echo
 echo "== Reviews (commit vs HEAD)"
 gh pr view "$pr" --json reviews \
-  --jq ".reviews[] | \"\(.author.login) \(.state) on \(.commit.oid[0:7]) \(if .commit.oid == \"$head\" then \"CURRENT\" else \"STALE\" end)\n  \(.body[0:300])\""
-[ "$(gh pr view "$pr" --json reviews --jq '.reviews | length')" != 0 ] || echo "(none)"
+  --jq ".reviews | if length == 0 then \"(none)\" else .[] | \"\(.author.login) \(.state) on \(.commit.oid[0:7]) \(if .commit.oid == \"$head\" then \"CURRENT\" else \"STALE\" end)\n  \(.body[0:300])\" end"
 
 echo
-echo "== PR conversation comments (independent reviews and Codex summaries land here)"
-gh pr view "$pr" --json comments \
-  --jq '.comments[] | "--- \(.author.login) \(.createdAt) [\(.body | length) chars]\n\(.body[0:500])"'
-[ "$(gh pr view "$pr" --json comments --jq '.comments | length')" != 0 ] || echo "(none)"
-
-echo
-echo "== Codex receipts (reviewed commit must equal HEAD)"
+echo "== PR conversation comments (independent reviews and Codex summaries land here), then Codex receipts"
 gh pr view "$pr" --json comments --jq '
-  .comments[] | select(.body | contains("codex-review-state"))
-  | (.body | capture("\"code_review\":\\{\"commit_sha\":\"(?<sha>[0-9a-f]*)\",\"has_any_findings\":(?<any>[a-z]*),\"has_unresolved_findings\":(?<open>[a-z]*),\"status\":\"(?<status>[a-z_]*)\"") // empty)
-  | "code_review status=\(.status) any_findings=\(.any) unresolved=\(.open) commit=\(.sha[0:7])"' || true
+  .comments
+  | (if length == 0 then "(none)" else .[] | "--- \(.author.login) \(.createdAt) [\(.body | length) chars]\n\(.body[0:500])" end),
+    "",
+    "-- Codex receipts (reviewed commit must equal HEAD)",
+    ([.[] | select(.body | contains("codex-review-state"))
+      | (.body | capture("\"code_review\":\\{\"commit_sha\":\"(?<sha>[0-9a-f]*)\",\"has_any_findings\":(?<any>[a-z]*),\"has_unresolved_findings\":(?<open>[a-z]*),\"status\":\"(?<status>[a-z_]*)\"") // empty)
+      | "code_review status=\(.status) any_findings=\(.any) unresolved=\(.open) commit=\(.sha[0:7])"]
+     | if length == 0 then "(none)" else .[] end)'
 
 echo
 echo "== Inline review comments (commit vs HEAD)"
 gh api "repos/{owner}/{repo}/pulls/$pr/comments" \
-  --jq ".[] | \"\(.user.login) \(.path):\(.line) on \(.commit_id[0:7]) \(if .commit_id == \"$head\" then \"CURRENT\" else \"STALE\" end)\n  \(.body[0:300])\""
-[ "$(gh api "repos/{owner}/{repo}/pulls/$pr/comments" --jq 'length')" != 0 ] || echo "(none)"
+  --jq "if length == 0 then \"(none)\" else .[] | \"\(.user.login) \(.path):\(.line) on \(.commit_id[0:7]) \(if .commit_id == \"$head\" then \"CURRENT\" else \"STALE\" end)\n  \(.body[0:300])\" end"
 
 echo
 echo "Anything listed above is unread until you read it in full:"
