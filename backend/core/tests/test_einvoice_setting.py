@@ -19,13 +19,19 @@ from .factories import PASSWORD, make_company, make_member
 
 # Made-up values, clearly not real registrations. No real TIN, BRN or ROB belongs in this repository (D59 (5)).
 TIN, BRN, ROB = "C0000000001", "000000000001", "RB-TEST-0001"
-SECRETS = (TIN, BRN, ROB)
+LEGAL_NAME, PHONE, SST, TTX = "Acme Registered Name Sdn Bhd", "+60312345678", "W10-1234-56000001", "TX-0000-0001"
+SECRETS = (TIN, BRN, ROB, PHONE, SST, TTX)
+NEW_FIELDS = ("legal_name", "phone", "sst_number", "tourism_tax_number")
 
 D1, D2, D3 = date(2027, 1, 1), date(2027, 6, 1), date(2027, 12, 1)
 
 
 def supplier(**overrides):
     fields = dict(
+        legal_name=LEGAL_NAME,
+        phone=PHONE,
+        sst_number=SST,
+        tourism_tax_number=TTX,
         tin=TIN,
         brn=BRN,
         rob=ROB,
@@ -190,7 +196,10 @@ def test_the_setting_cannot_be_written_to_differ_from_the_latest_recorded_change
     setting = CompanyEInvoiceSetting.objects.get(company=world["acme"])
 
     with as_user(world["acme_owner"]):
-        for edit in ({"tin": "C0000000009"}, {"einvoicing_enabled": False}, {"status": "exempt"}, {"city": "Ipoh"}):
+        for edit in (
+            {"tin": "C0000000009"}, {"einvoicing_enabled": False}, {"status": "exempt"}, {"city": "Ipoh"},
+            {"legal_name": "Other Name"}, {"phone": "+60399999999"}, {"sst_number": "X1"}, {"tourism_tax_number": "X1"},
+        ):
             with pytest.raises(DatabaseError):
                 with transaction.atomic():
                     CompanyEInvoiceSetting.objects.filter(pk=setting.pk).update(**edit)
@@ -399,6 +408,108 @@ def test_a_company_can_be_saved_off_before_its_details_are_known(world):
     assert einvoicing.einvoicing_enabled(world["acme"], D3) is False
 
 
+@pytest.mark.parametrize(
+    "bad",
+    [
+        {"legal_name": "x" * 201},
+        {"phone": "1234567"},
+        {"phone": "+6031234 5678"},
+        {"phone": "0" * 21},
+        {"phone": "NA"},
+        {"sst_number": "NA"},
+        {"sst_number": "na"},
+        {"sst_number": "A" * 36},
+        {"sst_number": "W10 1234"},
+        {"tourism_tax_number": "NA"},
+        {"tourism_tax_number": "A" * 18},
+        {"tourism_tax_number": "TX 0001"},
+    ],
+)
+def test_the_new_supplier_fields_are_checked_and_the_sentinel_na_is_never_stored(world, bad):
+    with pytest.raises(einvoicing.InvalidSetting) as refused:
+        change(world["acme_owner"], world["acme"], **bad)
+
+    assert not any(value in str(refused.value) for value in bad.values() if len(value) > 2)
+    assert CompanyEInvoiceSetting.objects.count() == 0 and not history(world["acme"])
+
+
+def test_sst_and_tourism_tax_numbers_may_be_blank_and_core_keeps_them_blank(world):
+    # #123 maps a blank value to the exact text NA on the document. Core stores blank, never NA.
+    change(world["acme_owner"], world["acme"], sst_number="", tourism_tax_number="")
+
+    stored = [CompanyEInvoiceSetting.objects.get(company=world["acme"]), *history(world["acme"])]
+    assert [(row.sst_number, row.tourism_tax_number) for row in stored] == [("", "")] * 2
+
+
+def test_the_legal_name_is_kept_on_the_setting_and_never_replaces_the_company_name(world):
+    change(world["acme_owner"], world["acme"], legal_name="x" * 200)
+
+    world["acme"].refresh_from_db()
+    assert world["acme"].name == "Acme Sdn Bhd"
+    assert len(CompanyEInvoiceSetting.objects.get(company=world["acme"]).legal_name) == 200
+    assert CompanyEInvoiceSetting._meta.get_field("legal_name").max_length == 200
+    assert CompanyEInvoiceSettingChange._meta.get_field("legal_name").max_length == 200
+
+
+def test_the_new_fields_are_saved_on_the_setting_and_in_every_history_row(world):
+    change(world["acme_owner"], world["acme"], effective_from=D1)
+    change(world["acme_owner"], world["acme"], effective_from=D2, legal_name="Renamed Sdn Bhd", phone="+60399999999")
+
+    setting = CompanyEInvoiceSetting.objects.get(company=world["acme"])
+    first, second = history(world["acme"])
+
+    assert tuple(getattr(first, name) for name in NEW_FIELDS) == (LEGAL_NAME, PHONE, SST, TTX)
+    assert (second.legal_name, second.phone, second.sst_number, second.tourism_tax_number) == (
+        "Renamed Sdn Bhd", "+60399999999", SST, TTX,
+    )
+    assert tuple(getattr(setting, name) for name in NEW_FIELDS) == tuple(getattr(second, name) for name in NEW_FIELDS)
+
+
+def test_a_company_saved_before_the_new_fields_existed_has_them_blank_not_invented(world):
+    einvoicing.update_setting(
+        world["acme_owner"], world["acme"], einvoicing_enabled=False, status=None, effective_from=D1,
+        tin="", brn="", msic_code="", address_line1="", city="", postal_zone="", state_code="",
+    )
+
+    row = CompanyEInvoiceSetting.objects.get(company=world["acme"])
+    assert tuple(getattr(row, name) for name in NEW_FIELDS) == ("", "", "", "")
+
+
+def test_the_database_refuses_a_history_row_the_setting_does_not_follow_in_a_new_field(world):
+    change(world["acme_owner"], world["acme"])
+
+    for edit in ({"phone": "+60399999999"}, {"legal_name": "Other"}, {"sst_number": ""}, {"tourism_tax_number": ""}):
+        with pytest.raises(DatabaseError):
+            with transaction.atomic():
+                CompanyEInvoiceSettingChange.objects.create(
+                    company=world["acme"], changed_by=world["acme_owner"], einvoicing_enabled=True,
+                    status="voluntary", effective_from=D2, **supplier(**edit),
+                )
+                settle()
+
+
+def test_staff_and_other_companies_cannot_read_or_write_the_new_supplier_fields(world, as_user):
+    change(world["acme_owner"], world["acme"])
+    change(world["beta_owner"], world["beta"])
+    acme_setting = CompanyEInvoiceSetting.objects.get(company=world["acme"])
+
+    with as_user(world["beta_owner"]):
+        assert CompanyEInvoiceSetting.objects.filter(company=world["acme"]).count() == 0
+        assert CompanyEInvoiceSetting.objects.filter(pk=acme_setting.pk).update(phone="+60399999999") == 0
+    with as_user(world["acme_staff"]):
+        assert CompanyEInvoiceSetting.objects.get(company=world["acme"]).phone == PHONE
+        with pytest.raises(DatabaseError):
+            with transaction.atomic():
+                CompanyEInvoiceSetting.objects.filter(pk=acme_setting.pk).update(phone="+60399999999")
+    with as_user(world["accountant"]):
+        with pytest.raises(DatabaseError):
+            with transaction.atomic():
+                CompanyEInvoiceSetting.objects.filter(pk=acme_setting.pk).update(sst_number="")
+
+    acme_setting.refresh_from_db()
+    assert (acme_setting.phone, acme_setting.sst_number) == (PHONE, SST)
+
+
 def test_the_rob_is_optional(world):
     change(world["acme_owner"], world["acme"], rob="")
 
@@ -464,6 +575,33 @@ def test_the_owner_saves_the_setting_from_the_screen(client, world, as_productio
     assert response.status_code == 302
     assert einvoicing.einvoicing_enabled(world["acme"], D1) is True
     assert "82193" in page and 'name="einvoicing_enabled"' in page
+    for name, value in (("legal_name", LEGAL_NAME), ("phone", PHONE), ("sst_number", SST), ("tourism_tax_number", TTX)):
+        assert f'name="{name}"' in page and value in page
+    setting = CompanyEInvoiceSetting.objects.get(company=world["acme"])
+    assert tuple(getattr(setting, name) for name in NEW_FIELDS) == (LEGAL_NAME, PHONE, SST, TTX)
+
+
+def test_the_screen_refuses_na_and_names_the_field(client, world, as_production_connection):
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = client.post(f"/companies/{world['acme'].pk}/einvoicing/", form(sst_number="NA"))
+
+    assert response.status_code == 200 and b"SST registration number" in response.content
+    assert CompanyEInvoiceSetting.objects.count() == 0
+
+
+def test_staff_read_the_new_supplier_fields_and_the_screen_has_chinese_labels(client, world, as_production_connection):
+    change(world["acme_owner"], world["acme"])
+    with as_production_connection():
+        sign_in(client, world["acme_staff"])
+        english = client.get(f"/companies/{world['acme'].pk}/einvoicing/").content.decode()
+        chinese = client.get(
+            f"/companies/{world['acme'].pk}/einvoicing/", headers={"accept-language": "zh-hans"}
+        ).content.decode()
+
+    assert LEGAL_NAME in english and PHONE in english and SST in english and TTX in english
+    assert "SST registration number" in english and "SST" in chinese and "SST registration number" not in chinese
+    assert 'name="phone"' not in english  # staff get no form
 
 
 def test_staff_and_accountants_see_the_setting_but_get_no_form_and_cannot_post(client, world, as_production_connection):

@@ -1,0 +1,10 @@
+{% load i18n %}
+      <h2>{% trans "Contact details" %}</h2>
+      <p><label>{% trans "Phone number" %} <input name="phone" maxlength="20" value="{{ form.phone|default:'' }}"></label></p>
+      <p><label>{% trans "SST registration number" %} <input name="sst_number" maxlength="35" value="{{ form.sst_number|default:'' }}"></label></p>
+      <p><label>{% trans "Address line 1" %} <input name="address_line1" maxlength="150" value="{{ form.address_line1|default:'' }}"></label></p>
+      <p><label>{% trans "Address line 2" %} <input name="address_line2" maxlength="150" value="{{ form.address_line2|default:'' }}"></label></p>
+      <p><label>{% trans "City" %} <input name="city" maxlength="50" value="{{ form.city|default:'' }}"></label></p>
+      <p><label>{% trans "Postcode" %} <input name="postal_zone" maxlength="50" value="{{ form.postal_zone|default:'' }}"></label></p>
+      <p><label>{% trans "State code" %} <input name="state_code" maxlength="50" value="{{ form.state_code|default:'' }}"></label></p>
+      <p><label>{% trans "Country code" %} <input name="country_code" maxlength="3" value="{{ form.country_code|default:country_default }}"></label></p>

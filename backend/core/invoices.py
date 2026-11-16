@@ -62,8 +62,10 @@ def _amount(raw, label, line_number, *, allow_zero):
 def _customer(company, customer_id, *, current=None):
     """The customer the draft names. A customer deactivated since the draft was started may stay on it.
 
-    With e-invoicing on the customer must have a TIN, an ID type and an ID value (D59 (7)). The customer master checks
-    that only when a customer is saved, so one saved while e-invoicing was off is caught here, when the draft picks it.
+    With e-invoicing on the customer must have a TIN, an ID type and an ID value (D59 (7)), and the telephone and address
+    LHDN needs on the buyer (#172). The customer master requires the identity only when a customer is saved and the rest
+    never, so one saved while e-invoicing was off, or before those fields existed, is caught here, when the draft picks
+    it. The error names every field to fix and none of their values, so approval (#46) never locks a bad buyer.
     """
     pk = _pk(customer_id)
     try:
@@ -73,9 +75,11 @@ def _customer(company, customer_id, *, current=None):
             customer = customers.customer_for_new_draft(company, pk)
     except (Customer.DoesNotExist, customers.CustomerNotAvailable):
         raise InvalidInvoice(_("Choose a customer.")) from None
-    if not (customer.tin and customer.id_type and customer.id_value) and einvoicing_enabled(company, timezone.localdate()):
+    gaps = customers.einvoice_gaps(customer) if einvoicing_enabled(company, timezone.localdate()) else []
+    if gaps:
         raise InvalidInvoice(
-            _("This customer needs a TIN, an ID type and an ID value while e-invoicing is on. Update the customer first.")
+            _("This customer needs these details while e-invoicing is on: %(fields)s. Update the customer first.")
+            % {"fields": ", ".join(gaps)}
         )
     return customer
 

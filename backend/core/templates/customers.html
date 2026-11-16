@@ -60,6 +60,7 @@
         </select></label></p>
       <p><label>{% trans "ID value" %} <input name="id_value" maxlength="20" value="{{ form.id_value|default:'' }}"></label></p>
       <p>{% trans "The TIN is checked with MyInvois before the customer is saved." %}</p>
+      {% include "customer_contact_fields.html" with country_default="MYS" %}
       <button type="submit">{% trans "Save" %}</button>
     </form>
   {% endif %}

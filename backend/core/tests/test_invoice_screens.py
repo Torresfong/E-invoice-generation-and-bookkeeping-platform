@@ -279,6 +279,6 @@ def test_a_customer_without_an_identity_is_refused_in_chinese_once_einvoicing_is
         english = client.post(invoices_url(world["acme"], "new"), form).content.decode()
         chinese = client.post(invoices_url(world["acme"], "new"), form, headers={"accept-language": "zh-hans"}).content.decode()
 
-    assert "needs a TIN" in english and "e-invoicing is on" in english
-    assert "TIN" in chinese and "电子发票" in chinese and "needs a TIN" not in chinese
+    assert "TIN" in english and "phone number" in english and "e-invoicing is on" in english
+    assert "TIN" in chinese and "电话" in chinese and "电子发票" in chinese and "phone number" not in chinese
     assert not Invoice.objects.exists()

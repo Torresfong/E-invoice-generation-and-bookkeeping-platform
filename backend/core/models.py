@@ -186,8 +186,8 @@ class DocumentSequence(TenantModel):
 class SupplierDetails(models.Model):
     """The supplier fields of a company's e-invoice setting, shared by the setting and each history row (D59 (2)).
 
-    TIN, BRN and ROB identify the business to LHDN. They must never reach a log, an audit entry, a fixture or a
-    `repr`, so `__str__` and `__repr__` show the company id only.
+    TIN, BRN, ROB, the phone number and the SST and tourism-tax numbers identify the business to LHDN. They must never
+    reach a log, an audit entry, a fixture or a `repr`, so `__str__` and `__repr__` show the company id only.
     """
 
     MANDATORY, VOLUNTARY, EXEMPT = "mandatory", "voluntary", "exempt"
@@ -197,6 +197,12 @@ class SupplierDetails(models.Model):
     # Empty until the exemption check of D63 has been done ("not yet checked").
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, null=True, blank=True)
     effective_from = models.DateField()
+    # The name LHDN prints for the supplier; `Company.name` is left as the owner typed it (#172). Blank until given.
+    legal_name = models.CharField(max_length=200, blank=True, default="", db_default="")
+    phone = models.CharField(max_length=20, blank=True, default="", db_default="")
+    # Blank means "none": Core never stores LHDN's sentinel "NA"; the document mapper writes it (#123).
+    sst_number = models.CharField(max_length=35, blank=True, default="", db_default="")
+    tourism_tax_number = models.CharField(max_length=17, blank=True, default="", db_default="")
     tin = models.CharField(max_length=20, blank=True, default="")
     brn = models.CharField(max_length=20, blank=True, default="")
     rob = models.CharField(max_length=20, blank=True, default="")
@@ -305,6 +311,16 @@ class Customer(TenantModel):
     tin = models.CharField(max_length=20, blank=True, default="", db_default="")
     id_type = models.CharField(max_length=8, blank=True, default="", db_default="")
     id_value = models.CharField(max_length=20, blank=True, default="", db_default="")
+    # What LHDN's buyer table needs besides the identity (#172). Blank for a customer saved before these existed:
+    # nothing is invented. The draft check (`customers.einvoice_gaps`) asks for them once e-invoicing is on.
+    phone = models.CharField(max_length=20, blank=True, default="", db_default="")
+    sst_number = models.CharField(max_length=35, blank=True, default="", db_default="")
+    address_line1 = models.CharField(max_length=150, blank=True, default="", db_default="")
+    address_line2 = models.CharField(max_length=150, blank=True, default="", db_default="")
+    city = models.CharField(max_length=50, blank=True, default="", db_default="")
+    postal_zone = models.CharField(max_length=50, blank=True, default="", db_default="")
+    state_code = models.CharField(max_length=50, blank=True, default="", db_default="")
+    country_code = models.CharField(max_length=3, blank=True, default="", db_default="")
     is_active = models.BooleanField(default=True, db_default=True)
     created_at = models.DateTimeField(db_default=Now())
 

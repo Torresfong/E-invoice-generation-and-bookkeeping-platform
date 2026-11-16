@@ -11,18 +11,29 @@
   {% if message %}<p role="status">{{ message }}</p>{% endif %}
   {% if error %}<p role="alert">{{ error }}</p>{% endif %}
   {% can "change_customer_identity" company as may_change_identity %}
-  {% if may_change_identity %}
+  {% can "manage_customers" company as may_manage %}
+  {% if may_manage %}
     <form method="post" action="/companies/{{ company.pk }}/customers/{{ customer.pk }}/">
       {% csrf_token %}
-      <p><label>{% trans "Legal name" %} <input name="legal_name" maxlength="200" value="{{ form.legal_name|default:'' }}" required></label></p>
-      <p><label>{% trans "TIN" %} <input name="tin" maxlength="20" value="{{ form.tin|default:'' }}"></label></p>
-      <p><label>{% trans "ID type" %}
-        <select name="id_type">
-          <option value="">—</option>
-          {% for type in id_types %}<option value="{{ type }}" {% if form.id_type == type %}selected{% endif %}>{{ type }}</option>{% endfor %}
-        </select></label></p>
-      <p><label>{% trans "ID value" %} <input name="id_value" maxlength="20" value="{{ form.id_value|default:'' }}"></label></p>
-      <p>{% trans "The TIN is checked with MyInvois before the customer is saved." %}</p>
+      {% if may_change_identity %}
+        <p><label>{% trans "Legal name" %} <input name="legal_name" maxlength="200" value="{{ form.legal_name|default:'' }}" required></label></p>
+        <p><label>{% trans "TIN" %} <input name="tin" maxlength="20" value="{{ form.tin|default:'' }}"></label></p>
+        <p><label>{% trans "ID type" %}
+          <select name="id_type">
+            <option value="">—</option>
+            {% for type in id_types %}<option value="{{ type }}" {% if form.id_type == type %}selected{% endif %}>{{ type }}</option>{% endfor %}
+          </select></label></p>
+        <p><label>{% trans "ID value" %} <input name="id_value" maxlength="20" value="{{ form.id_value|default:'' }}"></label></p>
+        <p>{% trans "The TIN is checked with MyInvois before the customer is saved." %}</p>
+      {% else %}
+        <dl>
+          <dt>{% trans "TIN" %}</dt><dd>{{ customer.tin }}</dd>
+          <dt>{% trans "ID type" %}</dt><dd>{{ customer.id_type }}</dd>
+          <dt>{% trans "ID value" %}</dt><dd>{{ customer.id_value }}</dd>
+        </dl>
+        <p>{% trans "Only the company owner can change the legal name, TIN or ID." %}</p>
+      {% endif %}
+      {% include "customer_contact_fields.html" with country_default="" %}
       <button type="submit">{% trans "Save" %}</button>
     </form>
   {% else %}
@@ -30,6 +41,9 @@
       <dt>{% trans "TIN" %}</dt><dd>{{ customer.tin }}</dd>
       <dt>{% trans "ID type" %}</dt><dd>{{ customer.id_type }}</dd>
       <dt>{% trans "ID value" %}</dt><dd>{{ customer.id_value }}</dd>
+      <dt>{% trans "Phone number" %}</dt><dd>{{ customer.phone }}</dd>
+      <dt>{% trans "SST registration number" %}</dt><dd>{{ customer.sst_number }}</dd>
+      <dt>{% trans "Address" %}</dt><dd>{{ customer.address_line1 }} {{ customer.address_line2 }} {{ customer.postal_zone }} {{ customer.city }} {{ customer.state_code }} {{ customer.country_code }}</dd>
     </dl>
     <p>{% trans "Only the company owner can change the legal name, TIN or ID." %}</p>
   {% endif %}
