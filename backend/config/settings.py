@@ -99,9 +99,9 @@ FIRM_APPLICATIONS_ENABLED = os.environ.get("FIRM_APPLICATIONS_ENABLED", "").lowe
 if FIRM_APPLICATIONS_ENABLED and not DEBUG:
     raise RuntimeError("FIRM_APPLICATIONS_ENABLED cannot be on outside development until two-factor authentication is done")
 
-# Where the signing certificate of each MyInvois environment lives in the key vault: a reference, never a key (D13).
-# Only ENVIRONMENT=production selects the production certificate; an environment not listed here will not start, so a
-# misspelt production cannot sign with the sandbox certificate.
+# Where the signing certificate of each MyInvois environment lives in the key vault: a reference, never a key (D13, D65).
+# Only ENVIRONMENT=production selects the production environment; an environment not listed here will not start, so a
+# misspelt production cannot run, or log its signings, as the sandbox (D65 allows one certificate for both).
 MYINVOIS_ENVIRONMENTS = {"development": "sandbox", "staging": "sandbox", "production": "production"}
 if ENVIRONMENT not in MYINVOIS_ENVIRONMENTS:
     raise RuntimeError(f"ENVIRONMENT must be one of {', '.join(MYINVOIS_ENVIRONMENTS)}")
