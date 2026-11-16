@@ -6,10 +6,11 @@ do, refuse another company's user, and read in Chinese.
 
 import pytest
 
-from core import customers
+from core import customers, ports
 from core.jobs import TransientError
 from core.models import AuditEntry, Customer
-from core.ports.myinvois import RateLimited
+from core.ports import startup
+from core.ports.myinvois import HttpResponse, RateLimited
 
 from .factories import PASSWORD
 
@@ -84,7 +85,13 @@ def gateway_down(fake_ports, error):
     fake_ports.gateway.validate_tin = refuse
 
 
-OUTAGES = [TransientError("MyInvois could not be reached"), RateLimited("MyInvois rate limit reached", 30)]
+NETWORK_FAILURE = TransientError("MyInvois could not be reached")
+OUTAGES = [NETWORK_FAILURE, RateLimited("MyInvois rate limit reached", 30)]
+SANDBOX = {
+    "MYINVOIS_SANDBOX_BASE_URL": "https://preprod.example.invalid",
+    "MYINVOIS_SANDBOX_CLIENT_ID": "client-id-value",
+    "MYINVOIS_SANDBOX_CLIENT_SECRET": "client-secret-value",
+}
 OUTAGE_ENGLISH = "MyInvois cannot be reached right now, so the TIN could not be checked. Nothing was saved. Try again in a few minutes."
 OUTAGE_CHINESE = "暂时无法连接 MyInvois，无法核对税务识别号，未保存任何内容。请几分钟后再试。"
 
@@ -105,11 +112,38 @@ def test_a_gateway_outage_on_the_create_screen_shows_a_message_keeps_what_was_ty
     assert Customer.objects.count() == 0
 
 
+@pytest.mark.parametrize(
+    "answer",
+    [OSError("connection refused"), HttpResponse(503), HttpResponse(429, {"Retry-After": "30"})],
+    ids=["network failure", "5xx", "429"],
+)
+def test_a_real_gateway_outage_reaches_the_screen_as_a_message_with_nothing_saved(
+    client, world, as_production_connection, answer
+):
+    """The real adapter, with only its transport scripted, as installed at start-up: no fake gateway stands in."""
+
+    def transport(method, url, headers, body):
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    ports.uninstall()
+    startup.install_configured_ports(SANDBOX, transport=transport)
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = client.post(url(world["acme"]), form())
+
+    body = response.content.decode()
+    assert response.status_code == 200 and OUTAGE_ENGLISH in body
+    assert "client-secret-value" not in body and "client-id-value" not in body
+    assert Customer.objects.count() == 0
+
+
 def test_a_gateway_outage_on_the_edit_screen_shows_a_message_and_changes_nothing(
     client, world, as_production_connection, fake_ports
 ):
     customer = make(world["acme_owner"], world["acme"])
-    gateway_down(fake_ports, OUTAGES[0])
+    gateway_down(fake_ports, NETWORK_FAILURE)
     with as_production_connection():
         sign_in(client, world["acme_owner"])
         response = client.post(url(world["acme"], customer.pk), form(tin=OTHER_TIN))
@@ -125,7 +159,7 @@ def test_a_gateway_outage_does_not_stop_a_customer_without_a_tin_or_an_unchanged
     client, world, as_production_connection, fake_ports
 ):
     customer = make(world["acme_owner"], world["acme"])
-    gateway_down(fake_ports, OUTAGES[0])
+    gateway_down(fake_ports, NETWORK_FAILURE)
     with as_production_connection():
         sign_in(client, world["acme_owner"])
         no_tin = client.post(url(world["acme"]), form(legal_name="No TIN", tin="", id_type="", id_value=""))

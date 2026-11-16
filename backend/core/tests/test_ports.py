@@ -1,12 +1,9 @@
 import pytest
 
 from core import ports
-from core.models import Customer
 from core.ports import startup
 from core.ports.fakes import FakeEmail
-from core.ports.myinvois import HttpResponse, MyInvoisHttpGateway
-
-from .factories import PASSWORD
+from core.ports.myinvois import MyInvoisHttpGateway
 
 SANDBOX = {
     "MYINVOIS_SANDBOX_BASE_URL": "https://preprod.example.invalid",
@@ -84,29 +81,15 @@ def test_another_port_can_be_installed_beside_the_gateway_and_each_keeps_its_own
         ports.get().ai
 
 
-@pytest.mark.parametrize(
-    "answer",
-    [OSError("connection refused"), HttpResponse(503), HttpResponse(429, {"Retry-After": "30"})],
-    ids=["network failure", "5xx", "429"],
-)
-def test_a_real_gateway_outage_reaches_the_customer_screen_as_a_message_with_nothing_saved(
-    client, world, as_production_connection, answer
-):
-    def transport(method, url, headers, body):
-        if isinstance(answer, Exception):
-            raise answer
-        return answer
+def test_the_app_start_up_itself_installs_the_gateway_from_the_environment(monkeypatch):
+    from django.apps import apps
 
     ports.uninstall()
-    startup.install_configured_ports(SANDBOX, transport=transport)
-    with as_production_connection():
-        assert client.post("/login/", {"email": world["acme_owner"].email, "password": PASSWORD}).status_code == 302
-        response = client.post(
-            f"/companies/{world['acme'].pk}/customers/",
-            {"legal_name": "Buyer Sdn Bhd", "tin": "C1234567890", "id_type": "BRN", "id_value": "201901234567"},
-        )
+    for name, value in SANDBOX.items():
+        monkeypatch.setenv(name, value)
 
-    body = response.content.decode()
-    assert response.status_code == 200 and "Nothing was saved" in body
-    assert "client-secret-value" not in body and "client-id-value" not in body
-    assert Customer.objects.count() == 0
+    apps.get_app_config("core").ready()
+
+    assert isinstance(ports.get().gateway, MyInvoisHttpGateway)
+    with pytest.raises(ports.PortsNotConfigured):
+        ports.get().email
