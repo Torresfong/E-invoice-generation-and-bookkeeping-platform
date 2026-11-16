@@ -19,7 +19,7 @@ Commands (run from `backend/`; `DATABASE_URL` must be set, there is no default b
 - One test: `pytest core/tests/test_health.py::test_health_page_reports_app_and_database_up`
 - Tests run inside the stack too: `docker compose exec backend pytest`. On a Windows host that is the only place they run; see `docs/agents/dev-environment.md` for that and the shell gotchas.
 - Translations: edit `backend/locale/zh_Hans/LC_MESSAGES/django.po`, then run `python manage.py compilemessages` (needs gettext). The compiled `.mo` files are committed, so recompile before committing.
-- External services are reached only through `core.ports.get()`; tests get fakes from the autouse `fake_ports` fixture. Queued work runs in tests with `core.jobs.run_pending()`.
+- External services are reached only through `core.ports.get()`; tests get fakes from the autouse `fake_ports` fixture. Real adapters are installed one port at a time at start-up by `core/ports/startup.py` (today the MyInvois gateway, from `MYINVOIS_<ENV>_*` settings); a port without an adapter raises `PortsNotConfigured`, never a fake. Queued work runs in tests with `core.jobs.run_pending()`.
 - CI runs `check`, a migration drift check and `pytest` against a Postgres 16 service (job `backend`), and builds the Docker image (job `image`). Both are required to merge.
 
 ## Workflow
