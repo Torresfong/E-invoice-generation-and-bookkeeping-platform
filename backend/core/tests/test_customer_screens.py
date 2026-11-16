@@ -117,12 +117,16 @@ def test_a_gateway_outage_on_the_create_screen_shows_a_message_keeps_what_was_ty
     [OSError("connection refused"), HttpResponse(503), HttpResponse(429, {"Retry-After": "30"})],
     ids=["network failure", "5xx", "429"],
 )
+@pytest.mark.parametrize("fails_at", ["the login", "the TIN check after a good login"])
 def test_a_real_gateway_outage_reaches_the_screen_as_a_message_with_nothing_saved(
-    client, world, as_production_connection, answer
+    client, world, as_production_connection, answer, fails_at
 ):
     """The real adapter, with only its transport scripted, as installed at start-up: no fake gateway stands in."""
+    logged_in = HttpResponse(200, body=b'{"access_token": "t", "expires_in": 3600}')
 
     def transport(method, url, headers, body):
+        if fails_at != "the login" and url.endswith("/connect/token"):
+            return logged_in
         if isinstance(answer, Exception):
             raise answer
         return answer
@@ -166,6 +170,9 @@ def test_a_gateway_outage_does_not_stop_a_customer_without_a_tin_or_an_unchanged
         unchanged = client.post(url(world["acme"], customer.pk), form())
 
     assert (no_tin.status_code, unchanged.status_code) == (302, 302)
+    assert Customer.objects.filter(company=world["acme"], legal_name="No TIN", tin="").exists()
+    customer.refresh_from_db()
+    assert (customer.legal_name, customer.tin, customer.id_type, customer.id_value) == ("Buyer Sdn Bhd", TIN, "BRN", BRN_VALUE)
 
 
 def test_staff_see_the_identity_but_cannot_change_it_from_the_edit_screen(client, world, as_production_connection):
