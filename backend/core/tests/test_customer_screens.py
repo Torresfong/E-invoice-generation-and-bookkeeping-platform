@@ -10,7 +10,14 @@ from core import customers, ports
 from core.jobs import TransientError
 from core.models import AuditEntry, Customer
 from core.ports import startup
-from core.ports.myinvois import HttpResponse, RateLimited
+from core.ports.myinvois import (
+    NOT_AUTHORISED,
+    AuthenticationFailed,
+    HttpResponse,
+    PermissionDenied,
+    RateLimited,
+    UnexpectedResponse,
+)
 
 from .factories import PASSWORD
 
@@ -140,6 +147,60 @@ def test_a_real_gateway_outage_reaches_the_screen_as_a_message_with_nothing_save
     body = response.content.decode()
     assert response.status_code == 200 and OUTAGE_ENGLISH in body
     assert "client-secret-value" not in body and "client-id-value" not in body
+    assert Customer.objects.count() == 0
+
+
+REFUSED_ENGLISH = "MyInvois refused the TIN check. Nothing was saved. Contact support."
+REFUSED_CHINESE = "MyInvois 拒绝了税务识别号核对，未保存任何内容。请联系支持。"
+PERMANENT_ERRORS = [
+    PermissionDenied(NOT_AUTHORISED),
+    AuthenticationFailed("MyInvois refused the credentials (401)"),
+    UnexpectedResponse("MyInvois answered 418, which the contract does not describe"),
+]
+
+
+@pytest.mark.parametrize("refusal", PERMANENT_ERRORS, ids=type)
+def test_a_permanent_gateway_error_shows_its_own_message_not_the_outage_one_and_saves_nothing(
+    client, world, as_production_connection, fake_ports, caplog, refusal
+):
+    customer = make(world["acme_owner"], world["acme"])
+    gateway_down(fake_ports, refusal)
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        created = client.post(url(world["acme"]), form(legal_name="Typed name", tin=OTHER_TIN))
+        chinese = client.post(url(world["acme"]), form(legal_name="Typed name", tin=OTHER_TIN), headers=CHINESE)
+        edited = client.post(url(world["acme"], customer.pk), form(tin=OTHER_TIN))
+
+    for response in (created, edited):
+        body = response.content.decode()
+        assert response.status_code == 200 and REFUSED_ENGLISH in body and OUTAGE_ENGLISH not in body
+    assert "Typed name" in created.content.decode()
+    assert REFUSED_CHINESE in chinese.content.decode()
+    assert Customer.objects.count() == 1
+    customer.refresh_from_db()
+    assert customer.tin == TIN
+    assert TIN not in caplog.text and OTHER_TIN not in caplog.text and BRN_VALUE not in caplog.text
+
+
+def test_a_second_save_inside_the_retry_after_window_makes_no_request_to_lhdn(client, world, as_production_connection):
+    sent = []
+
+    def transport(method, url, headers, body):
+        sent.append(url)
+        if url.endswith("/connect/token"):
+            return HttpResponse(200, body=b'{"access_token": "t", "expires_in": 3600}')
+        return HttpResponse(429, {"Retry-After": "60"})
+
+    ports.uninstall()
+    startup.install_configured_ports(SANDBOX, transport=transport)
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        first = client.post(url(world["acme"]), form())
+        requests_after_first = len(sent)
+        second = client.post(url(world["acme"]), form())
+
+    assert OUTAGE_ENGLISH in first.content.decode() and OUTAGE_ENGLISH in second.content.decode()
+    assert len(sent) == requests_after_first
     assert Customer.objects.count() == 0
 
 

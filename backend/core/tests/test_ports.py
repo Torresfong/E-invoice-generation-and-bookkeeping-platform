@@ -1,4 +1,7 @@
+from io import StringIO
+
 import pytest
+from django.core.management import call_command
 
 from core import ports
 from core.jobs import TransientError
@@ -111,3 +114,36 @@ def test_the_app_start_up_itself_installs_the_gateway_from_the_environment(monke
     assert isinstance(ports.get().gateway, MyInvoisHttpGateway)
     with pytest.raises(ports.PortsNotConfigured):
         ports.get().email
+
+
+# --- a missing gateway is reported at deploy, not at the first customer save (#180, D14) ---------------------------------
+
+
+def deploy_check_output():
+    out, err = StringIO(), StringIO()
+    call_command("check", "--deploy", stdout=out, stderr=err)
+    return out.getvalue() + err.getvalue()
+
+
+def test_the_deploy_check_reports_a_missing_gateway_and_does_not_fail_it():
+    ports.uninstall()
+
+    report = deploy_check_output()  # a warning: call_command would raise on an error
+
+    assert "no MyInvois gateway installed" in report
+
+
+def test_the_deploy_check_is_quiet_when_the_gateway_is_installed():
+    ports.uninstall()
+    startup.install_configured_ports(SANDBOX, transport=no_answer)
+
+    assert "no MyInvois gateway installed" not in deploy_check_output()
+
+
+def test_a_plain_check_passes_without_credentials_and_says_nothing_about_the_gateway():
+    ports.uninstall()
+    out, err = StringIO(), StringIO()
+
+    call_command("check", stdout=out, stderr=err)
+
+    assert "MyInvois" not in out.getvalue() + err.getvalue()

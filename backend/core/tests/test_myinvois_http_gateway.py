@@ -193,6 +193,36 @@ def test_retry_after_wins_over_the_reset_time_when_both_are_sent():
     assert raised.value.retry_after == 7
 
 
+def test_inside_the_retry_after_window_no_request_is_made_and_after_it_one_is():
+    # LHDN treats excessive requests after a 429 as malicious activity, so the pause is kept, not just reported.
+    gateway, lhdn, clock = a_gateway(token_answer(), answer(429, {"Retry-After": "30"}), answer(200))
+
+    with pytest.raises(RateLimited):
+        gateway.validate_tin("C1234567890", "BRN", "201901234567")
+    sent = len(lhdn.requests)
+    clock.now = T0 + timedelta(seconds=10)
+    with pytest.raises(RateLimited) as waiting:
+        gateway.validate_tin("C1234567890", "BRN", "201901234567")
+    with pytest.raises(RateLimited):
+        gateway.login_as_taxpayer(CREDENTIALS, 7, "C9999999990")
+    clock.now = T0 + timedelta(seconds=30)
+    outcome = gateway.validate_tin("C1234567890", "BRN", "201901234567")
+
+    assert len(lhdn.requests) == sent + 1  # nothing was sent inside the window, one request after it
+    assert waiting.value.retry_after == 20  # what is left of the window, for the job runner
+    assert outcome is TinCheck.VALID
+
+
+def test_a_429_that_names_no_wait_does_not_pause_the_gateway():
+    gateway, lhdn, _ = a_gateway(token_answer(), answer(429), answer(200))
+
+    with pytest.raises(RateLimited):
+        gateway.validate_tin("C1234567890", "BRN", "201901234567")
+    gateway.validate_tin("C1234567890", "BRN", "201901234567")
+
+    assert len(lhdn.requests) == 3
+
+
 @pytest.mark.parametrize("failure", [answer(500), answer(503), TimeoutError("timed out"), ConnectionError("reset")])
 def test_a_server_error_or_a_network_failure_is_transient(failure):
     gateway, _, _ = a_gateway(failure)

@@ -136,6 +136,7 @@ class MyInvoisHttpGateway:
         self._transport = transport
         self._now = now
         self._cache = cache if cache is not None else TokenCache()
+        self._paused_until = None  # set by a 429 that named its wait; nothing is sent to LHDN before then
 
     def __repr__(self):
         return f"<MyInvoisHttpGateway {self.environment}>"
@@ -144,7 +145,15 @@ class MyInvoisHttpGateway:
         """Make one request and return it if LHDN accepted it; otherwise raise the error the job runner acts on.
 
         `answers` are statuses the caller reads itself (a 404 for a TIN is an answer, not a failure). Messages say what happened and never repeat anything LHDN or the caller sent: they can echo a secret or a TIN.
+
+        After a 429 that says how long to wait, no request is made until then: LHDN asks clients to honour its rate-limit
+        headers and treats excessive requests as malicious. The pause is for the whole gateway, in this process only.
         """
+        now = self._now()
+        if self._paused_until is not None:
+            if now < self._paused_until:
+                raise RateLimited("MyInvois rate limit reached", math.ceil((self._paused_until - now).total_seconds()))
+            self._paused_until = None
         try:
             answer = self._transport(method, f"{self.base_url}{path}", headers, body)
         except OSError:
@@ -152,7 +161,10 @@ class MyInvoisHttpGateway:
         if answer.status in answers:
             return answer
         if answer.status == 429:
-            raise RateLimited("MyInvois rate limit reached", _retry_after(answer.headers, self._now()))
+            wait = _retry_after(answer.headers, self._now())
+            if wait is not None:
+                self._paused_until = self._now() + timedelta(seconds=wait)
+            raise RateLimited("MyInvois rate limit reached", wait)
         if answer.status == 403 or (answer.status == 400 and _oauth_error(answer) == "unauthorized_client"):
             # The sandbox answers a taxpayer that has not authorised us with 400 and `unauthorized_client`, not 403.
             raise PermissionDenied(NOT_AUTHORISED)
