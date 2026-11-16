@@ -23,6 +23,10 @@
         </select></label></p>
       <p><label>{% trans "Effective from" %} <input type="date" name="effective_from" value="{{ form.effective_from|date:'Y-m-d' }}" required></label></p>
       <h2>{% trans "Supplier details" %}</h2>
+      <p><label>{% trans "Registered name" %} <input name="legal_name" maxlength="200" value="{{ form.legal_name|default:'' }}"></label></p>
+      <p><label>{% trans "Phone number" %} <input name="phone" maxlength="20" value="{{ form.phone|default:'' }}"></label></p>
+      <p><label>{% trans "SST registration number" %} <input name="sst_number" maxlength="35" value="{{ form.sst_number|default:'' }}"></label></p>
+      <p><label>{% trans "Tourism tax registration number" %} <input name="tourism_tax_number" maxlength="17" value="{{ form.tourism_tax_number|default:'' }}"></label></p>
       <p><label>{% trans "TIN" %} <input name="tin" maxlength="20" value="{{ form.tin|default:'' }}"></label></p>
       <p><label>{% trans "BRN" %} <input name="brn" maxlength="20" value="{{ form.brn|default:'' }}"></label></p>
       <p><label>{% trans "ROB (optional)" %} <input name="rob" maxlength="20" value="{{ form.rob|default:'' }}"></label></p>
@@ -47,6 +51,10 @@
         <dt>{% trans "E-invoicing" %}</dt><dd>{% if setting.einvoicing_enabled %}{% trans "On" %}{% else %}{% trans "Off" %}{% endif %}</dd>
         <dt>{% trans "Status" %}</dt><dd>{% if setting.status %}{{ setting.get_status_display }}{% else %}{% trans "Not checked yet" %}{% endif %}</dd>
         <dt>{% trans "Effective from" %}</dt><dd>{{ setting.effective_from|date:"Y-m-d" }}</dd>
+        <dt>{% trans "Registered name" %}</dt><dd>{{ setting.legal_name }}</dd>
+        <dt>{% trans "Phone number" %}</dt><dd>{{ setting.phone }}</dd>
+        <dt>{% trans "SST registration number" %}</dt><dd>{{ setting.sst_number }}</dd>
+        <dt>{% trans "Tourism tax registration number" %}</dt><dd>{{ setting.tourism_tax_number }}</dd>
         <dt>{% trans "TIN" %}</dt><dd>{{ setting.tin }}</dd>
         <dt>{% trans "BRN" %}</dt><dd>{{ setting.brn }}</dd>
         <dt>{% trans "ROB (optional)" %}</dt><dd>{{ setting.rob }}</dd>

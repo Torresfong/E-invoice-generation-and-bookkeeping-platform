@@ -10,9 +10,9 @@ from django.core.exceptions import PermissionDenied
 from django.utils import translation
 
 from core import customers, invoices, items
-from core.models import Invoice, InvoiceLine
+from core.models import Customer, Invoice, InvoiceLine
 
-from .test_customers import BRN_VALUE, TIN, switch_einvoicing_on
+from .test_customers import BRN_VALUE, CONTACT, TIN, switch_einvoicing_on
 
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
 
@@ -195,13 +195,109 @@ def test_a_customer_saved_without_an_identity_cannot_be_drafted_once_einvoicing_
 
 def test_a_customer_with_a_full_identity_can_be_drafted_while_einvoicing_is_on(world, stock):
     switch_einvoicing_on(world["acme_owner"], world["acme"])
-    identified = customers.create_customer(
-        world["acme_owner"], world["acme"], legal_name="Identified Sdn Bhd", tin=TIN, id_type="BRN", id_value=BRN_VALUE
-    )
+    identified = complete_buyer(world)
 
     saved = invoices.create_draft(world["acme_owner"], world["acme"], customer_id=identified.pk, lines=[line(stock)])
 
     assert saved.customer == identified
+
+
+def complete_buyer(world, **overrides):
+    values = dict(legal_name="Identified Sdn Bhd", tin=TIN, id_type="BRN", id_value=BRN_VALUE, **CONTACT)
+    return customers.create_customer(world["acme_owner"], world["acme"], **{**values, **overrides})
+
+
+# --- the LHDN buyer fields are checked before a draft can lock a bad buyer (ticket #172) -----------------------------
+
+
+def test_a_customer_with_no_phone_or_address_cannot_be_drafted_while_einvoicing_is_on_and_each_field_is_named(world, stock):
+    # Saved while e-invoicing was off, so it has the identity but none of the new fields.
+    buyer = complete_buyer(world, **{field: "" for field in CONTACT})
+    started = draft(world, stock)
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+
+    with pytest.raises(invoices.InvalidInvoice) as new:
+        invoices.create_draft(world["acme_owner"], world["acme"], customer_id=buyer.pk, lines=[line(stock)])
+    with pytest.raises(invoices.InvalidInvoice) as edit:
+        invoices.update_draft(world["acme_owner"], started, customer_id=buyer.pk, lines=[line(stock, "4")])
+
+    for refused in (new, edit):
+        message = str(refused.value)
+        for field in ("phone number", "address line 1", "city", "state code", "country code"):
+            assert field in message
+        assert "TIN" not in message  # the identity is complete: only what is missing is named
+        # optional on LHDN's buyer table: never asked for
+        assert "SST" not in message and "address line 2" not in message and "postcode" not in message
+    assert Invoice.objects.count() == 1 and started.lines.get().quantity == Decimal("1")
+
+
+@pytest.mark.parametrize(
+    "broken, field",
+    [
+        ({"phone": "12345"}, "phone number"),
+        ({"phone": ""}, "phone number"),
+        ({"address_line1": ""}, "address line 1"),
+        ({"city": ""}, "city"),
+        # Whitespace only is as good as blank: LHDN's rules strip before they look (#122).
+        ({"address_line1": " "}, "address line 1"),
+        ({"city": " "}, "city"),
+        ({"phone": " "}, "phone number"),
+        ({"state_code": " ", "country_code": "SGP"}, "state code"),
+        ({"country_code": " "}, "country code"),
+        ({"state_code": ""}, "state code"),
+        ({"country_code": ""}, "country code"),
+        ({"postal_zone": "1234"}, "postcode"),
+        ({"state_code": "99"}, "state code"),
+        ({"sst_number": "NA"}, "SST registration number"),
+    ],
+)
+def test_one_missing_or_invalid_buyer_field_stops_the_draft_and_is_named(world, stock, broken, field):
+    buyer = complete_buyer(world)
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+    # A value the master would refuse today, as an older or directly written row can hold it.
+    Customer.objects.filter(pk=buyer.pk).update(**broken)
+
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        invoices.create_draft(world["acme_owner"], world["acme"], customer_id=buyer.pk, lines=[line(stock)])
+
+    assert field in str(refused.value)
+    assert not any(value.strip() and value in str(refused.value) for value in broken.values())
+    assert Invoice.objects.count() == 0
+
+
+def test_a_buyer_with_blank_optional_fields_can_be_drafted_while_einvoicing_is_on(world, stock):
+    # SST number, address line 2 and postcode are optional for the buyer: #123 sends NA for a blank SST number.
+    buyer = complete_buyer(world, sst_number="", address_line2="", postal_zone="")
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+
+    saved = invoices.create_draft(world["acme_owner"], world["acme"], customer_id=buyer.pk, lines=[line(stock)])
+
+    assert saved.customer == buyer
+
+
+def test_a_foreign_buyer_with_a_long_postal_zone_can_be_drafted(world, stock):
+    buyer = complete_buyer(world, country_code="SGP", postal_zone="P" * 50, state_code="Central Region")
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+
+    assert invoices.create_draft(world["acme_owner"], world["acme"], customer_id=buyer.pk, lines=[line(stock)])
+
+
+def test_with_einvoicing_off_the_ordinary_draft_needs_none_of_the_new_fields(world, stock):
+    saved = draft(world, stock)
+
+    assert saved.customer == stock["customer"] and saved.customer.phone == ""
+
+
+def test_a_completed_buyer_can_be_drafted_after_the_owner_or_staff_fills_the_new_fields_in(world, stock):
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+    with pytest.raises(invoices.InvalidInvoice):
+        draft(world, stock)
+    customers.update_customer(world["acme_staff"], stock["customer"], **CONTACT)
+    customers.update_customer(
+        world["acme_owner"], stock["customer"], tin=TIN, id_type="BRN", id_value=BRN_VALUE
+    )
+
+    assert draft(world, stock, user="acme_staff").customer == stock["customer"]
 
 
 def test_one_retained_line_of_a_deactivated_item_cannot_become_two(world, stock):

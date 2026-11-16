@@ -952,5 +952,38 @@ msgid "Choose an item on line %(line)s."
 msgstr "请选择第 %(line)s 行的商品。"
 
 #: .\core\invoices.py
-msgid "This customer needs a TIN, an ID type and an ID value while e-invoicing is on. Update the customer first."
-msgstr "开启电子发票后，该客户必须有 TIN、证件类型和证件号。请先更新客户资料。"
+#, python-format
+msgid "This customer needs these details while e-invoicing is on: %(fields)s. Update the customer first."
+msgstr "开启电子发票后，该客户必须具备以下资料：%(fields)s。请先更新客户资料。"
+
+#: .\core\einvoicing.py
+msgid "registered name"
+msgstr "注册名称"
+
+#: .\core\einvoicing.py
+msgid "phone number"
+msgstr "电话号码"
+
+#: .\core\einvoicing.py
+msgid "SST registration number"
+msgstr "SST 注册号"
+
+#: .\core\einvoicing.py
+msgid "tourism tax registration number"
+msgstr "旅游税注册号"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Registered name"
+msgstr "注册名称"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Phone number"
+msgstr "电话号码"
+
+#: .\core\templates\einvoice_setting.html
+msgid "Tourism tax registration number"
+msgstr "旅游税注册号"
+
+#: .\core\templates\customer_contact_fields.html
+msgid "Contact details"
+msgstr "联系资料"

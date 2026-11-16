@@ -8,8 +8,10 @@ fields, and writes the current row together with a history row (`CompanyEInvoice
 The database holds the same rules (migration 0035), so a writer that skips this module still cannot let staff change
 the setting, edit the history, or switch a mandatory company off without the acknowledgement.
 
-TIN, BRN and ROB never appear in an exception message, a log line or an audit entry here: errors name the field, not
-its value.
+TIN, BRN, ROB, the phone number and the SST and tourism-tax numbers never appear in an exception message, a log line or
+an audit entry here: errors name the field, not its value. The registered name, phone, SST and tourism-tax number
+(ticket #172) are part of the setting and of every history row; `Company.name` is a separate thing. A blank SST or
+tourism-tax number means "none": Core never stores LHDN's sentinel `NA`, and the MyInvois mapper (#123) writes it.
 """
 
 import re
@@ -19,7 +21,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
-from . import permissions
+from . import lhdn_fields, permissions
 from .db import scalar
 from .models import CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, SupplierDetails
 
@@ -34,17 +36,27 @@ ACKNOWLEDGEMENT_TEXT = gettext_lazy(
 STATUSES = {SupplierDetails.MANDATORY, SupplierDetails.VOLUNTARY, SupplierDetails.EXEMPT}
 
 SUPPLIER_FIELDS = (
+    "legal_name", "phone", "sst_number", "tourism_tax_number",
     "tin", "brn", "rob", "msic_code", "address_line1", "address_line2", "city", "postal_zone", "state_code", "country_code",
 )
-# Needed before a company can e-invoice; a company may be saved off with these empty (D63: not yet checked).
-REQUIRED_WHEN_ON = ("tin", "brn", "msic_code", "address_line1", "city", "postal_zone", "state_code", "country_code")
-MAX_LENGTH = {"tin": 20, "brn": 20, "rob": 20, "address_line1": 150, "address_line2": 150, "city": 50}
+# Needed before a company can e-invoice; a company may be saved off with these empty (D63: not yet checked). LHDN lists
+# the supplier's name and telephone among the required fields (e-Invoice Guideline v4.8, Appendix 1). The SST and
+# tourism-tax numbers are not here: a blank one means "none" and the mapper sends NA (#123).
+REQUIRED_WHEN_ON = (
+    "legal_name", "phone", "tin", "brn", "msic_code", "address_line1", "city", "postal_zone", "state_code", "country_code",
+)
+MAX_LENGTH = {
+    "legal_name": 200, "phone": 20, "sst_number": 35, "tourism_tax_number": 17,
+    "tin": 20, "brn": 20, "rob": 20, "address_line1": 150, "address_line2": 150, "city": 50,
+}
 PATTERNS = {
     "msic_code": re.compile(r"\d{5}"),
     "postal_zone": re.compile(r"\d{5}"),
     "state_code": re.compile(r"0[1-9]|1[0-7]"),  # LHDN state code list: 01 to 16, and 17 for not applicable
     "country_code": re.compile(r"[A-Z]{3}"),
 }
+# Checks that are more than a pattern. Core never stores the sentinel NA, so these refuse it (see `lhdn_fields`).
+FORMATS = {"phone": lhdn_fields.phone_ok, "sst_number": lhdn_fields.sst_ok, "tourism_tax_number": lhdn_fields.ttx_ok}
 
 
 class InvalidSetting(ValueError):
@@ -75,6 +87,10 @@ def _labels():
     return {
         "status": _("status"),
         "effective_from": _("effective date"),
+        "legal_name": _("registered name"),
+        "phone": _("phone number"),
+        "sst_number": _("SST registration number"),
+        "tourism_tax_number": _("tourism tax registration number"),
         "tin": _("TIN"),
         "brn": _("BRN"),
         "rob": _("ROB"),
@@ -99,7 +115,9 @@ def _validate(enabled, status, effective_from, supplier):
         if enabled and name in REQUIRED_WHEN_ON and not value:
             raise InvalidSetting(_("Enter the %(field)s.") % {"field": labels[name]})
         too_long = name in MAX_LENGTH and len(value) > MAX_LENGTH[name]
-        malformed = value and name in PATTERNS and not PATTERNS[name].fullmatch(value)
+        malformed = value and (
+            (name in PATTERNS and not PATTERNS[name].fullmatch(value)) or (name in FORMATS and not FORMATS[name](value))
+        )
         if too_long or malformed:
             raise InvalidSetting(_("Check the %(field)s.") % {"field": labels[name]})
 
@@ -122,6 +140,10 @@ def update_setting(
     einvoicing_enabled,
     status,
     effective_from,
+    legal_name="",
+    phone="",
+    sst_number="",
+    tourism_tax_number="",
     tin="",
     brn="",
     rob="",
@@ -141,6 +163,7 @@ def update_setting(
     """
     permissions.require(user, "manage_einvoicing", company)
     supplier = dict(
+        legal_name=legal_name, phone=phone, sst_number=sst_number, tourism_tax_number=tourism_tax_number,
         tin=tin, brn=brn, rob=rob, msic_code=msic_code, address_line1=address_line1, address_line2=address_line2,
         city=city, postal_zone=postal_zone, state_code=state_code, country_code=country_code,
     )

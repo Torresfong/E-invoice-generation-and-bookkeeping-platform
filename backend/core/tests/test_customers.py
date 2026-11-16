@@ -28,6 +28,19 @@ def make(user, company, **overrides):
     return customers.create_customer(user, company, **{**values, **overrides})
 
 
+# A buyer LHDN would accept (ticket #172). Made-up values: no real phone, SST number or address belongs in the repository.
+CONTACT = dict(
+    phone="+601236789",
+    sst_number="W10-1234-56000001",
+    address_line1="2 Buyer Road",
+    address_line2="Taman Test",
+    city="Petaling Jaya",
+    postal_zone="47400",
+    state_code="10",
+    country_code="MYS",
+)
+
+
 def switch_einvoicing_on(owner, company):
     einvoicing.update_setting(
         owner,
@@ -35,6 +48,8 @@ def switch_einvoicing_on(owner, company):
         einvoicing_enabled=True,
         status="voluntary",
         effective_from=date(2020, 1, 1),
+        legal_name="Acme Registered Name Sdn Bhd",
+        phone="+60312345678",
         tin="C9999999999",
         brn="200001000001",
         msic_code="82193",
@@ -311,6 +326,7 @@ def test_every_change_is_kept_with_its_values_before_and_after_and_who_made_it(w
     ]
     assert changes[0].after == {
         "legal_name": "Buyer Sdn Bhd", "tin": TIN, "id_type": "BRN", "id_value": BRN_VALUE, "is_active": True,
+        **{field: "" for field in CONTACT},
     }
     assert (changes[1].before["legal_name"], changes[1].after["legal_name"]) == ("Buyer Sdn Bhd", "Renamed Sdn Bhd")
     assert (changes[2].before["is_active"], changes[2].after["is_active"]) == (True, False)
@@ -456,3 +472,190 @@ def test_job_handlers_read_customers_of_their_company_only_and_never_write(world
             assert cursor.fetchall() == [("Buyer Sdn Bhd",)]
         attempt(lambda: Customer.objects.filter(pk=customer.pk).update(legal_name="Worker edit"))
         attempt(plant(world["acme"]))
+
+
+# --- the LHDN buyer fields: phone, SST number and address (ticket #172) ---------------------------------------------
+
+
+def test_a_customer_keeps_its_phone_sst_number_and_address(world):
+    customer = make(world["acme_staff"], world["acme"], **CONTACT)
+
+    customer.refresh_from_db()
+    assert {field: getattr(customer, field) for field in CONTACT} == CONTACT
+    assert Customer._meta.get_field("legal_name").max_length == 200
+
+
+def test_a_customer_without_the_new_fields_is_saved_with_blank_values_while_einvoicing_is_off(world):
+    customer = make(world["acme_owner"], world["acme"])
+
+    assert {field: getattr(customer, field) for field in CONTACT} == {field: "" for field in CONTACT}
+
+
+@pytest.mark.parametrize(
+    "bad, field",
+    [
+        ({"phone": "1234567"}, "phone number"),
+        ({"phone": "+6012 345 6789"}, "phone number"),
+        ({"phone": "0" * 21}, "phone number"),
+        ({"phone": "NA"}, "phone number"),
+        ({"sst_number": "NA"}, "SST registration number"),
+        ({"sst_number": "na"}, "SST registration number"),
+        ({"sst_number": "A" * 36}, "SST registration number"),
+        ({"sst_number": "W10 1234"}, "SST registration number"),
+        ({"sst_number": "A1;B2;C3"}, "SST registration number"),  # at most two numbers
+        ({"address_line1": "x" * 151}, "address line 1"),
+        ({"address_line2": "x" * 151}, "address line 2"),
+        ({"city": "x" * 51}, "city"),
+        ({"postal_zone": "4740"}, "postcode"),
+        ({"postal_zone": "474000"}, "postcode"),
+        ({"postal_zone": "4740A"}, "postcode"),
+        ({"state_code": "99"}, "state code"),
+        ({"state_code": "00"}, "state code"),
+        ({"country_code": "MY"}, "country code"),
+        ({"country_code": "XXX"}, "country code"),
+        ({"country_code": "SGP", "state_code": "x" * 51}, "state code"),
+        ({"country_code": "SGP", "state_code": "00"}, "state code"),  # "00" is no longer an LHDN state, anywhere (#122)
+        ({"country_code": "SGP", "postal_zone": "1" * 51}, "postcode"),
+    ],
+)
+def test_a_value_lhdn_would_refuse_is_refused_naming_the_field_and_nothing_is_saved(world, bad, field):
+    with pytest.raises(customers.InvalidCustomer) as refused:
+        make(world["acme_owner"], world["acme"], **{**CONTACT, **bad})
+
+    assert field in str(refused.value)
+    assert not any(value in str(refused.value) for value in map(str, bad.values()))
+    assert Customer.objects.count() == 0
+
+
+def test_a_foreign_buyer_may_have_a_long_postal_zone_and_a_state_name(world):
+    foreign = make(
+        world["acme_owner"], world["acme"],
+        **{**CONTACT, "country_code": "SGP", "postal_zone": "P" * 50, "state_code": "Central Region"},
+    )
+
+    assert (foreign.country_code, len(foreign.postal_zone), foreign.state_code) == ("SGP", 50, "Central Region")
+
+
+def test_the_sentinel_na_is_never_stored_and_a_blank_sst_number_is_fine(world):
+    # #123 turns a blank SST number into the exact value NA on the document; Core only ever holds blank.
+    customer = make(world["acme_owner"], world["acme"], **{**CONTACT, "sst_number": ""})
+    with pytest.raises(customers.InvalidCustomer):
+        customers.update_customer(world["acme_owner"], customer, sst_number="NA")
+
+    customer.refresh_from_db()
+    assert customer.sst_number == ""
+    assert not Customer.objects.filter(sst_number="NA").exists()
+
+
+def test_staff_may_complete_the_phone_and_address_but_not_the_identity(world, fake_ports):
+    customer = make(world["acme_owner"], world["acme"])
+
+    customers.update_customer(world["acme_staff"], customer, **CONTACT)
+    with pytest.raises(PermissionDenied):
+        customers.update_customer(world["acme_staff"], customer, tin=OTHER_TIN, phone="+60199999999")
+
+    customer.refresh_from_db()
+    assert {field: getattr(customer, field) for field in CONTACT} == CONTACT
+    assert customer.tin == TIN
+
+
+def test_an_accountant_or_another_companys_owner_cannot_change_the_new_fields(world):
+    customer = make(world["acme_owner"], world["acme"], **CONTACT)
+
+    for who in ("accountant", "beta_owner"):
+        with pytest.raises(PermissionDenied):
+            customers.update_customer(world[who], customer, phone="+60199999999")
+
+    customer.refresh_from_db()
+    assert customer.phone == CONTACT["phone"]
+
+
+def test_a_contact_change_alone_is_not_sent_to_the_tin_check(world, fake_ports):
+    customer = make(world["acme_owner"], world["acme"])
+    checked = len(fake_ports.gateway.tins_validated)
+
+    customers.update_customer(world["acme_staff"], customer, phone="+601236789")
+
+    assert len(fake_ports.gateway.tins_validated) == checked
+
+
+def test_a_failed_contact_edit_leaves_the_customer_as_it_was(world):
+    customer = make(world["acme_owner"], world["acme"], **CONTACT)
+
+    with pytest.raises(customers.InvalidCustomer):
+        customers.update_customer(world["acme_owner"], customer, phone="+60199999999", postal_zone="1")
+
+    customer.refresh_from_db()
+    assert (customer.phone, customer.postal_zone) == (CONTACT["phone"], CONTACT["postal_zone"])
+
+
+def test_the_history_keeps_every_new_field_before_and_after(world, as_user):
+    with as_user(world["acme_staff"]):
+        customer = make(world["acme_staff"], world["acme"], **CONTACT)
+        customers.update_customer(world["acme_staff"], customer, phone="+60199999999", city="Ipoh")
+
+    first, second = customers.history(customer)
+
+    assert {field: first.after[field] for field in CONTACT} == CONTACT
+    assert (second.before["phone"], second.after["phone"]) == (CONTACT["phone"], "+60199999999")
+    assert (second.before["city"], second.after["city"]) == (CONTACT["city"], "Ipoh")
+    assert set(CONTACT) <= set(second.before) and set(CONTACT) <= set(second.after)
+
+
+def test_a_raw_update_of_a_new_field_is_still_in_the_history(world, as_user):
+    customer = make(world["acme_owner"], world["acme"], **CONTACT)
+
+    with as_user(world["acme_staff"]):
+        Customer.objects.filter(pk=customer.pk).update(sst_number="W10-0000-00000009")
+
+    last = CustomerChange.objects.filter(customer=customer).order_by("id").last()
+    assert (last.before["sst_number"], last.after["sst_number"]) == (CONTACT["sst_number"], "W10-0000-00000009")
+
+
+def test_the_database_refuses_an_accountant_and_hides_the_customer_from_another_company(world, as_user):
+    customer = make(world["acme_owner"], world["acme"], **CONTACT)
+    gamma = make_company("Gamma Staff Co")
+    outsider = make_member("staff@gamma.example", gamma, CompanyAccess.STAFF)
+
+    with as_user(world["accountant"]):
+        attempt(lambda: Customer.objects.filter(pk=customer.pk).update(phone="+60199999999"))
+        attempt(plant(world["acme"], **CONTACT))
+    with as_user(outsider):
+        assert not Customer.objects.filter(pk=customer.pk).exists()
+        assert not CustomerChange.objects.filter(customer=customer).exists()
+        assert Customer.objects.filter(pk=customer.pk).update(phone="+60199999999") == 0
+        attempt(plant(world["acme"], **CONTACT))
+
+    customer.refresh_from_db()
+    assert customer.phone == CONTACT["phone"] and Customer.objects.count() == 1
+
+
+def test_the_audit_trail_names_the_changed_new_fields_and_never_their_values(world, as_user):
+    with as_user(world["acme_staff"]):
+        customer = make(world["acme_staff"], world["acme"], **CONTACT)
+        customers.update_customer(world["acme_staff"], customer, phone="+60199999999", sst_number="W10-0000-00000009")
+
+    entries = AuditEntry.objects.filter(company=world["acme"], target_type="core_customer", target_id=str(customer.pk))
+    dump = repr(list(entries.values()))
+
+    assert set(entries.order_by("id").last().changed_fields) == {"phone", "sst_number"}
+    assert not any(value in dump for value in (*CONTACT.values(), "+60199999999", "W10-0000-00000009") if len(value) > 3)
+
+
+def test_no_error_repr_or_log_shows_the_phone_or_sst_number(world, caplog):
+    caplog.set_level("DEBUG")
+    customer = make(world["acme_owner"], world["acme"], **CONTACT)
+    with pytest.raises(customers.InvalidCustomer) as refused:
+        customers.update_customer(world["acme_owner"], customer, phone="+60123", sst_number="W10-9999-99999999")
+
+    shown = " ".join([repr(customer), str(customer), str(refused.value), caplog.text])
+    assert not any(secret in shown for secret in (CONTACT["phone"], CONTACT["sst_number"], "+60123", "W10-9999-99999999"))
+
+
+def test_staff_saving_a_customer_unchanged_adds_no_history_row(world, fake_ports):
+    customer = make(world["acme_owner"], world["acme"], **CONTACT)
+    count = CustomerChange.objects.count()
+
+    customers.update_customer(world["acme_staff"], customer, **CONTACT)
+
+    assert CustomerChange.objects.count() == count

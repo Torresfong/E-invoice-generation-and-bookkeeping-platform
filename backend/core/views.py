@@ -458,7 +458,10 @@ def _customer_fields(post):
     Staff are not shown the identity fields, so their form never posts them; a hand-made request that does is judged by
     `customers.update_customer`, which refuses a value that differs from the saved one.
     """
-    return {name: post[name].strip() for name in customers.IDENTITY_FIELDS if name in post}
+    fields = {name: post[name].strip() for name in customers.EDITABLE_FIELDS if name in post}
+    if "country_code" in fields:
+        fields["country_code"] = fields["country_code"].upper()
+    return fields
 
 
 @audit.audited_read("customers")
@@ -474,7 +477,7 @@ def customer_list(request, pk):
         submitted = _customer_fields(request.POST)
         try:
             customers.create_customer(
-                request.user, access.company, **{name: submitted.get(name, "") for name in customers.IDENTITY_FIELDS}
+                request.user, access.company, **{name: submitted.get(name, "") for name in customers.EDITABLE_FIELDS}
             )
         except customers.InvalidCustomer as problem:
             return render(

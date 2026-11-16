@@ -226,10 +226,13 @@ def test_another_companys_user_is_refused_every_screen(client, world, as_product
             client.post(url(world["acme"]), form(legal_name="Planted")).status_code,
             client.get(url(world["acme"], customer.pk)).status_code,
             client.post(url(world["acme"], customer.pk, "deactivate")).status_code,
+            client.post(url(world["acme"], customer.pk), {"phone": "+60199999999", "city": "Ipoh"}).status_code,
         ]
 
     assert all(status in (403, 404) for status in statuses)
     assert Customer.objects.filter(company=world["acme"]).count() == 1
+    customer.refresh_from_db()
+    assert (customer.phone, customer.city) == ("", "")
 
 
 def test_the_screens_read_in_chinese_with_the_refusal_too(client, world, as_production_connection, fake_ports):
@@ -263,6 +266,81 @@ def test_an_accountants_view_of_the_customers_is_in_the_audit_trail_and_a_client
     assert {(e.target_type, e.actor_email) for e in viewed} == {
         ("customers", "accountant@firm.example"), ("customer", "accountant@firm.example"),
     }
+
+
+CONTACT = {
+    "phone": "+60123456789", "sst_number": "W10-1234-56000001", "address_line1": "2 Buyer Road",
+    "address_line2": "Taman Test", "city": "Petaling Jaya", "postal_zone": "47400", "state_code": "10",
+    "country_code": "mys",
+}
+
+
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+def test_a_customer_is_created_with_its_phone_sst_number_and_address_from_the_screen(
+    client, world, as_production_connection, who
+):
+    with as_production_connection():
+        sign_in(client, world[who])
+        created = client.post(url(world["acme"]), form(**CONTACT))
+
+    customer = Customer.objects.get(company=world["acme"])
+    assert created.status_code == 302
+    assert {field: getattr(customer, field) for field in CONTACT} == {**CONTACT, "country_code": "MYS"}
+
+
+def test_staff_edit_the_phone_and_address_but_get_no_identity_inputs(client, world, as_production_connection):
+    customer = make(world["acme_owner"], world["acme"])
+    with as_production_connection():
+        sign_in(client, world["acme_staff"])
+        page = client.get(url(world["acme"], customer.pk)).content.decode()
+        saved = client.post(url(world["acme"], customer.pk), CONTACT)
+
+    for name in CONTACT:
+        assert f'name="{name}"' in page
+    assert 'name="tin"' not in page and 'name="legal_name"' not in page
+    assert saved.status_code == 302
+    customer.refresh_from_db()
+    assert (customer.phone, customer.country_code, customer.tin) == (CONTACT["phone"], "MYS", TIN)
+
+
+def test_an_accountant_sees_the_new_fields_without_inputs_and_cannot_post_them(client, world, as_production_connection):
+    customer = make(world["acme_owner"], world["acme"], **{**CONTACT, "country_code": "MYS"})
+    with as_production_connection():
+        sign_in(client, world["accountant"])
+        page = client.get(url(world["acme"], customer.pk)).content.decode()
+        refused = client.post(url(world["acme"], customer.pk), {"phone": "+60199999999"})
+
+    assert CONTACT["phone"] in page and CONTACT["address_line1"] in page
+    assert not any(f'name="{name}"' in page for name in CONTACT)
+    assert refused.status_code == 403
+    customer.refresh_from_db()
+    assert customer.phone == CONTACT["phone"]
+
+
+def test_a_bad_postcode_shows_an_error_naming_the_field_keeps_what_was_typed_and_saves_nothing(
+    client, world, as_production_connection
+):
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = client.post(url(world["acme"]), form(**{**CONTACT, "postal_zone": "4740", "city": "Typed city"}))
+
+    body = response.content.decode()
+    assert response.status_code == 200 and "postcode" in body and "Typed city" in body
+    assert Customer.objects.count() == 0
+
+
+def test_the_new_customer_fields_read_in_chinese(client, world, as_production_connection):
+    customer = make(world["acme_owner"], world["acme"])
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        listing = client.get(url(world["acme"]), headers=CHINESE).content.decode()
+        edit = client.get(url(world["acme"], customer.pk), headers=CHINESE).content.decode()
+        refused = client.post(
+            url(world["acme"]), form(**{**CONTACT, "postal_zone": "4740"}), headers=CHINESE
+        ).content.decode()
+
+    assert "电话" in listing and "地址" in listing and "电话" in edit and "SST" in edit
+    assert "邮政编码" in refused and "postcode" not in refused
 
 
 def test_the_company_page_links_to_the_customers(client, world, as_production_connection):
