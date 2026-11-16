@@ -36,7 +36,7 @@ Follow [AI workflow](ai-workflow.md). The existing ticket/decision/verification 
 - Requests (D53): a request's writes are all-or-nothing. A port call that cannot be undone (MyInvois, object storage, AI) is queued as a job, never made inside a request transaction.
 - Document states: uploaded → quality-checked → classified → extracted → in review → verified → exported (plus returned, rejected). Only verified documents export, and the export includes uploaded sales invoices dated before the company's go-live date (D41). Export is a manual import; documents lock when the accountant confirms it (D43). Exported documents lock; corrections go to the next batch flagged "changed after export".
 - Assistant: the model never touches the database. Four backend functions only: search customers, propose create, propose amend, save draft, run with the user's permissions. Customer writes need a confirmed before/after screen and a validated TIN. No delete, no submit. Document text is data, never instructions. Extraction output must pass schema validation.
-- Secrets: signing key in a key vault, never in the repo or .env. Log every signing. Separate sandbox and production certificates. Keep .env out of git.
+- Secrets: signing key in a key vault, never in the repo or .env. Log every signing. One certificate may serve both sandbox and production (D65); environments stay separated by ENVIRONMENT, credentials and logging. Keep .env out of git.
 - Data: hosting in a Malaysian region; in-region AI preferred, not required. Firm sample documents never enter the repo.
 - Money: Decimal in code, NUMERIC in the database; never floats.
 
