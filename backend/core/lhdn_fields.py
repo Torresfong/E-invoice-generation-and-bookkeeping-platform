@@ -53,7 +53,12 @@ def postal_ok(value, country):
 
 
 def state_ok(value, country):
-    """A Malaysian state is a code on LHDN's list; another country may give a state name of at most 50 characters."""
+    """A Malaysian state is a code on LHDN's list; another country may give a state name of at most 50 characters.
+
+    "00" is refused for every country: it is no longer an LHDN state code (#122).
+    """
+    if value == "00":
+        return False
     if country == MALAYSIA:
         return value in state_codes()
     return len(value) <= STATE_MAX

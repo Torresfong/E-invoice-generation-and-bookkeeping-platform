@@ -511,6 +511,7 @@ def test_a_customer_without_the_new_fields_is_saved_with_blank_values_while_einv
         ({"country_code": "MY"}, "country code"),
         ({"country_code": "XXX"}, "country code"),
         ({"country_code": "SGP", "state_code": "x" * 51}, "state code"),
+        ({"country_code": "SGP", "state_code": "00"}, "state code"),  # "00" is no longer an LHDN state, anywhere (#122)
         ({"country_code": "SGP", "postal_zone": "1" * 51}, "postcode"),
     ],
 )
