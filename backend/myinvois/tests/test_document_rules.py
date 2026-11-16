@@ -17,7 +17,7 @@ from django.utils import translation
 from myinvois.code_lists import code_list_sources, classification_codes, country_codes, currency_codes, msic_codes, state_codes, tax_types, unit_codes
 from myinvois.field_rules import FieldError, check_customer, check_einvoice_setting, check_item, check_line
 
-DATA = Path(__file__).resolve().parents[1] / "codes"
+DATA = Path(__file__).resolve().parents[2] / "core" / "lhdn_codes"
 # Fictional values, the same kind the setting tests use. C0000000001 is 11 characters, inside the field table's 14.
 TIN, BRN = "C0000000001", "000000000001"
 LISTS = (
@@ -115,6 +115,14 @@ def test_each_code_list_is_loaded_from_its_versioned_file(name, filename, label,
     assert loaded[code] == description
     assert set(loaded) == {row["Code"] for row in raw}
     assert all(loaded[row["Code"]] == row[label].strip() for row in raw)
+
+
+def test_myinvois_reads_the_code_lists_through_the_core_source():
+    from core import lhdn_codes
+
+    assert code_list_sources() == lhdn_codes.code_list_sources()
+    for name, _filename, _label, _code, _description in LISTS:
+        assert LOADERS[name]() is getattr(lhdn_codes, LOADERS[name].__name__)()
 
 
 def test_each_code_list_records_its_source_and_the_date_it_was_taken():
