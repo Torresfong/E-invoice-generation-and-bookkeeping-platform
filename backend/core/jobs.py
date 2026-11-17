@@ -153,9 +153,10 @@ def _become_worker():
 def as_worker_in(company):
     """Run a block as the worker role in `company`'s context, as a job handler for it would, for operator tooling.
 
-    For reading. It sets no audit correlation id, which a job sets for the entries it writes (D50 (6)), so a block that
-    writes audited rows must set one itself. The database then shows the block only that company's rows of the tables
-    open to the worker, whoever calls this.
+    For reading, from top-level operator tooling only. It sets no audit correlation id, which a job sets for the entries
+    it writes (D50 (6)), so a block that writes audited rows must set one itself. On exit it clears the company context
+    and correlation id instead of restoring them, so a job handler, or another `as_worker_in` block, must not call it.
+    The database then shows the block only that company's rows of the tables open to the worker, whoever calls this.
     The calling connection must be allowed to take the worker role: the table owner, where it is not a superuser,
     must be a member of it.
     """

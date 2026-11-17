@@ -42,7 +42,9 @@ def test_a_company_with_e_invoicing_on_and_a_blank_name_and_phone_is_listed_by_l
 
     assert f"#{world['acme'].pk}" in shown and "Acme Sdn Bhd" in shown
     assert "phone number" in shown and "registered name" in shown
-    assert "+60312345678" not in shown and "Acme Registered Name Sdn Bhd" not in shown
+    # Labels only: no value of the setting that is still stored reaches the output (the blanked ones are gone anyway).
+    for stored in ("C9999999999", "200001000001", "1 Test Street", "82193", "50000", "Kuala Lumpur"):
+        assert stored not in shown
 
 
 def test_only_companies_with_the_switch_on_and_a_gap_are_listed(world):
