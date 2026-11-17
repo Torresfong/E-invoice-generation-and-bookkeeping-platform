@@ -1,0 +1,115 @@
+{
+  "_D": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
+  "_A": "urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2",
+  "_B": "urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2",
+  "Invoice": [
+    {
+      "ID": [{"_": "INV-1"}],
+      "IssueDate": [{"_": "2026-01-15"}],
+      "IssueTime": [{"_": "08:00:00Z"}],
+      "InvoiceTypeCode": [{"_": "01", "listVersionID": "1.1"}],
+      "DocumentCurrencyCode": [{"_": "MYR"}],
+      "AccountingSupplierParty": [
+        {
+          "Party": [
+            {
+              "IndustryClassificationCode": [{"_": "82193", "name": "Secretarial support services"}],
+              "PartyIdentification": [
+                {"ID": [{"_": "C9999999999", "schemeID": "TIN"}]},
+                {"ID": [{"_": "200001000001", "schemeID": "BRN"}]},
+                {"ID": [{"_": "NA", "schemeID": "SST"}]},
+                {"ID": [{"_": "NA", "schemeID": "TTX"}]}
+              ],
+              "PostalAddress": [
+                {
+                  "AddressLine": [{"Line": [{"_": "1 Test Street"}]}],
+                  "CityName": [{"_": "Kuala Lumpur"}],
+                  "CountrySubentityCode": [{"_": "14"}],
+                  "Country": [{"IdentificationCode": [{"_": "MYS", "listID": "ISO3166-1", "listAgencyID": "6"}]}],
+                  "PostalZone": [{"_": "50000"}]
+                }
+              ],
+              "PartyLegalEntity": [{"RegistrationName": [{"_": "Acme Registered Name Sdn Bhd"}]}],
+              "Contact": [{"Telephone": [{"_": "+60312345678"}]}]
+            }
+          ]
+        }
+      ],
+      "AccountingCustomerParty": [
+        {
+          "Party": [
+            {
+              "PartyLegalEntity": [{"RegistrationName": [{"_": "Buyer Sdn Bhd"}]}],
+              "PartyIdentification": [
+                {"ID": [{"_": "C1234567890", "schemeID": "TIN"}]},
+                {"ID": [{"_": "201901234567", "schemeID": "BRN"}]},
+                {"ID": [{"_": "W10-1234-56000001", "schemeID": "SST"}]}
+              ],
+              "PostalAddress": [
+                {
+                  "AddressLine": [{"Line": [{"_": "2 Buyer Road"}]}, {"Line": [{"_": "Taman Test"}]}],
+                  "CityName": [{"_": "Petaling Jaya"}],
+                  "CountrySubentityCode": [{"_": "10"}],
+                  "Country": [{"IdentificationCode": [{"_": "MYS", "listID": "ISO3166-1", "listAgencyID": "6"}]}],
+                  "PostalZone": [{"_": "47400"}]
+                }
+              ],
+              "Contact": [{"Telephone": [{"_": "+601236789"}]}]
+            }
+          ]
+        }
+      ],
+      "TaxTotal": [
+        {
+          "TaxAmount": [{"_": 0.00, "currencyID": "MYR"}],
+          "TaxSubtotal": [
+            {
+              "TaxableAmount": [{"_": 11.00, "currencyID": "MYR"}],
+              "TaxAmount": [{"_": 0.00, "currencyID": "MYR"}],
+              "TaxCategory": [
+                {"ID": [{"_": "06"}], "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}]}
+              ]
+            }
+          ]
+        }
+      ],
+      "LegalMonetaryTotal": [
+        {
+          "LineExtensionAmount": [{"_": 11.00, "currencyID": "MYR"}],
+          "TaxExclusiveAmount": [{"_": 11.00, "currencyID": "MYR"}],
+          "TaxInclusiveAmount": [{"_": 11.00, "currencyID": "MYR"}],
+          "PayableAmount": [{"_": 11.00, "currencyID": "MYR"}]
+        }
+      ],
+      "InvoiceLine": [
+        {
+          "ID": [{"_": "1"}],
+          "InvoicedQuantity": [{"_": 2, "unitCode": "C62"}],
+          "LineExtensionAmount": [{"_": 11.00, "currencyID": "MYR"}],
+          "TaxTotal": [
+            {
+              "TaxAmount": [{"_": 0.00, "currencyID": "MYR"}],
+              "TaxSubtotal": [
+                {
+                  "TaxableAmount": [{"_": 11.00, "currencyID": "MYR"}],
+                  "TaxAmount": [{"_": 0.00, "currencyID": "MYR"}],
+                  "TaxCategory": [
+                    {"ID": [{"_": "06"}], "TaxScheme": [{"ID": [{"_": "OTH", "schemeID": "UN/ECE 5153", "schemeAgencyID": "6"}]}]}
+                  ]
+                }
+              ]
+            }
+          ],
+          "Item": [
+            {
+              "CommodityClassification": [{"ItemClassificationCode": [{"_": "022", "listID": "CLASS"}]}],
+              "Description": [{"_": "Widget"}]
+            }
+          ],
+          "Price": [{"PriceAmount": [{"_": 5.50, "currencyID": "MYR"}]}],
+          "ItemPriceExtension": [{"Amount": [{"_": 11.00, "currencyID": "MYR"}]}]
+        }
+      ]
+    }
+  ]
+}
