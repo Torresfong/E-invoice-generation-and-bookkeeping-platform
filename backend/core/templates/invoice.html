@@ -12,7 +12,7 @@
   {% if error %}<p role="alert">{{ error }}</p>{% endif %}
   {% can "manage_invoices" company as may_manage %}
   {% can "approve_invoices" company as may_approve %}
-  {% if invoice and invoice.status != "draft" %}
+  {% if invoice and invoice.status != "draft" %}{# an approved invoice reads its own copy of the buyer and the item names #}
     <p>{{ invoice.number }} · {% if invoice.status == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Approved" %}{% endif %} · {% if invoice.is_einvoice %}{% trans "E-invoice" %}{% else %}{% trans "Normal invoice" %}{% endif %}</p>
     <h2>{% trans "Buyer" %}</h2>
     <p>{{ invoice.buyer_legal_name }}</p>
@@ -24,7 +24,7 @@
       </thead>
       <tbody>
         {% for line in invoice.lines.all %}
-          <tr><td>{{ line.item.name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td></tr>
+          <tr><td>{{ line.item_name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td></tr>
         {% endfor %}
       </tbody>
     </table>

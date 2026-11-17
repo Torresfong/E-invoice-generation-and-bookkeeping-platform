@@ -225,6 +225,10 @@ def approve_invoice(user, invoice, *, acknowledged=False):
 
         for name in BUYER_FIELDS:
             setattr(current, f"buyer_{name}", getattr(customer, name))
+        # Before the status changes: the lines of an approved invoice are locked by the database.
+        for line in current.lines.select_related("item"):
+            line.item_name = line.item.name
+            line.save(update_fields=["item_name"])
         current.is_einvoice = is_einvoice
         current.number = numbering.allocate_number(company, current.document_type)
         current.status = Invoice.APPROVED

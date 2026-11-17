@@ -431,6 +431,9 @@ class InvoiceLine(TenantModel):
 
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="+")
+    # The item's name as it was at approval (#46); empty on a draft's line, which reads the item. The lines of an
+    # approved invoice are locked, so a later rename of the item never changes the invoice.
+    item_name = models.CharField(max_length=200, blank=True, default="", db_default="")
     quantity = models.DecimalField(max_digits=18, decimal_places=4)
     unit_price = models.DecimalField(max_digits=18, decimal_places=4)
 

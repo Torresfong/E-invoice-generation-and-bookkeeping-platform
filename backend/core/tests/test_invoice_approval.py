@@ -402,3 +402,15 @@ def test_approving_needs_a_post(client, world, books, as_production_connection):
     with as_production_connection():
         sign_in(client, world["acme_owner"])
         assert client.get(page_url(world["acme"], draft, "approve")).status_code == 405
+
+
+def test_item_names_are_copied_at_approval_so_a_later_item_rename_never_changes_the_invoice(world, books, client, as_production_connection):
+    invoice = approve(world, new_draft(world, books))
+
+    items.update_item(world["acme_staff"], books["item"], name="Renamed widget")
+
+    assert [line.item_name for line in invoice.lines.all()] == ["Widget"]
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        page = client.get(page_url(world["acme"], invoice)).content.decode()
+    assert "Widget" in page and "Renamed widget" not in page
