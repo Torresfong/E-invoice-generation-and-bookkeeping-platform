@@ -215,9 +215,11 @@ def test_a_company_with_no_firm_can_use_every_client_portal_write_that_exists(
     with as_production_connection():
         statuses["draft"] = client.post(f"{base}/invoices/new/", draft_form(customer, (item, "2", "5"))).status_code
     draft = Invoice.objects.get(company=company)
+    # Sign-up stored the setting with the database's current date; a later change may not start earlier than that.
+    signed_up_on = CompanyEInvoiceSetting.objects.get(company=company).effective_from.isoformat()
     with as_production_connection():
         statuses["approve"] = client.post(f"{base}/invoices/{draft.pk}/approve/").status_code
-        statuses["setting"] = client.post(f"{base}/einvoicing/", setting_form(effective_from="2027-01-01")).status_code
+        statuses["setting"] = client.post(f"{base}/einvoicing/", setting_form(effective_from=signed_up_on)).status_code
         statuses["invite"] = client.post(f"{base}/invite/", {"email": "staff@solo.example"}).status_code
         statuses["item off"] = client.post(f"{base}/items/{item.pk}/deactivate/").status_code
         statuses["customer off"] = client.post(f"{base}/customers/{customer.pk}/deactivate/").status_code
