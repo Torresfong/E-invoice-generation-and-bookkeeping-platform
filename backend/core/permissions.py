@@ -28,6 +28,7 @@ ACTIONS = {
     "change_customer_identity": {OWNER},  # legal name, TIN, ID type and value (D46, ticket #7)
     "view_invoices": {OWNER, STAFF, ACCOUNTANT},
     "manage_invoices": {OWNER, STAFF},  # draft, edit and delete a draft invoice (D17, ticket #44)
+    "approve_invoices": {OWNER},  # approve (and approve again), and cancel; no delegation (D17, ticket #46)
     "view_audit_trail": {OWNER, ACCOUNTANT},
     "view_own_activity": {OWNER, STAFF, ACCOUNTANT},
 }

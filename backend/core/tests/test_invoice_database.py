@@ -9,7 +9,7 @@ from decimal import Decimal
 import pytest
 from django.db import DatabaseError, connection, transaction
 
-from core import customers, invoices, items
+from core import customers, invoices, items, numbering
 from core.models import Invoice, InvoiceLine
 
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
@@ -66,7 +66,7 @@ def test_amounts_are_numeric_columns_and_a_draft_number_may_be_empty(db):
 
 def test_the_database_refuses_a_numbered_draft_an_unknown_status_and_bad_amounts(world, books):
     attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(number="INV-1"))
-    attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(status="approved"))
+    attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(status="approved"))  # no number, buyer or time
     line = books["acme_draft"].lines.get()
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(quantity=Decimal("0")))
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(unit_price=Decimal("-0.01")))
@@ -127,15 +127,12 @@ def test_job_handlers_read_the_invoices_of_their_company_only_and_never_write(wo
 
 
 def test_an_invoice_that_has_left_the_draft_state_is_locked_with_its_lines(world, books):
-    # No code can make a non-draft invoice yet (approval is ticket #46). Lift the status constraint for this test only:
-    # DDL is transactional in PostgreSQL, so the test's rollback restores it.
-    with connection.cursor() as cursor:
-        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")  # run the deferred foreign-key checks, or ALTER TABLE is refused
-        cursor.execute("ALTER TABLE core_invoice DROP CONSTRAINT invoice_status_known")
-        cursor.execute("UPDATE core_invoice SET status = 'approved' WHERE id = %s", [books["acme_draft"].pk])
-    invoice, line = books["acme_draft"], books["acme_draft"].lines.get()
+    numbering.configure_sequence(world["acme"], numbering.INVOICE, prefix="INV-", start_number=1)
+    invoice = invoices.approve_invoice(world["acme_owner"], books["acme_draft"])
+    line = invoice.lines.get()
 
-    attempt(lambda: Invoice.objects.filter(pk=invoice.pk).update(customer=books["acme_customer"]))
+    other = customers.create_customer(world["acme_owner"], world["acme"], legal_name="Another buyer")
+    attempt(lambda: Invoice.objects.filter(pk=invoice.pk).update(customer=other))
     attempt(lambda: Invoice.objects.filter(pk=invoice.pk).delete())
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(quantity=2))
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).delete())

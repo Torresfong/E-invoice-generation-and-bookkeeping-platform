@@ -11,7 +11,24 @@
   {% if message %}<p role="status">{{ message }}</p>{% endif %}
   {% if error %}<p role="alert">{{ error }}</p>{% endif %}
   {% can "manage_invoices" company as may_manage %}
-  {% if invoice and not may_manage %}
+  {% can "approve_invoices" company as may_approve %}
+  {% if invoice and invoice.status != "draft" %}
+    <p>{{ invoice.number }} · {% if invoice.status == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Approved" %}{% endif %} · {% if invoice.is_einvoice %}{% trans "E-invoice" %}{% else %}{% trans "Normal invoice" %}{% endif %}</p>
+    <h2>{% trans "Buyer" %}</h2>
+    <p>{{ invoice.buyer_legal_name }}</p>
+    <p>{{ invoice.buyer_address_line1 }} {{ invoice.buyer_address_line2 }} {{ invoice.buyer_postal_zone }} {{ invoice.buyer_city }} {{ invoice.buyer_state_code }} {{ invoice.buyer_country_code }}</p>
+    <p>{% if invoice.buyer_tin %}{% trans "TIN" %}: {{ invoice.buyer_tin }}{% endif %} {% if invoice.buyer_id_value %}{{ invoice.buyer_id_type }}: {{ invoice.buyer_id_value }}{% endif %}</p>
+    <table>
+      <thead>
+        <tr><th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th></tr>
+      </thead>
+      <tbody>
+        {% for line in invoice.lines.all %}
+          <tr><td>{{ line.item.name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% elif invoice and not may_manage %}
     <p>{{ invoice.customer.legal_name }}</p>
     <table>
       <thead>
@@ -55,6 +72,16 @@
     {% if invoice %}
       <form method="post" action="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/delete/">{% csrf_token %}<button type="submit">{% trans "Delete draft" %}</button></form>
     {% endif %}
+  {% endif %}
+  {% if invoice and invoice.status == "draft" and may_approve %}
+    <form method="post" action="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/approve/">
+      {% csrf_token %}
+      {% if needs_acknowledgement %}
+        <p role="alert">{% trans "Issuing a normal invoice for a mandatory company needs your acknowledgement." %}</p>
+        <p><label><input type="checkbox" name="acknowledged" required> {{ acknowledgement_text }}</label></p>
+      {% endif %}
+      <button type="submit">{% trans "Approve" %}</button>
+    </form>
   {% endif %}
   <p><a href="/companies/{{ company.pk }}/invoices/">{% trans "Back to the invoices" %}</a></p>
 </body>

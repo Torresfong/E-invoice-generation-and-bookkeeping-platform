@@ -114,12 +114,35 @@ def _validate(enabled, status, effective_from, supplier):
         value = supplier[name]
         if enabled and name in REQUIRED_WHEN_ON and not value:
             raise InvalidSetting(_("Enter the %(field)s.") % {"field": labels[name]})
-        too_long = name in MAX_LENGTH and len(value) > MAX_LENGTH[name]
-        malformed = value and (
-            (name in PATTERNS and not PATTERNS[name].fullmatch(value)) or (name in FORMATS and not FORMATS[name](value))
-        )
-        if too_long or malformed:
+        if _unacceptable(name, value):
             raise InvalidSetting(_("Check the %(field)s.") % {"field": labels[name]})
+
+
+def _unacceptable(name, value):
+    """Is a given supplier value too long or malformed? An empty value is judged by `REQUIRED_WHEN_ON`, not here."""
+    too_long = name in MAX_LENGTH and len(value) > MAX_LENGTH[name]
+    malformed = value and (
+        (name in PATTERNS and not PATTERNS[name].fullmatch(value)) or (name in FORMATS and not FORMATS[name](value))
+    )
+    return bool(too_long or malformed)
+
+
+def supplier_gaps(company):
+    """The labels of what stops `company` issuing an e-invoice: a missing or invalid supplier field, never a value.
+
+    A setting saved before #172 can still hold a blank registered name or phone, because the rule is checked only at
+    the next save. Approval (#46) refuses such a supplier rather than snapshot blanks.
+    """
+    setting = current_setting(company)
+    labels = _labels()
+    if setting is None:
+        return [labels[name] for name in SUPPLIER_FIELDS if name in REQUIRED_WHEN_ON]
+    gaps = []
+    for name in SUPPLIER_FIELDS:
+        value = (getattr(setting, name) or "").strip()
+        if (name in REQUIRED_WHEN_ON and not value) or _unacceptable(name, value):
+            gaps.append(labels[name])
+    return gaps
 
 
 def acknowledgement_required(previous, enabled, status):

@@ -55,6 +55,7 @@ ENDPOINTS = [
     ("POST", "/companies/{pk}/invoices/new/", "companies/<int:pk>/invoices/new/"),
     ("POST", "/companies/{pk}/invoices/1/", "companies/<int:pk>/invoices/<int:invoice_pk>/"),
     ("POST", "/companies/{pk}/invoices/1/delete/", "companies/<int:pk>/invoices/<int:invoice_pk>/delete/"),
+    ("POST", "/companies/{pk}/invoices/1/approve/", "companies/<int:pk>/invoices/<int:invoice_pk>/approve/"),
     ("POST", "/companies/{pk}/invite/", "companies/<int:pk>/invite/"),
 ]
 
