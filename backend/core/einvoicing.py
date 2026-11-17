@@ -152,17 +152,18 @@ def supplier_gaps(company):
 
 
 def companies_with_supplier_gaps():
-    """For an operator: each company with e-invoicing on and what is missing, as `(company, labels)`, by company id.
+    """For an operator: each company with e-invoicing on today and what is missing, as `(company, labels)`, by company id.
 
-    The setting table is under forced row-level security and the table owner has no policy on it, so each company is
+    "On" is the same question approval asks, `einvoicing_enabled(company, today)` from the dated history (D59 (2)), so a
+    switch-on that takes effect later is not listed yet. The setting table is under forced row-level security and the table owner has no policy on it, so each company is
     read as the worker role in that company's context (`jobs.as_worker_in`): the database shows one company at a time,
     and only `Company` is read across all of them. Only labels leave this function, never a value.
     """
+    today = timezone.localdate()
     listed = []
     for company in Company.objects.order_by("pk"):
         with jobs.as_worker_in(company):
-            setting = current_setting(company)
-            if setting is not None and setting.einvoicing_enabled and (gaps := supplier_gaps(company)):
+            if einvoicing_enabled(company, today) and (gaps := supplier_gaps(company)):
                 listed.append((company, gaps))
     return listed
 

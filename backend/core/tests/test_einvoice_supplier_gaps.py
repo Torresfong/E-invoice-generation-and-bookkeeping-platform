@@ -4,7 +4,7 @@ Tested through the operator command, as in test_operator.py. A setting saved bef
 or phone, which approval (#46) refuses; the listing names those companies before the owner finds out at the first approval.
 """
 
-from datetime import date
+from datetime import date, timedelta
 from io import StringIO
 
 import pytest
@@ -64,6 +64,19 @@ def test_only_companies_with_the_switch_on_and_a_gap_are_listed(world):
     assert f"#{world['acme'].pk}" in shown
     for left_out in (world["beta"], off_with_gaps, never_saved):
         assert f"#{left_out.pk}" not in shown and left_out.name not in shown
+
+
+def test_a_company_switched_on_from_a_future_date_is_not_listed_until_that_date(world):
+    # Approval treats the switch as on only from its effective date (D59 (2)), so the listing must agree.
+    einvoicing.update_setting(
+        world["acme_owner"], world["acme"], einvoicing_enabled=True, status="voluntary",
+        effective_from=date.today() + timedelta(days=30), legal_name="Acme Registered Name Sdn Bhd",
+        phone="+60312345678", tin="C9999999999", brn="200001000001", msic_code="82193", address_line1="1 Test Street",
+        city="Kuala Lumpur", postal_zone="50000", state_code="14", country_code="MYS",
+    )
+    blank_supplier_details(world["acme"], phone="")
+
+    assert "No company" in listing()
 
 
 def test_it_says_so_when_no_company_has_a_gap(world):
