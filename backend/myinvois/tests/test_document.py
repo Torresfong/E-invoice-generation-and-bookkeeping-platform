@@ -327,6 +327,24 @@ def test_a_line_amount_rounds_half_a_sen_up(world, books):
     assert line["ItemPriceExtension"] == [{"Amount": [{"_": 0.01, "currencyID": "MYR"}]}]
 
 
+def test_a_large_line_amount_rounds_correctly_despite_pythons_default_decimal_precision(world, books):
+    # Codex's finding on PR #191: quantity and unit_price are each NUMERIC(18,4) (core/models.py), so their exact
+    # product can need up to 36 significant digits - more than Python's default 28-digit Decimal context. Both
+    # values below are inside what core.invoices._amount already accepts (at most 14 integer, 4 fractional
+    # digits each), so this is reachable, not a theoretical maximum. Under the ambient (default) context the
+    # multiplication itself would already round to 28 significant digits, under ROUND_HALF_EVEN, before
+    # `.quantize(..., ROUND_HALF_UP)` ever saw the result - giving ...438.56 instead of the correctly rounded
+    # ...438.55 confirmed by hand below. `_line_details` works around this with its own, wider-precision context.
+    invoice = approved_invoice(world, books, lines=[
+        {"item": books["item"].pk, "quantity": "70442201917.6046", "unit_price": "55353191799.5913"},
+    ])
+
+    (inv,) = decode(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
+
+    (line,) = inv["InvoiceLine"]
+    assert line["ItemPriceExtension"] == [{"Amount": [{"_": 3899200713530705492438.55, "currencyID": "MYR"}]}]
+
+
 def test_a_draft_invoice_is_refused(world, books):
     owner, acme = world["acme_owner"], world["acme"]
     draft = invoices.create_draft(

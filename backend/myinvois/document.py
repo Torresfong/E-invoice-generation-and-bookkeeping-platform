@@ -25,7 +25,7 @@ padded code is refused before it is ever stored.
 
 import json
 from datetime import timezone as dt_timezone
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 from uuid import uuid4
 
 from core import einvoicing
@@ -59,6 +59,14 @@ UBL_NAMESPACES = {
 }
 
 CENTS = Decimal("0.01")
+
+# `InvoiceLine.quantity` and `.unit_price` are each NUMERIC(18,4): up to 14 integer and 4 fractional digits
+# (`core/models.py`). Their exact product can need up to 36 significant digits (14+14 integer, 4+4 fractional),
+# more than Python's default 28-digit Decimal context. Multiplying in the ambient context would silently round
+# the product under ROUND_HALF_EVEN before `.quantize(..., ROUND_HALF_UP)` ever saw it, for inputs well inside
+# what `core.invoices._amount` already accepts, and `quantize` itself raises `InvalidOperation` once the exact
+# product needs more digits than the context allows. 50 is comfortable headroom above the 36-digit maximum.
+LINE_AMOUNT_PRECISION = 50
 
 
 class InvalidDocument(PermanentError, ValueError):
@@ -189,7 +197,9 @@ def _line_details(line, invoice_number):
     # D-number records that rounding rule, and the invoice engine's own PDF and export (#12, #60-#63) will need
     # the same total; raised for Torres on PR #191 rather than decided here, since moving the calculation into
     # `core` so every consumer shares one answer would touch the invoice engine, which this ticket does not.
-    subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
+    with localcontext() as ctx:
+        ctx.prec = LINE_AMOUNT_PRECISION
+        subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
     return {
         "classification_code": line.item.classification_code,
         "description": line.item_name,
