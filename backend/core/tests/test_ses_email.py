@@ -109,7 +109,15 @@ def test_nothing_in_the_logs_holds_a_link_a_token_or_an_address(caplog):
     assert "owner@acme.example" not in logged
 
 
-def test_the_real_client_gives_up_in_ten_seconds_and_never_retries_a_send():
+@pytest.fixture
+def offline_aws(monkeypatch):
+    """Building a real boto3 client resolves credentials; dummy ones and no metadata service keep that offline."""
+    monkeypatch.setenv("AWS_ACCESS_KEY_ID", "test-key-id")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "test-secret")
+    monkeypatch.setenv("AWS_EC2_METADATA_DISABLED", "true")
+
+
+def test_the_real_client_gives_up_in_ten_seconds_and_never_retries_a_send(offline_aws):
     """A request waits on the send, and a retry after a read timeout could deliver the message twice."""
     from core.ports.ses import ses_client
 
@@ -120,7 +128,7 @@ def test_the_real_client_gives_up_in_ten_seconds_and_never_retries_a_send():
     assert config.retries["total_max_attempts"] == 1
 
 
-def test_the_real_client_does_not_let_botocore_log_request_bodies():
+def test_the_real_client_does_not_let_botocore_log_request_bodies(offline_aws):
     """botocore logs every request's parameters at DEBUG, and the body holds a single-use link."""
     from core.ports.ses import ses_client
 
