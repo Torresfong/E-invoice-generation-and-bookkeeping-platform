@@ -20,11 +20,6 @@ PATH = "/signup/"
 OWNER_PASSWORD = "a long enough passphrase"
 
 
-@pytest.fixture
-def signup_open(settings):
-    settings.SIGNUP_ENABLED = True
-
-
 def submit(client, email="solo@owner.example", name="Solo Sdn Bhd", einvoicing_choice="yes"):
     data = {"email": email, "company_name": name}
     if einvoicing_choice is not None:

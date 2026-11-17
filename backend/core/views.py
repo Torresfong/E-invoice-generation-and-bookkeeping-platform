@@ -712,7 +712,7 @@ def _registration_closed(request):
     return render(request, "signup_closed.html", status=403)
 
 
-def _valid_sign_up_form(request, email, company_name):
+def _sign_up_form_error(email, company_name):
     """The error to show for a sign-up form, or None when the address and the company name are acceptable."""
     try:
         validate_email(email)
@@ -742,7 +742,7 @@ def open_sign_up(request):
     company_name = request.POST.get("company_name", "").strip()
     choice = request.POST.get("issues_einvoices", "")
     context = {"open": True, "email": email, "company_name": company_name, "issues_einvoices": choice}
-    error = _valid_sign_up_form(request, email, company_name)
+    error = _sign_up_form_error(email, company_name)
     if error is None and choice not in ("yes", "no"):
         error = _("Say whether your company issues e-invoices.")
     if error:
@@ -770,7 +770,7 @@ def sign_up(request, token):
 
     company_name = request.POST.get("company_name", "").strip()
     context = {"email": email, "company_name": company_name}
-    error = _valid_sign_up_form(request, email, company_name)
+    error = _sign_up_form_error(email, company_name)
     if error:
         return render(request, "signup.html", {**context, "error": error})
     try:
