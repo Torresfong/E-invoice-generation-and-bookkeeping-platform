@@ -33,6 +33,7 @@ from core.views import (
     register,
     sign_in,
     sign_out,
+    open_sign_up,
     sign_up,
     signup_links,
 )
@@ -67,6 +68,7 @@ urlpatterns = [
     path("firm/<int:pk>/deactivate/", deactivate_firm_person),
     path("apply/", apply_as_firm),
     path("signup-links/", signup_links),
+    path("signup/", open_sign_up),
     path("signup/<str:token>/", sign_up),
     path("register/<str:token>/", register),
     path("accept/<str:token>/", accept_invitation),

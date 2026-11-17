@@ -64,6 +64,31 @@ def start(signup_link, email, company_name):
         raise
 
 
+def start_open(email, company_name, issues_einvoices):
+    """Store a pending registration with no firm and email the verification link (D67 (2)).
+
+    `issues_einvoices` is the owner's answer, applied as the company's e-invoice switch when the registration is
+    completed. As with `start`, an address that already has an account is silently skipped and the email is sent inside
+    the transaction.
+    """
+    raw, hashed = new_token()
+    expires = timezone.now() + timedelta(hours=settings.REGISTRATION_LINK_HOURS)
+    with transaction.atomic():
+        created = scalar(
+            "SELECT start_open_registration(%s, %s, %s, %s, %s)", [hashed, email, company_name, issues_einvoices, expires]
+        )
+        if created:
+            ports.get().email.send(
+                email,
+                _("Confirm your registration"),
+                _(
+                    "Use this link to choose a password and finish creating %(company)s. "
+                    "It works once and expires in %(hours)s hours:\n\n%(url)s\n"
+                )
+                % {"company": company_name, "hours": settings.REGISTRATION_LINK_HOURS, "url": link("register", raw)},
+            )
+
+
 def complete(verification_link, password):
     """Create the company, the owner and the owner's membership from a pending registration. Returns the new owner.
 
