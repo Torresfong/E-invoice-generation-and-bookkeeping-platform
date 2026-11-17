@@ -24,6 +24,7 @@ NOT_AUDITED = {
     "companies/<int:pk>/customers/<int:customer_pk>/activate/": "owner and staff action: an accountant is refused before anything is shown",
     "companies/<int:pk>/invoices/new/": "owner and staff action: an accountant is refused before anything is shown",
     "companies/<int:pk>/invoices/<int:invoice_pk>/delete/": "owner and staff action: an accountant is refused before anything is shown",
+    "companies/<int:pk>/invoices/<int:invoice_pk>/approve/": "owner action: an accountant is refused before anything is shown",
 }
 
 

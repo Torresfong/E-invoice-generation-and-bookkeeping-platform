@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, customers, einvoicing, firm_admin, firm_applications, invoices, items, permissions, registration, throttle, tokens
+from . import audit, customers, einvoicing, firm_admin, firm_applications, invoices, items, numbering, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Invoice, Item, SupplierDetails
 from .signin import complete_sign_in
 
@@ -427,7 +427,31 @@ def invoice_detail(request, pk, invoice_pk):
     context = _invoice_context(access, invoice)
     if request.GET.get("saved"):
         context["message"] = _("Draft saved.")
+    if request.GET.get("approved"):
+        context["message"] = _("Invoice approved.")
     return render(request, "invoice.html", context)
+
+
+@require_POST
+def invoice_approve(request, pk, invoice_pk):
+    """The owner approves a draft: it takes its number, the buyer is copied and the invoice locks (D17, D19, D44)."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "approve_invoices", access.company)
+    invoice = get_object_or_404(Invoice.objects.select_related("customer"), pk=invoice_pk, company_id=pk)
+    try:
+        invoices.approve_invoice(request.user, invoice, acknowledged=bool(request.POST.get("acknowledged")))
+    except invoices.InvalidInvoice as problem:
+        return render(request, "invoice.html", _invoice_context(access, invoice, error=str(problem)))
+    except einvoicing.AcknowledgementRequired:
+        context = _invoice_context(access, invoice, needs_acknowledgement=True)
+        context["acknowledgement_text"] = einvoicing.ACKNOWLEDGEMENT_TEXT
+        return render(request, "invoice.html", context)
+    except numbering.SequenceNotConfigured:
+        error = _("Set the invoice numbering before approving.")
+        return render(request, "invoice.html", _invoice_context(access, invoice, error=error))
+    return redirect(_invoices_url(pk, invoice_pk) + "?approved=1")
 
 
 @require_POST

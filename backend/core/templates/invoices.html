@@ -23,9 +23,9 @@
       <tbody>
         {% for invoice in invoices %}
           <tr>
-            <td><a href="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/">{{ invoice.customer.legal_name }}</a></td>
+            <td><a href="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/">{% if invoice.buyer_legal_name %}{{ invoice.buyer_legal_name }}{% else %}{{ invoice.customer.legal_name }}{% endif %}</a></td>
             <td>{% if invoice.number %}{{ invoice.number }}{% else %}—{% endif %}</td>
-            <td>{% trans "Draft" %}</td>
+            <td>{% if invoice.status == "approved" %}{% trans "Approved" %}{% elif invoice.status == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Draft" %}{% endif %}</td>
             <td>{{ invoice.created_at|date:"Y-m-d" }}</td>
           </tr>
         {% endfor %}

@@ -354,27 +354,70 @@ class CustomerChange(TenantModel):
 
 
 class Invoice(TenantModel):
-    """An invoice a company is drafting (D44, D59 (1); ticket #44).
+    """An invoice of a company, from draft to approved (D44, D59 (1); tickets #44, #46).
 
-    The invoice generation engine owns it and it holds nothing specific to LHDN: whether it becomes an e-invoice or a
-    normal invoice is decided at approval from the company's e-invoice setting (D59 (3)). A draft has no number, so
-    deleting one cannot leave a gap (D44); the number is taken at approval (D62, #45). Migration 0041 lets a draft be
-    deleted and refuses to change or delete anything else, so an approved invoice stays locked (D17, D19).
+    The invoice generation engine owns it and it holds nothing specific to LHDN. A draft has no number, so deleting
+    one cannot leave a gap (D44). The owner's approval takes the number (D62, #45), copies the buyer onto the invoice
+    (D19) and records whether it is an e-invoice or a normal invoice from the company's setting at that moment
+    (D59 (3)). Migration 0043 holds the rules in the database: the owner and staff change or delete a draft; an
+    approved invoice changes only when the owner approves it again (renewing the issue time, D60 (2)) or cancels it; the
+    database does not check the 72 hours, the submission ticket decides when a second approval is offered. A number is
+    unique per company and document type.
     """
 
-    DRAFT = "draft"
+    DRAFT, APPROVED, CANCELLED = "draft", "approved", "cancelled"
 
     customer = models.ForeignKey(Customer, on_delete=models.PROTECT, related_name="+")
+    document_type = models.CharField(max_length=12, default="invoice", db_default="invoice")
     status = models.CharField(max_length=10, default=DRAFT, db_default=DRAFT)
     number = models.CharField(max_length=20, null=True, blank=True)
     created_at = models.DateTimeField(db_default=Now())
+    # Set at approval. `approved_at` is the issue time; it is renewed when the owner approves again (D60 (2)).
+    approved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    approved_at = models.DateTimeField(null=True, blank=True)
+    # True for an e-invoice, False for a normal invoice; null while a draft. Locked at approval (D59 (3)).
+    is_einvoice = models.BooleanField(null=True, blank=True)
+    # The owner's acknowledgement when a company of status mandatory issues a normal invoice (D59 (5)).
+    acknowledged_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    acknowledged_version = models.CharField(max_length=40, blank=True, default="", db_default="")
+    # The buyer as it was at approval (D19, #172). Empty while a draft, which reads the customer.
+    buyer_legal_name = models.CharField(max_length=200, blank=True, default="", db_default="")
+    buyer_tin = models.CharField(max_length=20, blank=True, default="", db_default="")
+    buyer_id_type = models.CharField(max_length=8, blank=True, default="", db_default="")
+    buyer_id_value = models.CharField(max_length=20, blank=True, default="", db_default="")
+    buyer_phone = models.CharField(max_length=20, blank=True, default="", db_default="")
+    buyer_sst_number = models.CharField(max_length=35, blank=True, default="", db_default="")
+    buyer_address_line1 = models.CharField(max_length=150, blank=True, default="", db_default="")
+    buyer_address_line2 = models.CharField(max_length=150, blank=True, default="", db_default="")
+    buyer_city = models.CharField(max_length=50, blank=True, default="", db_default="")
+    buyer_postal_zone = models.CharField(max_length=50, blank=True, default="", db_default="")
+    buyer_state_code = models.CharField(max_length=50, blank=True, default="", db_default="")
+    buyer_country_code = models.CharField(max_length=3, blank=True, default="", db_default="")
 
     class Meta:
         constraints = [
-            models.CheckConstraint(condition=models.Q(status="draft"), name="invoice_status_known"),
+            models.CheckConstraint(
+                condition=models.Q(status__in=["draft", "approved", "cancelled"]), name="invoice_status_known"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(document_type__in=["invoice", "credit_note", "debit_note", "refund_note"]),
+                name="invoice_document_type_known",
+            ),
             models.CheckConstraint(
                 condition=~models.Q(status="draft") | models.Q(number__isnull=True), name="invoice_draft_has_no_number"
             ),
+            models.CheckConstraint(
+                condition=models.Q(status="draft")
+                | (
+                    models.Q(
+                        number__isnull=False, approved_at__isnull=False, approved_by__isnull=False, is_einvoice__isnull=False
+                    )
+                    & ~models.Q(buyer_legal_name="")
+                ),
+                name="invoice_approved_is_complete",
+            ),
+            models.UniqueConstraint(fields=["company", "document_type", "number"], name="invoice_number_unique"),
         ]
         indexes = [models.Index(fields=["company", "-created_at"], name="invoice_company_created")]
         ordering = ["-created_at", "-id"]
@@ -388,6 +431,9 @@ class InvoiceLine(TenantModel):
 
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
     item = models.ForeignKey(Item, on_delete=models.PROTECT, related_name="+")
+    # The item's name as it was at approval (#46); empty on a draft's line, which reads the item. The lines of an
+    # approved invoice are locked, so a later rename of the item never changes the invoice.
+    item_name = models.CharField(max_length=200, blank=True, default="", db_default="")
     quantity = models.DecimalField(max_digits=18, decimal_places=4)
     unit_price = models.DecimalField(max_digits=18, decimal_places=4)
 
@@ -494,6 +540,7 @@ class AuditEntry(models.Model):
     UPDATE = "update"
     DELETE = "delete"
     VIEWED = "viewed"
+    APPROVED = "approved"
     ACTIONS = [
         (LOGIN, _("Signed in")),
         (LOGIN_FAILED, _("Failed sign-in")),
@@ -502,6 +549,7 @@ class AuditEntry(models.Model):
         (UPDATE, _("Updated")),
         (DELETE, _("Deleted")),
         (VIEWED, _("Viewed")),
+        (APPROVED, _("Approved")),
     ]
 
     company = models.ForeignKey(Company, null=True, on_delete=models.PROTECT, related_name="+")

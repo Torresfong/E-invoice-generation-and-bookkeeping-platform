@@ -18,15 +18,18 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from . import customers, items, permissions
+from . import audit, customers, einvoicing, items, numbering, permissions
 from .einvoicing import einvoicing_enabled
-from .models import Customer, Invoice, InvoiceLine, Item
+from .models import AuditEntry, Customer, Invoice, InvoiceLine, Item
 
 # The column sizes of InvoiceLine: NUMERIC(18, 4), so at most 14 digits before the point and 4 after it.
 # ASCII digits only: `\d` alone would also accept the digits of other scripts.
 AMOUNT = re.compile(r"[0-9]{1,14}(\.[0-9]{1,4})?")
 
-__all__ = ["InvalidInvoice", "InvoiceLocked", "create_draft", "delete_draft", "list_invoices", "update_draft"]
+__all__ = [
+    "InvalidInvoice", "InvoiceLocked", "approve_invoice", "cancel_invoice", "create_draft", "delete_draft",
+    "list_invoices", "update_draft",
+]
 
 
 class InvalidInvoice(ValueError):
@@ -155,6 +158,103 @@ def update_draft(user, invoice, *, customer_id, lines):
         current.customer = customer
         current.save(update_fields=["customer"])
         _write_lines(current, resolved)
+    invoice.refresh_from_db()
+    return invoice
+
+
+BUYER_FIELDS = (
+    "legal_name", "tin", "id_type", "id_value", "phone", "sst_number",
+    "address_line1", "address_line2", "city", "postal_zone", "state_code", "country_code",
+)
+
+
+def _refuse_incomplete(company, customer):
+    """With e-invoicing on, refuse a buyer or supplier with gaps. The draft checked the buyer only when it picked the
+    customer and the supplier setting only when it was saved, so either can have become incomplete since (#172)."""
+    problems = []
+    buyer = customers.einvoice_gaps(customer)
+    if buyer:
+        problems.append(_("the customer needs: %(fields)s") % {"fields": ", ".join(buyer)})
+    supplier = einvoicing.supplier_gaps(company)
+    if supplier:
+        problems.append(_("the e-invoice setting needs: %(fields)s") % {"fields": ", ".join(supplier)})
+    if problems:
+        raise InvalidInvoice(_("This invoice cannot be approved: %(problems)s.") % {"problems": "; ".join(problems)})
+
+
+def approve_invoice(user, invoice, *, acknowledged=False):
+    """The owner approves a draft: it takes the next number, copies the buyer, records the route and locks (D17, D19, D44).
+
+    Everything happens in one transaction, so a failure anywhere leaves the draft as it was and uses no number.
+    `acknowledged=True` is the owner's acceptance of the D59 (5) notice, needed to issue a normal invoice for a company
+    of status mandatory; it is recorded on the invoice. Raises `PermissionDenied` for anyone but the owner,
+    `InvalidInvoice` (naming fields, never values) for a missing line or an incomplete buyer or supplier,
+    `AcknowledgementRequired`, `SequenceNotConfigured`, and `InvoiceLocked` for a cancelled invoice.
+
+    An invoice that is already approved is approved again: its number, buyer and route stay, and only the approval
+    time and approver are renewed (D60 (2)), so numbering is never called a second time. This module does not know
+    whether the invoice has been submitted; the submission ticket decides when a second approval is offered.
+    """
+    permissions.require(user, "approve_invoices", invoice.company)
+    with transaction.atomic():
+        current = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if current.status == Invoice.CANCELLED:
+            raise InvoiceLocked
+        if current.status == Invoice.APPROVED:
+            current.approved_by, current.approved_at = user, timezone.now()
+            current.save(update_fields=["approved_by", "approved_at"])
+            audit.record(
+                AuditEntry.APPROVED, current.company, user, "invoice", current.pk, ["approved_at", "approved_by"]
+            )
+            invoice.refresh_from_db()
+            return invoice
+        if not current.lines.exists():
+            raise InvalidInvoice(_("Add at least one line."))
+
+        company, today = current.company, timezone.localdate()
+        # Held until the end, so the customer cannot be edited between the check and the copy.
+        customer = Customer.objects.select_for_update().get(pk=current.customer_id)
+        is_einvoice = einvoicing_enabled(company, today)
+        if is_einvoice:
+            _refuse_incomplete(company, customer)
+        elif einvoicing.is_mandatory(company):
+            if not acknowledged:
+                raise einvoicing.AcknowledgementRequired
+            current.acknowledged_by, current.acknowledged_at = user, timezone.now()
+            current.acknowledged_version = einvoicing.ACKNOWLEDGEMENT_VERSION
+
+        for name in BUYER_FIELDS:
+            setattr(current, f"buyer_{name}", getattr(customer, name))
+        # Before the status changes: the lines of an approved invoice are locked by the database.
+        for line in current.lines.select_related("item"):
+            line.item_name = line.item.name
+            line.save(update_fields=["item_name"])
+        current.is_einvoice = is_einvoice
+        current.number = numbering.allocate_number(company, current.document_type)
+        current.status = Invoice.APPROVED
+        current.approved_by, current.approved_at = user, timezone.now()
+        current.save()
+        audit.record(
+            AuditEntry.APPROVED, company, user, "invoice", current.pk,
+            ["status", "number", "is_einvoice", "approved_at", "approved_by", "buyer"],
+        )
+    invoice.refresh_from_db()
+    return invoice
+
+
+def cancel_invoice(user, invoice):
+    """The owner cancels an approved invoice. It keeps its number, which is never reused, and numbering is not called (D44).
+
+    Only the engine side: telling LHDN is the MyInvois module's job. Raises `PermissionDenied` for anyone but the owner
+    and `InvoiceLocked` for an invoice that is not approved.
+    """
+    permissions.require(user, "approve_invoices", invoice.company)
+    with transaction.atomic():
+        current = Invoice.objects.select_for_update().get(pk=invoice.pk)
+        if current.status != Invoice.APPROVED:
+            raise InvoiceLocked
+        current.status = Invoice.CANCELLED
+        current.save(update_fields=["status"])
     invoice.refresh_from_db()
     return invoice
 

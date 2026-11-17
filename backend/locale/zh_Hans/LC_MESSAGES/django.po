@@ -991,3 +991,57 @@ msgstr "旅游税注册号"
 #: .\core\templates\customer_contact_fields.html
 msgid "Contact details"
 msgstr "联系资料"
+
+#: .\core\models.py
+#: .\core\templates\invoices.html
+#: .\core\templates\invoice.html
+msgid "Approved"
+msgstr "已批准"
+
+#: .\core\templates\invoices.html
+#: .\core\templates\invoice.html
+msgid "Cancelled"
+msgstr "已取消"
+
+#: .\core\templates\invoice.html
+msgid "E-invoice"
+msgstr "电子发票"
+
+#: .\core\templates\invoice.html
+msgid "Normal invoice"
+msgstr "普通发票"
+
+#: .\core\templates\invoice.html
+msgid "Buyer"
+msgstr "买方"
+
+#: .\core\templates\invoice.html
+msgid "Approve"
+msgstr "批准"
+
+#: .\core\templates\invoice.html
+msgid "Issuing a normal invoice for a mandatory company needs your acknowledgement."
+msgstr "强制电子发票公司开具普通发票需要您的确认。"
+
+#: .\core\views.py
+msgid "Invoice approved."
+msgstr "发票已批准。"
+
+#: .\core\views.py
+msgid "Set the invoice numbering before approving."
+msgstr "批准前请先设置发票编号。"
+
+#: .\core\invoices.py
+#, python-format
+msgid "the customer needs: %(fields)s"
+msgstr "客户需要补充:%(fields)s"
+
+#: .\core\invoices.py
+#, python-format
+msgid "the e-invoice setting needs: %(fields)s"
+msgstr "电子发票设置需要补充:%(fields)s"
+
+#: .\core\invoices.py
+#, python-format
+msgid "This invoice cannot be approved: %(problems)s."
+msgstr "此发票无法批准:%(problems)s。"
