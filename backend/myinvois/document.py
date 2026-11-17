@@ -130,18 +130,28 @@ def map_invoice(invoice, *, document_version, now):
     lines = list(invoice.lines.select_related("item"))
     if not lines:
         raise InvalidDocument("lines")
-    pairs = [(line, _line_details(line, invoice.number)) for line in lines]
 
-    problems = list(check_einvoice_setting(supplier)) + list(check_customer(buyer))
-    for _line, details in pairs:
-        problems += list(check_line(details))
-    if problems:
-        # `check_einvoice_setting`, `check_customer` and `check_line` share field names (both parties have a
-        # "city"), so the message, not the bare field key, says whose field it is (field_rules' labels already
-        # distinguish "the company's city" from "the customer's city"); still never a value (field_rules' own rule).
-        raise InvalidDocument("; ".join(dict.fromkeys(str(problem.message) for problem in problems)))
+    # Every amount computed below (each line's subtotal, their sum, and the inclusive total built from that sum)
+    # runs in one widened-precision context: `NUMERIC(18,4)` operands can need up to 36 significant digits (see
+    # `LINE_AMOUNT_PRECISION`), more than Python's default 28-digit context, and that is true of the summation
+    # and the final addition just as much as the per-line multiplication (Codex's second finding on PR #191: the
+    # first fix only widened the multiplication, so a large sum or total still lost precision past that point).
+    with localcontext() as ctx:
+        ctx.prec = LINE_AMOUNT_PRECISION
+        pairs = [(line, _line_details(line, invoice.number)) for line in lines]
 
-    document = _build(invoice, supplier, buyer, pairs, issued_at, document_version)
+        problems = list(check_einvoice_setting(supplier)) + list(check_customer(buyer))
+        for _line, details in pairs:
+            problems += list(check_line(details))
+        if problems:
+            # `check_einvoice_setting`, `check_customer` and `check_line` share field names (both parties have a
+            # "city"), so the message, not the bare field key, says whose field it is (field_rules' labels already
+            # distinguish "the company's city" from "the customer's city"); still never a value (field_rules' own
+            # rule).
+            raise InvalidDocument("; ".join(dict.fromkeys(str(problem.message) for problem in problems)))
+
+        document = _build(invoice, supplier, buyer, pairs, issued_at, document_version)
+
     encoded = _encode(document)
     if len(encoded) > MAX_DOCUMENT_BYTES:
         raise InvalidDocument("document size")
@@ -197,9 +207,9 @@ def _line_details(line, invoice_number):
     # D-number records that rounding rule, and the invoice engine's own PDF and export (#12, #60-#63) will need
     # the same total; raised for Torres on PR #191 rather than decided here, since moving the calculation into
     # `core` so every consumer shares one answer would touch the invoice engine, which this ticket does not.
-    with localcontext() as ctx:
-        ctx.prec = LINE_AMOUNT_PRECISION
-        subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
+    # Relies on its caller (`map_invoice`) to have already widened the Decimal context's precision: see the
+    # comment there.
+    subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
     return {
         "classification_code": line.item.classification_code,
         "description": line.item_name,

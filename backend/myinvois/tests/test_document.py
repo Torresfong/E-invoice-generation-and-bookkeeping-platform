@@ -11,6 +11,7 @@ reaches the customer master: the buyer is the locked snapshot already copied ont
 
 import json
 from datetime import date, datetime, timedelta, timezone as dt_timezone
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -53,6 +54,18 @@ def approved_invoice(world, books, *, lines=None, user="acme_owner"):
 
 def decode(document_bytes):
     return json.loads(document_bytes.decode("utf-8"))
+
+
+def decode_exact(document_bytes):
+    """Like `decode`, but every number comes back as a `Decimal`, not a `float`.
+
+    Codex's review of PR #191 found that plain `decode()` cannot tell a correctly rounded large amount from a
+    wrongly rounded one: both round to the *same* float once a number needs more significant digits than a float
+    holds (about 15-17), so a float-based assertion passes whether or not the precision bug it was meant to catch
+    is still there. Use this, and a `Decimal(...)` literal to compare against, for any assertion on an amount
+    that is not a small, ordinary invoice total.
+    """
+    return json.loads(document_bytes.decode("utf-8"), parse_float=Decimal)
 
 
 def force_approved_invoice(world, books, *, buyer_overrides=None, invoice_overrides=None, lines=None):
@@ -328,21 +341,49 @@ def test_a_line_amount_rounds_half_a_sen_up(world, books):
 
 
 def test_a_large_line_amount_rounds_correctly_despite_pythons_default_decimal_precision(world, books):
-    # Codex's finding on PR #191: quantity and unit_price are each NUMERIC(18,4) (core/models.py), so their exact
-    # product can need up to 36 significant digits - more than Python's default 28-digit Decimal context. Both
-    # values below are inside what core.invoices._amount already accepts (at most 14 integer, 4 fractional
+    # Codex's first finding on PR #191: quantity and unit_price are each NUMERIC(18,4) (core/models.py), so their
+    # exact product can need up to 36 significant digits - more than Python's default 28-digit Decimal context.
+    # Both values below are inside what core.invoices._amount already accepts (at most 14 integer, 4 fractional
     # digits each), so this is reachable, not a theoretical maximum. Under the ambient (default) context the
     # multiplication itself would already round to 28 significant digits, under ROUND_HALF_EVEN, before
     # `.quantize(..., ROUND_HALF_UP)` ever saw the result - giving ...438.56 instead of the correctly rounded
-    # ...438.55 confirmed by hand below. `_line_details` works around this with its own, wider-precision context.
+    # ...438.55 confirmed by hand below.
+    #
+    # Codex's second finding, on the first fix: `decode()` (plain `json.loads`) turns every number into a float,
+    # and a float cannot hold this many significant digits either, so the wrong ...438.56 and the right ...438.55
+    # become the *same* float and the assertion could not actually tell them apart. `decode_exact()` keeps every
+    # number as a `Decimal`, so the comparison below is exact.
     invoice = approved_invoice(world, books, lines=[
         {"item": books["item"].pk, "quantity": "70442201917.6046", "unit_price": "55353191799.5913"},
     ])
 
-    (inv,) = decode(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
+    (inv,) = decode_exact(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
 
     (line,) = inv["InvoiceLine"]
-    assert line["ItemPriceExtension"] == [{"Amount": [{"_": 3899200713530705492438.55, "currencyID": "MYR"}]}]
+    assert line["ItemPriceExtension"] == [
+        {"Amount": [{"_": Decimal("3899200713530705492438.55"), "currencyID": "MYR"}]}
+    ]
+
+
+def test_a_large_document_total_keeps_its_precision_past_the_line_amount(world, books):
+    # Codex's second finding on PR #191: the first fix only widened the precision of the per-line multiplication
+    # in `_line_details`, so a large line amount was correct on its own but the summation in `_totals` and the
+    # `total_excluding_tax + total_tax` addition in `_build` still ran in the default 28-digit context, silently
+    # dropping digits a second time on the way from a (now correct) line amount to the document's own totals.
+    invoice = approved_invoice(world, books, lines=[
+        {"item": books["item"].pk, "quantity": "99999999999999.1234", "unit_price": "99999999999999.5678"},
+    ])
+    expected = Decimal("9999999999999869120000000000.38")
+
+    document = decode_exact(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))
+
+    (inv,) = document["Invoice"]
+    (line,) = inv["InvoiceLine"]
+    total = inv["LegalMonetaryTotal"][0]
+    assert line["ItemPriceExtension"] == [{"Amount": [{"_": expected, "currencyID": "MYR"}]}]
+    assert total["TaxExclusiveAmount"] == [{"_": expected, "currencyID": "MYR"}]
+    assert total["TaxInclusiveAmount"] == [{"_": expected, "currencyID": "MYR"}]
+    assert total["PayableAmount"] == [{"_": expected, "currencyID": "MYR"}]
 
 
 def test_a_draft_invoice_is_refused(world, books):
