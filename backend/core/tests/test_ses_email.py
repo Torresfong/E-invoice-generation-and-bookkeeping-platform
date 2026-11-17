@@ -109,6 +109,26 @@ def test_nothing_in_the_logs_holds_a_link_a_token_or_an_address(caplog):
     assert "owner@acme.example" not in logged
 
 
+def test_the_real_client_gives_up_in_ten_seconds_and_never_retries_a_send():
+    """A request waits on the send, and a retry after a read timeout could deliver the message twice."""
+    from core.ports.ses import ses_client
+
+    config = ses_client("ap-southeast-5").meta.config
+
+    assert config.read_timeout == 10
+    assert config.connect_timeout == 5
+    assert config.retries["total_max_attempts"] == 1
+
+
+def test_the_real_client_does_not_let_botocore_log_request_bodies():
+    """botocore logs every request's parameters at DEBUG, and the body holds a single-use link."""
+    from core.ports.ses import ses_client
+
+    ses_client("ap-southeast-5")
+
+    assert logging.getLogger("botocore").getEffectiveLevel() >= logging.INFO
+
+
 # --- start-up --------------------------------------------------------------------------------------------------------
 
 

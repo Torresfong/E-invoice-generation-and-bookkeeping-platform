@@ -11,6 +11,8 @@ does that **in memory, per process**: a repeat within one process sends once, bu
 accepted a message and is then run again as a new process has forgotten the key and sends a second copy. That is the
 limit; closing it needs a table of sent keys, which is a tenancy decision (a company column, RLS) left to the first
 ticket that sends mail from a job (#12). Today's callers (sign-up, invitation, reset) are web requests and pass no key.
+A second thread that repeats a key while the first send is still in flight returns at once, and if that send then fails
+only the first caller sees the error; a job that is run again after its failure sends, because the failure freed the key.
 """
 
 import logging
@@ -19,8 +21,6 @@ import threading
 from .interfaces import IdempotencyKeyMissing
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_REGION = "ap-southeast-5"
 
 
 class EmailSendFailed(RuntimeError):
@@ -67,8 +67,14 @@ class SesEmail:
 def ses_client(region):
     """The real SES v2 client. boto3 is imported here so nothing else needs it, and nothing connects until a send."""
     import boto3
+    from botocore.config import Config
 
-    return boto3.client("sesv2", region_name=region)
+    # botocore logs each request's parameters at DEBUG, and the body holds a single-use link.
+    logging.getLogger("botocore").setLevel(logging.INFO)
+    # A web request waits on the send, so give up in seconds, as the gateway does. No automatic retry: one after a read
+    # timeout could deliver the message twice, and the caller's request fails and is tried again as a whole.
+    config = Config(connect_timeout=5, read_timeout=10, retries={"total_max_attempts": 1})
+    return boto3.client("sesv2", region_name=region, config=config)
 
 
 def email_from_settings(sender, region, make_client=ses_client):
