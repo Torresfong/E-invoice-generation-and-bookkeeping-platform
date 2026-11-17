@@ -11,10 +11,16 @@ from datetime import date
 import pytest
 from django.test import Client
 
-from core import einvoicing
-from core.models import AuditEntry, AuthToken, Company, CompanyAccess, CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, FirmAuditEntry, User
+from core import einvoicing, numbering
+from core.models import (
+    AuditEntry, AuthToken, Company, CompanyAccess, CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, Customer,
+    FirmAuditEntry, Invoice, Item, User,
+)
 
 from .factories import PASSWORD
+from .test_einvoice_setting import form as setting_form
+from .test_invoice_screens import draft_form
+from .test_item_screens import item_form
 
 PATH = "/signup/"
 OWNER_PASSWORD = "a long enough passphrase"
@@ -186,6 +192,66 @@ def test_a_company_with_no_firm_uses_every_client_portal_screen(firms_world, sig
         statuses = {page: client.get(page).status_code for page in pages}
 
     assert statuses == {page: 200 for page in pages}
+
+
+def test_a_company_with_no_firm_can_use_every_client_portal_write_that_exists(
+    firms_world, signup_open, fake_ports, as_production_connection
+):
+    """Ticket #188: the writes the client portal has today, done by a firm-less owner, end to end (D67 (2)).
+
+    Every POST route the portal has for a company is done once: item, customer and invoice create, edit and delete or
+    deactivate and reactivate, approve, the e-invoice setting and the staff invitation. Uploading documents and
+    submitting to LHDN do not exist yet (#47), so they have no screen to test.
+    """
+    with as_production_connection():
+        client = register(fake_ports, einvoicing_choice="no")
+    company, _ = created()
+    base = f"/companies/{company.pk}"
+    numbering.configure_sequence(company, numbering.INVOICE, prefix="INV-", start_number=1)
+    # Reads with the ORM happen between the blocks: inside one, row-level security hides rows the request did not open.
+    with as_production_connection():
+        statuses = {
+            "item": client.post(f"{base}/items/", item_form(name="Widget")).status_code,
+            "customer": client.post(f"{base}/customers/", {"legal_name": "Buyer Sdn Bhd"}).status_code,
+        }
+    item, customer = Item.objects.get(company=company), Customer.objects.get(company=company)
+    form = draft_form(customer, (item, "2", "5"))
+    with as_production_connection():
+        statuses["draft"] = client.post(f"{base}/invoices/new/", form).status_code
+        statuses["second draft"] = client.post(f"{base}/invoices/new/", form).status_code
+    draft, spare = Invoice.objects.filter(company=company).order_by("pk")
+    with as_production_connection():
+        statuses["edit draft"] = client.post(f"{base}/invoices/{draft.pk}/", draft_form(customer, (item, "3", "5"))).status_code
+        statuses["delete draft"] = client.post(f"{base}/invoices/{spare.pk}/delete/").status_code
+        statuses["edit item"] = client.post(f"{base}/items/{item.pk}/", item_form(name="Widget v2")).status_code
+        statuses["edit customer"] = client.post(f"{base}/customers/{customer.pk}/", {"legal_name": "Buyer Renamed"}).status_code
+    # Sign-up stored the setting with the database's current date; a later change may not start earlier than that.
+    signed_up_on = CompanyEInvoiceSetting.objects.get(company=company).effective_from.isoformat()
+    with as_production_connection():
+        statuses["approve"] = client.post(f"{base}/invoices/{draft.pk}/approve/").status_code
+        locked = client.post(f"{base}/invoices/{draft.pk}/", draft_form(customer, (item, "9", "5"))).status_code
+        statuses["setting"] = client.post(f"{base}/einvoicing/", setting_form(effective_from=signed_up_on)).status_code
+        statuses["invite"] = client.post(f"{base}/invite/", {"email": "staff@solo.example"}).status_code
+        statuses["item off"] = client.post(f"{base}/items/{item.pk}/deactivate/").status_code
+        statuses["customer off"] = client.post(f"{base}/customers/{customer.pk}/deactivate/").status_code
+    off = (Item.objects.get(pk=item.pk).is_active, Customer.objects.get(pk=customer.pk).is_active)
+    with as_production_connection():
+        statuses["item on"] = client.post(f"{base}/items/{item.pk}/activate/").status_code
+        statuses["customer on"] = client.post(f"{base}/customers/{customer.pk}/activate/").status_code
+
+    assert statuses == {name: 302 for name in statuses}
+    assert locked == 403, "an approved invoice is locked for a firm-less owner too"
+    assert off == (False, False)
+    draft.refresh_from_db()
+    assert (draft.status, draft.number) == (Invoice.APPROVED, "INV-1")
+    assert [line.quantity for line in draft.lines.all()] == [3]  # the edit before approval stuck; the one after did not
+    assert list(Invoice.objects.filter(company=company)) == [draft]  # the spare draft is gone
+    assert Company.objects.get(pk=company.pk).firm_id is None
+    item.refresh_from_db(), customer.refresh_from_db()
+    assert (item.name, item.is_active) == ("Widget v2", True)
+    assert (customer.legal_name, customer.is_active) == ("Buyer Renamed", True)
+    assert CompanyEInvoiceSetting.objects.get(company=company).einvoicing_enabled
+    assert fake_ports.email.sent[-1]["to"] == "staff@solo.example"
 
 
 def test_sign_up_is_rate_limited_per_address(db, signup_open, settings, fake_ports, as_production_connection):
