@@ -11,10 +11,16 @@ from datetime import date
 import pytest
 from django.test import Client
 
-from core import einvoicing
-from core.models import AuditEntry, AuthToken, Company, CompanyAccess, CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, FirmAuditEntry, User
+from core import einvoicing, numbering
+from core.models import (
+    AuditEntry, AuthToken, Company, CompanyAccess, CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, Customer,
+    FirmAuditEntry, Invoice, Item, User,
+)
 
 from .factories import PASSWORD
+from .test_einvoice_setting import form as setting_form
+from .test_invoice_screens import draft_form
+from .test_item_screens import item_form
 
 PATH = "/signup/"
 OWNER_PASSWORD = "a long enough passphrase"
@@ -186,6 +192,42 @@ def test_a_company_with_no_firm_uses_every_client_portal_screen(firms_world, sig
         statuses = {page: client.get(page).status_code for page in pages}
 
     assert statuses == {page: 200 for page in pages}
+
+
+def test_a_company_with_no_firm_can_use_every_client_portal_write_that_exists(
+    firms_world, signup_open, fake_ports, as_production_connection
+):
+    """Ticket #188: the writes the client portal has today, done by a firm-less owner, end to end (D67 (2)).
+
+    Uploading documents and submitting to LHDN do not exist yet (#47), so they have no screen to test.
+    """
+    with as_production_connection():
+        client = register(fake_ports, einvoicing_choice="no")
+    company, _ = created()
+    base = f"/companies/{company.pk}"
+    numbering.configure_sequence(company, numbering.INVOICE, prefix="INV-", start_number=1)
+    with as_production_connection():
+        statuses = {
+            "item": client.post(f"{base}/items/", item_form(name="Widget")).status_code,
+            "customer": client.post(f"{base}/customers/", {"legal_name": "Buyer Sdn Bhd"}).status_code,
+        }
+    item, customer = Item.objects.get(company=company), Customer.objects.get(company=company)
+    with as_production_connection():
+        statuses["draft"] = client.post(f"{base}/invoices/new/", draft_form(customer, (item, "2", "5"))).status_code
+    draft = Invoice.objects.get(company=company)
+    with as_production_connection():
+        statuses["approve"] = client.post(f"{base}/invoices/{draft.pk}/approve/").status_code
+        statuses["setting"] = client.post(f"{base}/einvoicing/", setting_form(effective_from="2027-01-01")).status_code
+        statuses["invite"] = client.post(f"{base}/invite/", {"email": "staff@solo.example"}).status_code
+        statuses["item off"] = client.post(f"{base}/items/{item.pk}/deactivate/").status_code
+        statuses["customer off"] = client.post(f"{base}/customers/{customer.pk}/deactivate/").status_code
+
+    assert statuses == {name: 302 for name in statuses}
+    draft.refresh_from_db()
+    assert (draft.status, draft.number) == (Invoice.APPROVED, "INV-1")
+    assert company.firm is None and not Item.objects.get().is_active and not Customer.objects.get().is_active
+    assert CompanyEInvoiceSetting.objects.get(company=company).einvoicing_enabled
+    assert fake_ports.email.sent[-1]["to"] == "staff@solo.example"
 
 
 def test_sign_up_is_rate_limited_per_address(db, signup_open, settings, fake_ports, as_production_connection):
