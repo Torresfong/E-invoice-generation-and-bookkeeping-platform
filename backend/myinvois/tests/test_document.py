@@ -18,8 +18,9 @@ from django.db import connection
 from django.utils import timezone
 
 from core import customers, einvoicing, items, invoices, numbering
+from core.jobs import PermanentError
 from core.models import CompanyEInvoiceSetting, Invoice
-from myinvois.document import InvalidDocument, map_invoice
+from myinvois.document import InvalidDocument, StaleIssueTime, map_invoice
 
 from core.tests.test_customers import BRN_VALUE, CONTACT, TIN, switch_einvoicing_on
 
@@ -243,7 +244,23 @@ def test_a_missing_buyer_field_is_named(world, books):
     with pytest.raises(InvalidDocument) as refused:
         map_invoice(invoice, document_version="1.1", now=invoice.approved_at)
 
-    assert "city" in str(refused.value)
+    # Not just "city": both parties have one, and the message, not the field key, is what distinguishes them
+    # (field_rules.py's own `_customer_labels`/`_company_labels`). This pins that it is the buyer's that is named.
+    assert "customer's city" in str(refused.value)
+
+
+def test_a_missing_supplier_field_names_the_supplier_not_the_buyer(world, books):
+    invoice = approved_invoice(world, books)
+    with connection.cursor() as cursor:
+        cursor.execute("SET CONSTRAINTS ALL IMMEDIATE")
+        cursor.execute("ALTER TABLE core_companyeinvoicesetting DISABLE TRIGGER USER")
+        CompanyEInvoiceSetting.objects.filter(company=world["acme"]).update(city="")
+        cursor.execute("ALTER TABLE core_companyeinvoicesetting ENABLE TRIGGER USER")
+
+    with pytest.raises(InvalidDocument) as refused:
+        map_invoice(invoice, document_version="1.1", now=invoice.approved_at)
+
+    assert "company's city" in str(refused.value) and "customer's city" not in str(refused.value)
 
 
 def test_an_issue_time_in_the_future_is_refused(world, books):
@@ -254,16 +271,18 @@ def test_an_issue_time_in_the_future_is_refused(world, books):
         map_invoice(invoice, document_version="1.1", now=future - timedelta(hours=2))
 
     assert "future" in str(refused.value)
+    assert not isinstance(refused.value, StaleIssueTime)  # a future time can never recover by lookup (D58 (5))
 
 
-def test_an_issue_time_more_than_72_hours_old_is_refused(world, books):
+def test_an_issue_time_more_than_72_hours_old_is_refused_as_a_distinguishable_stale_subclass(world, books):
     invoice = approved_invoice(world, books)
     too_late = invoice.approved_at + timedelta(hours=73)
 
-    with pytest.raises(InvalidDocument) as refused:
+    with pytest.raises(StaleIssueTime) as refused:
         map_invoice(invoice, document_version="1.1", now=too_late)
 
     assert "72" in str(refused.value)
+    assert isinstance(refused.value, InvalidDocument)  # #47 may still catch the general case
 
 
 def test_an_issue_time_within_72_hours_is_accepted(world, books):
@@ -271,6 +290,41 @@ def test_an_issue_time_within_72_hours_is_accepted(world, books):
     just_in_time = invoice.approved_at + timedelta(hours=71, minutes=59)
 
     map_invoice(invoice, document_version="1.1", now=just_in_time)  # does not raise
+
+
+def test_invalid_document_is_a_permanent_error_so_a_job_never_retries_it_blindly(world, books):
+    # core.jobs._after_failure gives a PermanentError exactly one attempt; a missing field or a bad document
+    # version will not fix itself on retry, unlike StaleIssueTime's recovery path (handled by #47, see its docstring).
+    assert issubclass(InvalidDocument, PermanentError)
+    assert issubclass(StaleIssueTime, InvalidDocument)
+
+
+def test_an_unsupported_document_version_is_refused(world, books):
+    invoice = approved_invoice(world, books)
+
+    with pytest.raises(InvalidDocument) as refused:
+        map_invoice(invoice, document_version="9.9", now=invoice.approved_at)
+
+    assert "document_version" in str(refused.value)
+
+
+@pytest.mark.parametrize("version", ["1.0", "1.1"])
+def test_each_supported_document_version_is_accepted(world, books, version):
+    invoice = approved_invoice(world, books)
+
+    map_invoice(invoice, document_version=version, now=invoice.approved_at)  # does not raise
+
+
+def test_a_line_amount_rounds_half_a_sen_up(world, books):
+    # The first amount calculation in the codebase (InvoiceLine stores none of its own); pinned at the boundary
+    # that distinguishes ROUND_HALF_UP from ROUND_HALF_EVEN or truncation, raised for Torres on PR #191 as a
+    # choice no D-number records yet (see `_line_details`'s docstring).
+    invoice = approved_invoice(world, books, lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "0.005"}])
+
+    (inv,) = decode(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
+
+    (line,) = inv["InvoiceLine"]
+    assert line["ItemPriceExtension"] == [{"Amount": [{"_": 0.01, "currencyID": "MYR"}]}]
 
 
 def test_a_draft_invoice_is_refused(world, books):

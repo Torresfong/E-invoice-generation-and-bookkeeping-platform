@@ -29,16 +29,24 @@ from decimal import ROUND_HALF_UP, Decimal
 from uuid import uuid4
 
 from core import einvoicing
+from core.jobs import PermanentError
 from core.models import Invoice
 
 from .code_lists import msic_codes
 from .field_rules import check_customer, check_einvoice_setting, check_line
 from .submission import STALE_AFTER
 
-# The brief (#123) sets this at 300 KB, the same per-document figure D66 (3) sets for a consolidated e-invoice; D60,
-# which governs this ticket's document rules, sets no document-size limit of its own. A job sends the result to
-# `submission.submit_invoice`.
-MAX_DOCUMENT_BYTES = 300 * 1024
+# LHDN's Submit Documents page gives this as "300 KB maximum per e-Invoice", read here as the stricter decimal
+# 300,000 bytes rather than the looser binary 300 * 1024 (LHDN's own wording wins where the two differ). D60, which
+# governs this ticket's document rules, sets no size limit of its own; D66 (3) states the same 300 KB figure for a
+# consolidated e-invoice. This checks only the unsigned document a job would pass to `submission.submit_invoice`:
+# #43 adds a `UBLExtensions`/`Signature` block (the certificate among them), so the signed document needs the same
+# check again, after signing, which this ticket does not build.
+MAX_DOCUMENT_BYTES = 300_000
+
+# D60 (1): "1.1" in production, "1.0" in the sandbox while unsigned. Not this function's choice (`map_invoice`'s
+# caller picks one), but checked, since LHDN rejects any other value and a typo should not reach a built document.
+DOCUMENT_VERSIONS = ("1.0", "1.1")
 
 INVOICE_TYPE_CODE = "01"
 NOT_APPLICABLE = "06"  # LHDN's tax-type code for "Not Applicable": the only one #123 ever emits (see module docstring).
@@ -53,8 +61,30 @@ UBL_NAMESPACES = {
 CENTS = Decimal("0.01")
 
 
-class InvalidDocument(ValueError):
-    """The document cannot be built. The message names each field or rule that failed, never a value."""
+class InvalidDocument(PermanentError, ValueError):
+    """The document cannot be built. The message names each field or rule that failed, never a value.
+
+    A `core.jobs.PermanentError`: none of this function's own refusals (a bad field, an unsupported
+    `document_version`, an oversized document) can fix itself on retry, so a job handler gets exactly one attempt
+    (`core.jobs._after_failure`) instead of the three a plain, unclassified exception would get. These messages are
+    operator- and log-facing only, in English regardless of the active language, unlike `field_rules`' own
+    messages (joined into one of these below), which are translated. A caller that shows one to the owner (D60 (2)
+    already does, for the same 72-hour rule, through `StaleIssueTime` below) must translate its own text instead of
+    forwarding `str(exc)`.
+    """
+
+
+class StaleIssueTime(InvalidDocument):
+    """The invoice's issue time is more than 72 hours old (D60 (2)); never raised for a future issue time.
+
+    Handoff for #47: `submission.submit_invoice` already runs a recovery lookup for this exact rule (D58 (5), (6))
+    before it gives up and tells the owner (`submission.StaleDocument`), because the document may already be at
+    LHDN from an earlier attempt whose answer was lost. If a job calls `map_invoice` again after such a loss, more
+    than 72 hours may have passed by then, and this subclass is raised before `submit_invoice` ever runs, so #47
+    must either run that recovery lookup (or the same check `submit_invoice` does) before mapping, or catch this
+    subclass specifically, not `InvalidDocument` generally, and take the same recovery path rather than treat it as
+    an ordinary refusal.
+    """
 
 
 def map_invoice(invoice, *, document_version, now):
@@ -67,6 +97,8 @@ def map_invoice(invoice, *, document_version, now):
     choose it. `now` is compared to the issue time (`invoice.approved_at`, D60 (2)): more than 72 hours old, or in
     the future, is refused.
     """
+    if document_version not in DOCUMENT_VERSIONS:
+        raise InvalidDocument("document_version")
     if invoice.status != Invoice.APPROVED:
         raise InvalidDocument("status: the invoice must be approved")
     if invoice.document_type != "invoice":
@@ -80,7 +112,7 @@ def map_invoice(invoice, *, document_version, now):
     if issued_at > now:
         raise InvalidDocument("issue time is in the future")
     if now - issued_at > STALE_AFTER:
-        raise InvalidDocument("issue time is more than 72 hours old")
+        raise StaleIssueTime("issue time is more than 72 hours old")
 
     setting = einvoicing.current_setting(invoice.company)
     if setting is None:
@@ -152,6 +184,11 @@ def _buyer_details(invoice):
 
 
 def _line_details(line, invoice_number):
+    # `InvoiceLine` stores no amount of its own (`core/models.py`), so this is the first place anything computes
+    # one: quantity times unit price, rounded to the sen under ROUND_HALF_UP (1 x 0.005 rounds up to 0.01). No
+    # D-number records that rounding rule, and the invoice engine's own PDF and export (#12, #60-#63) will need
+    # the same total; raised for Torres on PR #191 rather than decided here, since moving the calculation into
+    # `core` so every consumer shares one answer would touch the invoice engine, which this ticket does not.
     subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
     return {
         "classification_code": line.item.classification_code,
