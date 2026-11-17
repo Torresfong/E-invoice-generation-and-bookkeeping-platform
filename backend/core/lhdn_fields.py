@@ -2,7 +2,8 @@
 
 `myinvois.field_rules` (#122) judges the same values when a document is mapped. `core` may not import `myinvois`
 (D61), so the few rules the master data needs live here, read from the same published code lists
-(`core.lhdn_codes`). The two copies must agree; the tests of both name the same limits.
+(`core.lhdn_codes`). `myinvois.field_rules` imports the phone, SST, tourism-tax and length limits from here; only the Malaysian postcode
+pattern and the state `00` rule are written in both places, so those two must agree.
 
 Core never stores the sentinel `NA`: a blank SST or tourism-tax number means "none", and the MyInvois mapper (#123)
 writes the exact text `NA` on the document. `phone_ok`, `sst_ok` and `ttx_ok` therefore refuse `NA`, in any case.

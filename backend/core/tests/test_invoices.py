@@ -242,6 +242,8 @@ def test_a_customer_with_no_phone_or_address_cannot_be_drafted_while_einvoicing_
         ({"address_line1": " "}, "address line 1"),
         ({"city": " "}, "city"),
         ({"phone": " "}, "phone number"),
+        ({"tin": " "}, "TIN"),
+        ({"id_value": " "}, "ID value"),
         ({"state_code": " ", "country_code": "SGP"}, "state code"),
         ({"country_code": " "}, "country code"),
         ({"state_code": ""}, "state code"),
