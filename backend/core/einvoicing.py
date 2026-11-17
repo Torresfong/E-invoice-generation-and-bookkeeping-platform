@@ -21,9 +21,9 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.utils.translation import gettext_lazy
 
-from . import lhdn_fields, permissions
+from . import jobs, lhdn_fields, permissions
 from .db import scalar
-from .models import CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, SupplierDetails
+from .models import Company, CompanyEInvoiceSetting, CompanyEInvoiceSettingChange, SupplierDetails
 
 # Bumped whenever the wording below changes, so each recorded acknowledgement says which text the owner accepted.
 ACKNOWLEDGEMENT_VERSION = "mandatory-off-v1"
@@ -149,6 +149,23 @@ def supplier_gaps(company):
         if (name in REQUIRED_WHEN_ON and not value) or _unacceptable(name, value):
             gaps.append(labels[name])
     return gaps
+
+
+def companies_with_supplier_gaps():
+    """For an operator: each company with e-invoicing on today and what is missing, as `(company, labels)`, by company id.
+
+    "On" is the same question approval asks, `einvoicing_enabled(company, today)` from the dated history (D59 (2)), so a
+    switch-on that takes effect later is not listed yet. The setting table is under forced row-level security and the table owner has no policy on it, so each company is
+    read as the worker role in that company's context (`jobs.as_worker_in`): the database shows one company at a time,
+    and only `Company` is read across all of them. Only labels leave this function, never a value.
+    """
+    today = timezone.localdate()
+    listed = []
+    for company in Company.objects.order_by("pk"):
+        with jobs.as_worker_in(company):
+            if einvoicing_enabled(company, today) and (gaps := supplier_gaps(company)):
+                listed.append((company, gaps))
+    return listed
 
 
 def acknowledgement_required(previous, enabled, status):
