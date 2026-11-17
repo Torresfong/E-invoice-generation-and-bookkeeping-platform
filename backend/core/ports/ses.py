@@ -10,7 +10,8 @@ Idempotency. SES has no idempotency key, so the adapter keeps the keys itself, a
 does that **in memory, per process**: a repeat within one process sends once, but a worker that crashes after SES
 accepted a message and is then run again as a new process has forgotten the key and sends a second copy. That is the
 limit; closing it needs a table of sent keys, which is a tenancy decision (a company column, RLS) left to the first
-ticket that sends mail from a job (#12). Today's callers (sign-up, invitation, reset) are web requests and pass no key.
+ticket that sends mail from a job (#12). The set of keys is never trimmed, which is harmless while no caller passes
+one and is replaced by that table. Today's callers (sign-up, invitation, reset) are web requests and pass no key.
 A second thread that repeats a key while the first send is still in flight returns at once, and if that send then fails
 only the first caller sees the error; a job that is run again after its failure sends, because the failure freed the key.
 """

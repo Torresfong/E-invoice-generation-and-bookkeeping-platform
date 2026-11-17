@@ -132,9 +132,15 @@ def test_the_real_client_does_not_let_botocore_log_request_bodies(offline_aws):
     """botocore logs every request's parameters at DEBUG, and the body holds a single-use link."""
     from core.ports.ses import ses_client
 
-    ses_client("ap-southeast-5")
+    botocore_log = logging.getLogger("botocore")
+    saved = botocore_log.level
+    botocore_log.setLevel(logging.DEBUG)  # as when the root logger is at DEBUG: the case the guard exists for
+    try:
+        ses_client("ap-southeast-5")
 
-    assert logging.getLogger("botocore").getEffectiveLevel() >= logging.INFO
+        assert botocore_log.level == logging.INFO
+    finally:
+        botocore_log.setLevel(saved)  # the guard changes process-wide state; later tests must not inherit it
 
 
 # --- start-up --------------------------------------------------------------------------------------------------------
@@ -189,3 +195,20 @@ def test_a_reset_request_whose_real_send_fails_answers_500_and_leaves_no_token(c
 
     assert response.status_code == 500
     assert AuthToken.objects.count() == 0
+
+
+def test_a_failed_real_send_leaves_no_link_or_address_in_the_500_log(client, as_production_connection, db, caplog):
+    """Django logs a 500's whole exception chain, so the failure must not carry the message as its cause."""
+    caplog.set_level(logging.DEBUG)
+    make_member("owner@acme.example", make_company(), CompanyAccess.OWNER)
+    failing = FakeSesClient(fail_with=OSError("could not send " + LINK_BODY))
+    ports.install(type("Ports", (), {"email": adapter(failing)})())
+    client.raise_request_exception = False
+
+    with as_production_connection():
+        response = client.post("/password-reset/", {"email": "owner@acme.example"})
+
+    assert response.status_code == 500
+    assert "Internal Server Error" in caplog.text  # the failure was logged, so the absence below means something
+    assert "SECRET-TOKEN-VALUE" not in caplog.text
+    assert "owner@acme.example" not in caplog.text
