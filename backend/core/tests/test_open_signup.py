@@ -203,3 +203,20 @@ def test_with_sign_up_switched_off_the_screen_says_registration_is_closed(db, se
 
     assert form.status_code == response.status_code == 403 and b"closed" in response.content
     assert fake_ports.email.sent == [] and not AuthToken.objects.exists()
+
+
+def test_opening_the_link_while_signed_in_as_someone_else_registers_and_signs_in_the_new_owner(
+    firms_world, signup_open, fake_ports, as_production_connection
+):
+    with as_production_connection():
+        client = Client()
+        assert client.post("/login/", {"email": "owner@gamma.example", "password": PASSWORD}).status_code == 302
+        submit(Client())
+        response = verify(client, register_path(fake_ports))
+    company, owner = created()
+
+    assert response.status_code == 302
+    assert CompanyEInvoiceSetting.objects.filter(company=company).count() == 1
+    with as_production_connection():
+        listing = client.get("/companies/").content.decode()
+    assert "Solo Sdn Bhd" in listing and "Gamma Holdings" not in listing  # the session is now the new owner's

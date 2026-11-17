@@ -18,6 +18,7 @@ from django.utils.translation import gettext as _
 
 from . import ports
 from .db import scalar
+from .rls import IDENTITY_SETTING
 from .tokens import InvalidLink, hash_token, link, new_token
 
 # The SQLSTATE the functions of migration 0029 raise for a link that is unknown, expired or used.
@@ -100,6 +101,10 @@ def complete(verification_link, password):
     try:
         # A savepoint keeps the refusal from aborting the request's transaction.
         with transaction.atomic(), connection.cursor() as cursor:
+            # Registering is not done as anyone. If the browser is still signed in as another account, that identity must
+            # not reach the e-invoice guards of migration 0035, which would refuse the new owner's first setting.
+            # `complete_sign_in` makes the new owner the identity afterwards.
+            cursor.execute("SELECT set_config(%s, '', true)", [IDENTITY_SETTING])
             cursor.execute(
                 "SELECT new_user_id, new_user_email FROM complete_registration(%s, %s)",
                 [hash_token(verification_link), encoded],
