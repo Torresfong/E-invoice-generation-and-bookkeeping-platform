@@ -20,7 +20,7 @@ from django.utils.translation import gettext as _
 
 from . import audit, customers, einvoicing, items, numbering, permissions
 from .einvoicing import einvoicing_enabled
-from .models import AuditEntry, Customer, Invoice, InvoiceLine, Item, SupplierDetails
+from .models import AuditEntry, Customer, Invoice, InvoiceLine, Item
 
 # The column sizes of InvoiceLine: NUMERIC(18, 4), so at most 14 digits before the point and 4 after it.
 # ASCII digits only: `\d` alone would also accept the digits of other scripts.
@@ -217,7 +217,7 @@ def approve_invoice(user, invoice, *, acknowledged=False):
         is_einvoice = einvoicing_enabled(company, today)
         if is_einvoice:
             _refuse_incomplete(company, customer)
-        elif _mandatory(company):
+        elif einvoicing.is_mandatory(company):
             if not acknowledged:
                 raise einvoicing.AcknowledgementRequired
             current.acknowledged_by, current.acknowledged_at = user, timezone.now()
@@ -236,11 +236,6 @@ def approve_invoice(user, invoice, *, acknowledged=False):
         )
     invoice.refresh_from_db()
     return invoice
-
-
-def _mandatory(company):
-    setting = einvoicing.current_setting(company)
-    return setting is not None and setting.status == SupplierDetails.MANDATORY
 
 
 def cancel_invoice(user, invoice):

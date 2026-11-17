@@ -360,7 +360,8 @@ class Invoice(TenantModel):
     one cannot leave a gap (D44). The owner's approval takes the number (D62, #45), copies the buyer onto the invoice
     (D19) and records whether it is an e-invoice or a normal invoice from the company's setting at that moment
     (D59 (3)). Migration 0043 holds the rules in the database: the owner and staff change or delete a draft; an
-    approved invoice changes only when the owner approves it again after 72 hours (D60 (2)) or cancels it; a number is
+    approved invoice changes only when the owner approves it again (renewing the issue time, D60 (2)) or cancels it; the
+    database does not check the 72 hours, the submission ticket decides when a second approval is offered. A number is
     unique per company and document type.
     """
 

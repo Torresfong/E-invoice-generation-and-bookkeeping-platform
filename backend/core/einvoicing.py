@@ -83,6 +83,12 @@ def current_setting(company):
     return CompanyEInvoiceSetting.objects.filter(company=company).first()
 
 
+def is_mandatory(company):
+    """Is the company's recorded status mandatory? A company with no setting is not (D59 (5))."""
+    setting = current_setting(company)
+    return setting is not None and setting.status == SupplierDetails.MANDATORY
+
+
 def _labels():
     return {
         "status": _("status"),
