@@ -77,6 +77,12 @@ LOGIN_FAILURE_WINDOW_SECONDS = 15 * 60
 # Where links in emails sent outside a request (operator commands) point.
 BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 
+# Email goes out through the Amazon SES API (#151, D14); SES has no SMTP endpoint in ap-southeast-5. With no sender
+# address no email adapter is installed, and `check --deploy` warns. No credential is a setting: boto3 finds the task's
+# IAM role itself.
+EMAIL_SENDER_ADDRESS = os.environ.get("EMAIL_SENDER_ADDRESS", "")
+EMAIL_REGION = os.environ.get("EMAIL_REGION", "ap-southeast-5")
+
 # Password reset links last an hour, invitations a week (D40 (5)).
 RESET_LINK_HOURS = 1
 # The link a new firm administrator or accountant gets to choose a first password (D49).
