@@ -712,6 +712,46 @@ def _registration_closed(request):
     return render(request, "signup_closed.html", status=403)
 
 
+def _sign_up_form_error(email, company_name):
+    """The error to show for a sign-up form, or None when the address and the company name are acceptable."""
+    try:
+        validate_email(email)
+        if len(email) > 254:  # the column's width
+            raise ValidationError("too long")
+    except ValidationError:
+        return _("Enter a valid email address.")
+    if not company_name or len(company_name) > 200:
+        return _("Enter your company name (up to 200 characters).")
+    return None
+
+
+def open_sign_up(request):
+    """The public form for a client owner with no firm link (D67 (2)): address, company name and whether it issues e-invoices.
+
+    It creates nothing by itself; the emailed link does (`register`). The same switch and throttle as a firm's link apply.
+    """
+    if not settings.SIGNUP_ENABLED:
+        return _registration_closed(request)
+    if request.method != "POST":
+        return render(request, "signup.html", {"open": True})
+    email = request.POST.get("email", "").strip()
+    if not throttle.allow_signup(email, request.META.get("REMOTE_ADDR", "")):
+        logger.info("signup refused: throttled")
+        return render(request, "signup.html", {"open": True, "error": _("Too many attempts. Try again later.")}, status=429)
+
+    company_name = request.POST.get("company_name", "").strip()
+    choice = request.POST.get("issues_einvoices", "")
+    context = {"open": True, "email": email, "company_name": company_name, "issues_einvoices": choice}
+    error = _sign_up_form_error(email, company_name)
+    if error is None and choice not in ("yes", "no"):
+        error = _("Say whether your company issues e-invoices.")
+    if error:
+        return render(request, "signup.html", {**context, "error": error})
+    # Answers "sent" even when the address already has an account and nothing was sent.
+    registration.start_open(email, company_name, choice == "yes")
+    return render(request, "signup.html", {"open": True, "sent": True})
+
+
 def sign_up(request, token):
     """The public form behind a firm's sign-up link: an address and a company name. It creates nothing by itself."""
     if not settings.SIGNUP_ENABLED:
@@ -730,14 +770,9 @@ def sign_up(request, token):
 
     company_name = request.POST.get("company_name", "").strip()
     context = {"email": email, "company_name": company_name}
-    try:
-        validate_email(email)
-        if len(email) > 254:  # the column's width
-            raise ValidationError("too long")
-    except ValidationError:
-        return render(request, "signup.html", {**context, "error": _("Enter a valid email address.")})
-    if not company_name or len(company_name) > 200:
-        return render(request, "signup.html", {**context, "error": _("Enter your company name (up to 200 characters).")})
+    error = _sign_up_form_error(email, company_name)
+    if error:
+        return render(request, "signup.html", {**context, "error": error})
     try:
         # Answers "sent" even when the address already has an account and nothing was sent.
         registration.start(token, email, company_name)

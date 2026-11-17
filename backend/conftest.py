@@ -49,6 +49,12 @@ def myinvois_certificates(settings):
 
 
 @pytest.fixture
+def signup_open(settings):
+    """Owner sign-up is off by default; tests of the sign-up flow switch it on."""
+    settings.SIGNUP_ENABLED = True
+
+
+@pytest.fixture
 def email_down(fake_ports):
     """The email port refuses every message, as when the mail server is down. A request that sends one answers 500."""
 

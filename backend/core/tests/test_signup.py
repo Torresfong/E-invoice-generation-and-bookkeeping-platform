@@ -20,11 +20,6 @@ from core.models import AuditEntry, AuthToken, Company, CompanyAccess, FirmAudit
 from .factories import PASSWORD, make_member
 
 
-@pytest.fixture
-def signup_open(settings):
-    settings.SIGNUP_ENABLED = True
-
-
 def sign_in(client, user):
     assert client.post("/login/", {"email": user.email, "password": PASSWORD}).status_code == 302
 

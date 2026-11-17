@@ -1045,3 +1045,23 @@ msgstr "电子发票设置需要补充:%(fields)s"
 #, python-format
 msgid "This invoice cannot be approved: %(problems)s."
 msgstr "此发票无法批准:%(problems)s。"
+
+#: .\core\views.py
+msgid "Say whether your company issues e-invoices."
+msgstr "请说明贵公司是否开具电子发票。"
+
+#: .\core\templates\signup.html
+msgid "Does your company issue e-invoices to LHDN MyInvois?"
+msgstr "贵公司是否向 LHDN MyInvois 开具电子发票?"
+
+#: .\core\templates\signup.html
+msgid "Yes"
+msgstr "是"
+
+#: .\core\templates\signup.html
+msgid "No"
+msgstr "否"
+
+#: .\core\templates\signup.html
+msgid "You can change this later in your company's e-invoice settings."
+msgstr "您之后可以在公司的电子发票设置中更改。"

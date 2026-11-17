@@ -520,6 +520,9 @@ class AuthToken(models.Model):
     # registration also holds the company name until the owner opens the emailed link.
     firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.CASCADE, related_name="+")
     company_name = models.CharField(max_length=200, blank=True, db_default="")
+    # Open owner sign-up (D67 (2)): the owner's answer to "does this company issue e-invoices?", applied when the
+    # registration is completed. Empty for a registration made through a firm's link.
+    einvoicing_enabled = models.BooleanField(null=True, blank=True)
     expires_at = models.DateTimeField()
     used_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

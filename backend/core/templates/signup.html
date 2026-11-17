@@ -15,6 +15,14 @@
       {% csrf_token %}
       <p><label>{% trans "Email address" %} <input type="email" name="email" value="{{ email }}" autocomplete="username" required></label></p>
       <p><label>{% trans "Company name" %} <input type="text" name="company_name" value="{{ company_name }}" maxlength="200" autocomplete="organization" required></label></p>
+      {% if open %}
+      <fieldset>
+        <legend>{% trans "Does your company issue e-invoices to LHDN MyInvois?" %}</legend>
+        <label><input type="radio" name="issues_einvoices" value="yes" {% if issues_einvoices == "yes" %}checked{% endif %} required> {% trans "Yes" %}</label>
+        <label><input type="radio" name="issues_einvoices" value="no" {% if issues_einvoices == "no" %}checked{% endif %}> {% trans "No" %}</label>
+        <p>{% trans "You can change this later in your company's e-invoice settings." %}</p>
+      </fieldset>
+      {% endif %}
       <button type="submit">{% trans "Continue" %}</button>
     </form>
   {% endif %}
