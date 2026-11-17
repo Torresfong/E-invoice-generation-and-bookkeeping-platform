@@ -177,6 +177,7 @@ Implements D36 and ADR 0001 rules 1 to 3 and 6.
 - The job table has no admin screen, API or report; a test pins that the admin and any job route are absent.
 - A job whose handler raises is recorded with the exception class only. Retry, backoff, leases and purging are in "Job execution" below.
 - A role that owns no policy on a new tenant table (the owner, a non-superuser) cannot write it under forced row-level security; operator tooling that writes tenant data must run as `worker` or `web`.
+- Operator tooling that must read tenant data across companies (#187, `list_einvoice_supplier_gaps`) reads `Company` as the owner (it has the `definer_functions` policy) and then each company's rows as `worker` in that company's context (`jobs.as_worker_in`), so the database shows one company at a time and no new function or grant is needed. The `worker` role itself can see only the company it is set to. The owner connection must therefore be a member of `worker` where it is not a superuser (a role that is a member of both `web` and `worker` is refused by migration 0017, so the owner must not be a member of `web`); development and test connections are superusers and need nothing. Run the command before go-live from that owner connection, never from the web process.
 
 ## Job execution (ticket 24, #27)
 
