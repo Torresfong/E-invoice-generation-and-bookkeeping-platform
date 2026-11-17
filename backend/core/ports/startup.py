@@ -1,7 +1,7 @@
 """Install the real adapters when the app starts (#159, D14).
 
 `CoreConfig.ready()` calls this for the web process and the worker alike. Each real adapter has its own installer here,
-so installing one never makes `ports.get()` pretend another exists; the email adapter (#151) adds its own. Tests install
+so installing one never makes `ports.get()` pretend another exists; the email adapter (#151, D68) has its own. Tests install
 fakes with `ports.install()` after this has run, so no test reaches a real service. Nothing here makes a network call:
 the gateway logs in only when a caller first needs it.
 """
@@ -15,17 +15,23 @@ from django.core import checks
 from . import PortsNotConfigured, install_port
 from . import get as get_ports
 from .myinvois import gateway_from_environment, urllib_transport
+from .ses import email_from_settings, ses_client
 
 # A web request waits on the TIN check, so a hung LHDN is given up on well before a proxy's idle timeout turns the wait
 # into a 504 (the transport's own default is 30 seconds for each socket operation).
 REQUEST_TIMEOUT_SECONDS = 10
 
 
-def install_configured_ports(env=os.environ, transport=partial(urllib_transport, timeout=REQUEST_TIMEOUT_SECONDS)):
+def install_configured_ports(
+    env=os.environ, transport=partial(urllib_transport, timeout=REQUEST_TIMEOUT_SECONDS), email_client=ses_client
+):
     """Install every real adapter whose settings and secrets are present. One that is missing stays uninstalled."""
     gateway = gateway_from_environment(settings.MYINVOIS_ENVIRONMENT, env, transport)
     if gateway is not None:
         install_port("gateway", gateway)
+    email = email_from_settings(settings.EMAIL_SENDER_ADDRESS, settings.EMAIL_REGION, email_client)
+    if email is not None:
+        install_port("email", email)
 
 
 @checks.register(checks.Tags.security, deploy=True)
@@ -43,6 +49,25 @@ def check_gateway_installed(app_configs, **kwargs):
                 "no MyInvois gateway installed: customers with a TIN cannot be saved",
                 hint=f"Set MYINVOIS_{settings.MYINVOIS_ENVIRONMENT.upper()}_BASE_URL, _CLIENT_ID and _CLIENT_SECRET.",
                 id="core.W001",
+            )
+        ]
+    return []
+
+
+@checks.register(checks.Tags.security, deploy=True)
+def check_email_installed(app_configs, **kwargs):
+    """Warn when no email adapter is installed, so a deployment whose sign-up and reset links go nowhere is caught.
+
+    A warning under `check --deploy` only, as for the gateway: CI has no sender address.
+    """
+    try:
+        get_ports().email
+    except PortsNotConfigured:
+        return [
+            checks.Warning(
+                "no email adapter installed: sign-up, invitation and password-reset emails cannot be sent",
+                hint="Set EMAIL_SENDER_ADDRESS (and EMAIL_REGION if it is not ap-southeast-5); AWS credentials come from the task role.",
+                id="core.W002",
             )
         ]
     return []
