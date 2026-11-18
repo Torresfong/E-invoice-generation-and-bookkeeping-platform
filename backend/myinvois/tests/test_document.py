@@ -376,9 +376,9 @@ def test_a_large_document_total_keeps_its_precision_past_the_line_amount(world, 
     ])
     expected = Decimal("9999999999999869120000000000.38")
 
-    document = decode_exact(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))
+    decoded = decode_exact(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))
 
-    (inv,) = document["Invoice"]
+    (inv,) = decoded["Invoice"]
     (line,) = inv["InvoiceLine"]
     total = inv["LegalMonetaryTotal"][0]
     assert line["ItemPriceExtension"] == [{"Amount": [{"_": expected, "currencyID": "MYR"}]}]

@@ -66,9 +66,10 @@ CENTS = Decimal("0.01")
 # total to reach the inclusive total, can need a few digits more again. Computing in the ambient context would
 # silently round under ROUND_HALF_EVEN before `.quantize(..., ROUND_HALF_UP)` ever saw a result, for inputs well
 # inside what `core.invoices._amount` already accepts, and `quantize` itself raises `InvalidOperation` once an
-# exact result needs more digits than the context allows (both seen in review on PR #191, NB3/B2). `map_invoice`
-# runs every amount calculation - each line, their sum, and the inclusive total - inside one context set to this
-# precision; 50 is comfortable headroom for the sizes an LHDN-accepted invoice can actually reach.
+# exact result needs more digits than the context allows (both seen in review on PR #191: Codex's P2 on
+# `a100b07`, then its remainder, B2, on `36f562b`). `map_invoice` runs every amount calculation - each line,
+# their sum, and the inclusive total - inside one context set to this precision; 50 is comfortable headroom
+# for the sizes an LHDN-accepted invoice can actually reach.
 LINE_AMOUNT_PRECISION = 50
 
 
