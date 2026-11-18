@@ -210,9 +210,12 @@ def _line_details(line, invoice_number):
     # D-number records that rounding rule, and the invoice engine's own PDF and export (#12, #60-#63) will need
     # the same total; raised for Torres on PR #191 rather than decided here, since moving the calculation into
     # `core` so every consumer shares one answer would touch the invoice engine, which this ticket does not.
-    # Relies on its caller (`map_invoice`) to have already widened the Decimal context's precision: see the
-    # comment there.
-    subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
+    # Correct on its own, not just as `map_invoice` currently calls it (Torres's review, NB-g on PR #191): a
+    # future caller - a note (#124) or #125's per-line tax reusing this helper - gets the same widened precision
+    # without having to know to provide it itself. Nesting inside a caller's own `localcontext()` is harmless.
+    with localcontext() as ctx:
+        ctx.prec = LINE_AMOUNT_PRECISION
+        subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
     return {
         "classification_code": line.item.classification_code,
         "description": line.item_name,
