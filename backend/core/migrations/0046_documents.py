@@ -9,10 +9,11 @@ from core.audit import enable_audit
 from core.rls import enable_tenant_rls
 
 # The document upload table (ticket #14, D20). A tenant table under the standard isolation policy and audited by
-# trigger, like 0036's item master; the worker needs it (`worker=True`) because `store_uploaded_document` writes
-# `storage_key` from a job. The rule kept in the database, like the guards of 0034 to 0038, checked ahead of every
-# early return and for every operation (CODING_STANDARDS.md, "a guard trigger checks the role before it returns,
-# for every operation"):
+# trigger, like 0036's item master; the worker needs it (`worker=True`) because the queued job writes `storage_key`,
+# and, once it has read the staged bytes anyway, also runs the D41 go-live-date check and may move the document on
+# to `returned_for_re_upload` with a reason (`status`, `bounce_reason`). The rule kept in the database, like the
+# guards of 0034 to 0038, checked ahead of every early return and for every operation (CODING_STANDARDS.md, "a
+# guard trigger checks the role before it returns, for every operation"):
 #   - a document is never deleted, as an item or a customer is not: nothing in this ticket deletes one, and D20's
 #     later states (classified, exported, locked) would otherwise have nowhere safe to stand;
 #   - when a signed-in user is in play only the owner and staff of the company may insert or update a document
@@ -55,13 +56,14 @@ TRIGGERS_FORWARD = [
     "FOR EACH ROW EXECUTE FUNCTION document_guard()",
 ]
 
-# The worker only ever updates storage_key (core.documents.store_uploaded_document); it never inserts or deletes,
-# and least privilege keeps it unable to touch any other column even if a handler were ever buggy or hostile
-# (tenancy.md, "Background jobs": "a handler is trusted code... review of every handler is still needed").
+# The worker only ever updates storage_key, status and bounce_reason (core.documents.store_uploaded_document, which
+# also runs the D41 go-live-date check once it has staged bytes to read); it never inserts or deletes, and least
+# privilege keeps it unable to touch any other column even if a handler were ever buggy or hostile (tenancy.md,
+# "Background jobs": "a handler is trusted code... review of every handler is still needed").
 PRIVILEGES_FORWARD = [
     "REVOKE DELETE ON core_document FROM web",
     "REVOKE INSERT, UPDATE, DELETE ON core_document FROM worker",
-    "GRANT UPDATE (storage_key) ON core_document TO worker",
+    "GRANT UPDATE (storage_key, status, bounce_reason) ON core_document TO worker",
 ]
 
 REVERSE = [

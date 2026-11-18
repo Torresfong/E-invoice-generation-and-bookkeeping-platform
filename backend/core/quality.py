@@ -13,6 +13,10 @@ nearly flat). A PDF is checked only structurally (a valid header and a trailer, 
 a PDF page to pixels to run the same sharpness check needs a PDF renderer (poppler or PyMuPDF), a much heavier
 dependency the pilot does not carry, so a blurry scanned PDF is not caught here. This is a known, accepted gap for
 this ticket, not an oversight.
+
+This module also holds `SALES_INVOICE_AFTER_GO_LIVE`, the one reason code `core.documents`'s own, separate,
+asynchronous check produces (D41): both are "why wasn't this upload accepted", so one registry of codes and
+messages serves both, even though that check runs later, in a job, not here.
 """
 
 import io
@@ -32,6 +36,7 @@ CORRUPTED = "corrupted"
 TOO_SMALL = "too_small"
 TOO_LARGE = "too_large"
 TOO_BLURRY = "too_blurry"
+SALES_INVOICE_AFTER_GO_LIVE = "sales_invoice_after_go_live"
 
 # A page shorter or narrower than this is not a readable document: a crude stand-in for "page found" (D20).
 MIN_PIXELS_PER_SIDE = 400
@@ -68,6 +73,10 @@ def reason_text(code):
         TOO_SMALL: _("The photo is too small or cropped. Retake it with the whole page in frame."),
         TOO_LARGE: _("The photo is too large to check. Try a smaller photo, or compress it first."),
         TOO_BLURRY: _("The photo is too blurry. Retake it in good light, holding the phone steady."),
+        SALES_INVOICE_AFTER_GO_LIVE: _(
+            "This looks like a sales invoice dated on or after your go-live date. Issue it in the platform "
+            "instead of uploading it."
+        ),
     }.get(code, _("Upload it again."))
 
 

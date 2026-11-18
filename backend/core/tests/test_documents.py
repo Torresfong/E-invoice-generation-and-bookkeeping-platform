@@ -130,6 +130,106 @@ def test_the_queued_job_writes_the_bytes_through_storage_by_company_and_month(fa
     assert fake_ports.storage.get(document.storage_key) == data
 
 
+# --- the D41 go-live-date check (ticket #14, extended by Torres's decision to build it now rather than in #15) ---
+
+
+def _answer(document_type, invoice_date):
+    return lambda document, schema, idempotency_key=None: {"document_type": document_type, "invoice_date": invoice_date}
+
+
+@pytest.mark.django_db
+def test_a_sales_invoice_dated_on_the_go_live_date_is_returned(fake_ports):
+    from datetime import date
+
+    from core.models import CompanyAccess
+
+    company = make_company("Acme")
+    company.go_live_date = date(2026, 6, 1)
+    company.save(update_fields=["go_live_date"])
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+    fake_ports.ai.extract = _answer(documents.SALES_INVOICE, "2026-06-01")
+
+    document = upload(owner, company)
+    jobs.run_pending()
+    document.refresh_from_db()
+
+    assert document.status == Document.RETURNED_FOR_REUPLOAD
+    assert document.bounce_reason == quality.SALES_INVOICE_AFTER_GO_LIVE
+    assert document.storage_key  # still stored: the go-live check does not stop the storage write
+
+
+@pytest.mark.django_db
+def test_a_sales_invoice_dated_before_go_live_stays_quality_checked(fake_ports):
+    from datetime import date
+
+    from core.models import CompanyAccess
+
+    company = make_company("Acme")
+    company.go_live_date = date(2026, 6, 1)
+    company.save(update_fields=["go_live_date"])
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+    fake_ports.ai.extract = _answer(documents.SALES_INVOICE, "2026-05-31")
+
+    document = upload(owner, company)
+    jobs.run_pending()
+    document.refresh_from_db()
+
+    assert document.status == Document.QUALITY_CHECKED and document.bounce_reason == ""
+
+
+@pytest.mark.django_db
+def test_a_purchase_invoice_is_unaffected_by_the_go_live_date(fake_ports):
+    from datetime import date
+
+    from core.models import CompanyAccess
+
+    company = make_company("Acme")
+    company.go_live_date = date(2026, 1, 1)
+    company.save(update_fields=["go_live_date"])
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+    fake_ports.ai.extract = _answer("purchase_invoice", "2026-06-01")
+
+    document = upload(owner, company)
+    jobs.run_pending()
+    document.refresh_from_db()
+
+    assert document.status == Document.QUALITY_CHECKED
+
+
+@pytest.mark.django_db
+def test_no_go_live_date_set_skips_the_check_entirely(fake_ports):
+    from core.models import CompanyAccess
+
+    company = make_company("Acme")  # go_live_date left null
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+    fake_ports.ai.extract = lambda *a, **k: pytest.fail("must not call the AI provider with no go-live date set")
+
+    document = upload(owner, company)
+    jobs.run_pending()
+    document.refresh_from_db()
+
+    assert document.status == Document.QUALITY_CHECKED
+
+
+@pytest.mark.django_db
+def test_a_malformed_extraction_answer_fails_open(fake_ports):
+    from datetime import date
+
+    from core.models import CompanyAccess
+
+    company = make_company("Acme")
+    company.go_live_date = date(2026, 1, 1)
+    company.save(update_fields=["go_live_date"])
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+    fake_ports.ai.extract = _answer(documents.SALES_INVOICE, "not-a-date")
+
+    document = upload(owner, company)
+    jobs.run_pending()
+    document.refresh_from_db()
+
+    assert document.status == Document.QUALITY_CHECKED
+
+
 @pytest.mark.django_db
 def test_list_documents_only_returns_the_given_companys_rows():
     from core.models import CompanyAccess
@@ -219,15 +319,21 @@ def test_a_document_cannot_be_deleted_by_anyone(world, as_user, who):
 
 
 @pytest.mark.django_db
-def test_the_worker_can_update_only_storage_key(world):
+def test_the_worker_can_update_only_storage_key_status_and_bounce_reason(world):
     document = upload(world["acme_owner"], world["acme"])
 
     with jobs.as_worker_in(world["acme"]):
-        Document.objects.filter(pk=document.pk).update(storage_key="documents/1/2026-11/1.png")
+        Document.objects.filter(pk=document.pk).update(
+            storage_key="documents/1/2026-11/1.png", status=Document.RETURNED_FOR_REUPLOAD,
+            bounce_reason=quality.SALES_INVOICE_AFTER_GO_LIVE,
+        )
         attempt(lambda: Document.objects.filter(pk=document.pk).update(original_filename="hijacked.png"))
 
     document.refresh_from_db()
-    assert document.storage_key == "documents/1/2026-11/1.png" and document.original_filename == "invoice.png"
+    assert document.storage_key == "documents/1/2026-11/1.png"
+    assert document.status == Document.RETURNED_FOR_REUPLOAD
+    assert document.bounce_reason == quality.SALES_INVOICE_AFTER_GO_LIVE
+    assert document.original_filename == "invoice.png"
 
 
 @pytest.mark.django_db

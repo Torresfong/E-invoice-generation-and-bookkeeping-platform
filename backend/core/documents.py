@@ -10,12 +10,25 @@ through the real object storage port, because that port call cannot be undone an
 request's own transaction (D53 (3)); the job's payload holds the document id only (ADR 0001 rule 4). The storage
 key groups by company and upload month, matching the SQL Account export's own per-month batching (D42).
 
+The same job also runs the D41 go-live-date check, since an AI call is likewise a port call that must happen in a
+job, not the request (D53 (3)), and the job has already read the staged bytes for the storage write. It asks the
+AI provider only whether the document is a sales invoice and, if so, its date (`EXTRACTION_SCHEMA`); nothing else
+from that answer is kept, because classifying and extracting a document in full is ticket #15/#18's job, not this
+one's. A sales invoice dated on or after `company.go_live_date` is moved from `quality_checked` on to
+`returned_for_re_upload` with the reason "issue it in the platform" (D18); an older one, or one the AI does not
+call a sales invoice, or a company with no go-live date set yet, is left `quality_checked`. Because this needs an
+AI call, it is not part of the "bounced within seconds" promise that the fast local check keeps (D20); the issue's
+own acceptance criterion for it names no such deadline. An extraction answer this module cannot parse (no go-live
+date set, an unrecognised document type, a malformed date) fails open: the document stays `quality_checked` rather
+than risk wrongly bouncing a document nobody has reviewed.
+
 Known limitation, accepted for this ticket: `_stage` writes to disk inside the request's own transaction, so a
 later rollback of that same transaction (a deliberate 5xx, D53 (1)) leaves the staged bytes on disk with no
 `Document` row pointing at them. Nothing sweeps an orphan like this; it is a disk-hygiene cost, not a correctness
 or tenancy one, since no row and no job ever names it.
 """
 
+from datetime import date
 from pathlib import Path
 
 from django.conf import settings
@@ -25,6 +38,19 @@ from . import jobs, permissions, ports, quality
 from .models import Document
 
 STORE_DOCUMENT_JOB = "store_uploaded_document"
+
+# What the AI provider is asked for and nothing more (D41): whether this is a sales invoice, and if so, its date.
+# A future real adapter must answer in this shape; `document_type` values other than "sales_invoice" (purchase
+# invoice, receipt, anything else) and a null or missing date are both treated as "no go-live check applies".
+SALES_INVOICE = "sales_invoice"
+EXTRACTION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "document_type": {"type": "string"},
+        "invoice_date": {"type": ["string", "null"]},
+    },
+    "required": ["document_type", "invoice_date"],
+}
 
 
 def list_documents(company):
@@ -83,7 +109,8 @@ def _storage_key(document):
 
 @jobs.register(STORE_DOCUMENT_JOB)
 def _store_uploaded_document(*, document_id):
-    """Write a staged upload through the object storage port and record its key; clean up the staging file.
+    """Write a staged upload through the object storage port, record its key, run the D41 go-live check, and clean
+    up the staging file.
 
     Row-level security already confines this to the job's own company (migration 0046, `worker=True`): a payload
     naming another company's document id finds nothing here, consistent with the job queue's identifier-only rule.
@@ -96,8 +123,36 @@ def _store_uploaded_document(*, document_id):
     """
     document = Document.objects.get(pk=document_id)
     path = _staging_path(document)
+    data = path.read_bytes()
     key = _storage_key(document)
-    ports.get().storage.put(key, path.read_bytes())
+    ports.get().storage.put(key, data)
     document.storage_key = key
-    document.save(update_fields=["storage_key"])
+    fields = ["storage_key"]
+
+    reason = _go_live_check(document, data)
+    if reason:
+        document.status, document.bounce_reason = Document.RETURNED_FOR_REUPLOAD, reason
+        fields += ["status", "bounce_reason"]
+
+    document.save(update_fields=fields)
     transaction.on_commit(lambda: path.unlink(missing_ok=True))
+
+
+def _go_live_check(document, data):
+    """None if the document stays `quality_checked`; otherwise the reason it is returned instead (D41).
+
+    Fails open on anything this module cannot act on with confidence: no go-live date set yet, a document type
+    other than a sales invoice, or an extraction answer with no date or one that does not parse.
+    """
+    if document.company.go_live_date is None:
+        return None
+    answer = ports.get().ai.extract(data, EXTRACTION_SCHEMA, idempotency_key=jobs.idempotency_key("extract"))
+    if answer.get("document_type") != SALES_INVOICE:
+        return None
+    try:
+        invoice_date = date.fromisoformat(answer.get("invoice_date") or "")
+    except ValueError:
+        return None
+    if invoice_date >= document.company.go_live_date:
+        return quality.SALES_INVOICE_AFTER_GO_LIVE
+    return None

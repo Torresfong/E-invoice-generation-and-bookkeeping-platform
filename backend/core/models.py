@@ -116,6 +116,10 @@ class Company(models.Model):
     name = models.CharField(max_length=200)
     firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="companies")
     created_at = models.DateTimeField(auto_now_add=True)
+    # The platform is the only invoice issuer from this date (D18, D41); null until onboarding sets it. Minimal
+    # field for ticket #14's go-live-date check on uploaded sales invoices; the onboarding screen that lets the
+    # owner set it, and any further use beyond that one check, is ticket #23's scope, not built here.
+    go_live_date = models.DateField(null=True, blank=True)
 
     def __str__(self):
         return self.name

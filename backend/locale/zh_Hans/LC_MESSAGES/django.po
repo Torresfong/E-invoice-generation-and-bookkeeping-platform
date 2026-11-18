@@ -322,6 +322,12 @@ msgstr "照片太大，无法检查。请使用较小的照片，或先压缩后
 msgid "Upload it again."
 msgstr "请重新上传。"
 
+#: core/quality.py:69
+msgid ""
+"This looks like a sales invoice dated on or after your go-live date. Issue it in the platform instead of "
+"uploading it."
+msgstr "这似乎是一张上线日期当天或之后开立的销售发票。请直接在平台上开具此发票，而不是上传它。"
+
 #: core/quality.py:64
 msgid ""
 "The photo is too blurry. Retake it in good light, holding the phone steady."

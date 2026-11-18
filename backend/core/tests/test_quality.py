@@ -91,7 +91,7 @@ def test_a_file_with_no_pdf_header_is_bounced():
 def test_every_reason_code_has_a_message():
     for code in (
         quality.EMPTY, quality.UNSUPPORTED_TYPE, quality.NOT_A_PDF, quality.PDF_INCOMPLETE, quality.CORRUPTED,
-        quality.TOO_SMALL, quality.TOO_LARGE, quality.TOO_BLURRY,
+        quality.TOO_SMALL, quality.TOO_LARGE, quality.TOO_BLURRY, quality.SALES_INVOICE_AFTER_GO_LIVE,
     ):
         assert quality.reason_text(code)
 
