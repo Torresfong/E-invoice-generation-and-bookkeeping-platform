@@ -9,6 +9,11 @@ An accepted upload is staged to local disk (`settings.DOCUMENT_STAGING_ROOT`) an
 through the real object storage port, because that port call cannot be undone and so must happen outside the
 request's own transaction (D53 (3)); the job's payload holds the document id only (ADR 0001 rule 4). The storage
 key groups by company and upload month, matching the SQL Account export's own per-month batching (D42).
+
+Known limitation, accepted for this ticket: `_stage` writes to disk inside the request's own transaction, so a
+later rollback of that same transaction (a deliberate 5xx, D53 (1)) leaves the staged bytes on disk with no
+`Document` row pointing at them. Nothing sweeps an orphan like this; it is a disk-hygiene cost, not a correctness
+or tenancy one, since no row and no job ever names it.
 """
 
 from pathlib import Path
@@ -34,9 +39,14 @@ def upload_document(user, company, *, filename, content_type, data):
     the `Document` row whatever the local check decides: `quality_checked` when it passes, or
     `returned_for_re_upload` with `bounce_reason` holding one of `core.quality`'s reason codes when it does not;
     render it with `core.quality.reason_text` (or the `reason_text` template filter), never store the rendered text.
+
+    A file over `settings.MAX_UPLOAD_BYTES` is bounced before it ever reaches Pillow: Django places no cap of its
+    own on a file upload's size, and decoding an oversized image is exactly the costly, memory-hungry work this
+    check exists to avoid. The view still reads the whole upload into memory first; avoiding that too would need
+    a streaming read, which is not built here.
     """
     permissions.require(user, "upload_documents", company)
-    reason = quality.check(data, content_type)
+    reason = quality.TOO_LARGE if len(data) > settings.MAX_UPLOAD_BYTES else quality.check(data, content_type)
     with transaction.atomic():
         document = Document.objects.create(company=company, uploaded_by=user, original_filename=filename, content_type=content_type)
         if reason:

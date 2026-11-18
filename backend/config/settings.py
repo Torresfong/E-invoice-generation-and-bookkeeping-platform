@@ -142,6 +142,10 @@ if JOB_RETENTION_DAYS < 1:
 # the pilot's single-host deployment; a multi-host deployment would need a different handoff.
 DOCUMENT_STAGING_ROOT = Path(os.environ.get("DOCUMENT_STAGING_ROOT", BASE_DIR / "var" / "pending_documents"))
 
+# Django places no cap of its own on a file upload's size; a phone photo or scanned PDF is a few megabytes at most,
+# so this is a generous bound against a hostile or mistaken giant upload, not a limit a real document should meet.
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
+
 # Every signing is logged (D13); Django's defaults would drop this line in production.
 LOGGING = {
     "version": 1,

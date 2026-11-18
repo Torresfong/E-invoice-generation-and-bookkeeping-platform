@@ -55,10 +55,13 @@ TRIGGERS_FORWARD = [
     "FOR EACH ROW EXECUTE FUNCTION document_guard()",
 ]
 
-# The worker only ever updates storage_key (core.documents.store_uploaded_document); it never inserts or deletes.
+# The worker only ever updates storage_key (core.documents.store_uploaded_document); it never inserts or deletes,
+# and least privilege keeps it unable to touch any other column even if a handler were ever buggy or hostile
+# (tenancy.md, "Background jobs": "a handler is trusted code... review of every handler is still needed").
 PRIVILEGES_FORWARD = [
     "REVOKE DELETE ON core_document FROM web",
-    "REVOKE INSERT, DELETE ON core_document FROM worker",
+    "REVOKE INSERT, UPDATE, DELETE ON core_document FROM worker",
+    "GRANT UPDATE (storage_key) ON core_document TO worker",
 ]
 
 REVERSE = [

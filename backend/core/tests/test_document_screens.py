@@ -28,6 +28,12 @@ def upload_file(data=None, name="invoice.png", content_type="image/png"):
     return {"file": SimpleUploadedFile(name, data or sharp_page(), content_type=content_type)}
 
 
+@pytest.fixture(autouse=True)
+def staging_in_tmp(settings, tmp_path):
+    """Stage into pytest's own tmp_path, not the real var/pending_documents (see test_documents.py)."""
+    settings.DOCUMENT_STAGING_ROOT = tmp_path
+
+
 @pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
 def test_the_owner_and_staff_upload_and_see_it_listed(client, world, as_production_connection, who):
     with as_production_connection():

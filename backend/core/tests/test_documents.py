@@ -22,6 +22,13 @@ def attempt(statement_block):
             statement_block()
 
 
+@pytest.fixture(autouse=True)
+def staging_in_tmp(settings, tmp_path):
+    """Stage into pytest's own tmp_path, not the real var/pending_documents: a test that never runs the storage
+    job (most of them) would otherwise leave its staged file behind in the working tree."""
+    settings.DOCUMENT_STAGING_ROOT = tmp_path
+
+
 def upload(user, company, *, filename="invoice.png", content_type="image/png", data=None):
     return documents.upload_document(user, company, filename=filename, content_type=content_type, data=data or sharp_page())
 
@@ -50,6 +57,20 @@ def test_an_accountant_cannot_upload():
 
     with pytest.raises(PermissionDenied):
         upload(accountant, company)
+
+
+@pytest.mark.django_db
+def test_an_upload_over_the_byte_limit_is_bounced_without_reaching_pillow(settings, monkeypatch):
+    from core.models import CompanyAccess
+
+    settings.MAX_UPLOAD_BYTES = 10
+    company = make_company("Acme")
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+    monkeypatch.setattr(quality, "check", lambda *a, **k: pytest.fail("must not reach Pillow"))
+
+    document = upload(owner, company, data=b"x" * 11)
+
+    assert document.status == Document.RETURNED_FOR_REUPLOAD and document.bounce_reason == quality.TOO_LARGE
 
 
 @pytest.mark.django_db
@@ -181,7 +202,7 @@ def test_the_staged_file_is_removed_once_the_job_stores_it():
 
 
 @pytest.mark.django_db
-@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff", "accountant"])
 def test_a_document_cannot_be_deleted_by_anyone(world, as_user, who):
     with as_user(world["acme_owner"]):
         document = Document.objects.create(
@@ -195,3 +216,38 @@ def test_a_document_cannot_be_deleted_by_anyone(world, as_user, who):
     attempt(lambda: Document.objects.filter(pk=document.pk).delete())
 
     assert Document.objects.filter(pk=document.pk).exists()
+
+
+@pytest.mark.django_db
+def test_the_worker_can_update_only_storage_key(world):
+    document = upload(world["acme_owner"], world["acme"])
+
+    with jobs.as_worker_in(world["acme"]):
+        Document.objects.filter(pk=document.pk).update(storage_key="documents/1/2026-11/1.png")
+        attempt(lambda: Document.objects.filter(pk=document.pk).update(original_filename="hijacked.png"))
+
+    document.refresh_from_db()
+    assert document.storage_key == "documents/1/2026-11/1.png" and document.original_filename == "invoice.png"
+
+
+@pytest.mark.django_db
+def test_a_job_naming_another_companys_document_touches_nothing(world, registry):
+    beta_document = upload(world["beta_owner"], world["beta"])
+    seen = {}
+
+    def probe(**payload):
+        try:
+            Document.objects.get(pk=payload["document_id"])
+        except Document.DoesNotExist:
+            seen["found"] = False
+        else:
+            seen["found"] = True
+
+    jobs.register("probe-cross-company")(probe)
+    jobs.enqueue("probe-cross-company", company=world["acme"], document_id=beta_document.pk)
+
+    jobs.run_pending()
+
+    beta_document.refresh_from_db()
+    assert beta_document.original_filename == "invoice.png"
+    assert seen == {"found": False}
