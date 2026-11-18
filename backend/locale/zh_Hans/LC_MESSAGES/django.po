@@ -597,6 +597,20 @@ msgstr ""
 msgid "Not checked yet"
 msgstr "尚未核查"
 
+#. SupplierDetails.STATUS_CHOICES labels (core/models.py): plain strings, translated dynamically by
+#. {% trans label %} in einvoice_setting.html, so makemessages finds no static call site for them.
+#: core/models.py
+msgid "Mandatory"
+msgstr "强制"
+
+#: core/models.py
+msgid "Voluntary"
+msgstr "自愿"
+
+#: core/models.py
+msgid "Exempt"
+msgstr "豁免"
+
 #: core/templates/einvoice_setting.html:24
 #: core/templates/einvoice_setting.html:53
 msgid "Effective from"
@@ -1192,12 +1206,3 @@ msgid ""
 msgstr ""
 "发票 %(number)s 在开具后 72 小时内未能提交给 LHDN，LHDN 已不再接受。您的草稿"
 "已保留，请检查后重新批准。"
-
-#~ msgid "Mandatory"
-#~ msgstr "强制"
-
-#~ msgid "Voluntary"
-#~ msgstr "自愿"
-
-#~ msgid "Exempt"
-#~ msgstr "豁免"
