@@ -161,3 +161,20 @@ def test_the_staged_file_is_removed_once_the_job_stores_it():
     jobs.run_pending()
 
     assert not staged.exists()
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("who", ["acme_owner", "acme_staff"])
+def test_a_document_cannot_be_deleted_by_anyone(world, as_user, who):
+    with as_user(world["acme_owner"]):
+        document = Document.objects.create(
+            company=world["acme"], uploaded_by=world["acme_owner"], original_filename="invoice.png",
+            content_type="image/png",
+        )
+
+    with as_user(world[who]):
+        attempt(lambda: Document.objects.filter(pk=document.pk).delete())
+    # nor by the table owner, who is not stopped by privileges: the trigger refuses
+    attempt(lambda: Document.objects.filter(pk=document.pk).delete())
+
+    assert Document.objects.filter(pk=document.pk).exists()

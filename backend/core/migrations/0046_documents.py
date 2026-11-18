@@ -10,7 +10,11 @@ from core.rls import enable_tenant_rls
 
 # The document upload table (ticket #14, D20). A tenant table under the standard isolation policy and audited by
 # trigger, like 0036's item master; the worker needs it (`worker=True`) because `store_uploaded_document` writes
-# `storage_key` from a job. The rule kept in the database, like the guards of 0034 to 0038:
+# `storage_key` from a job. The rule kept in the database, like the guards of 0034 to 0038, checked ahead of every
+# early return and for every operation (CODING_STANDARDS.md, "a guard trigger checks the role before it returns,
+# for every operation"):
+#   - a document is never deleted, as an item or a customer is not: nothing in this ticket deletes one, and D20's
+#     later states (classified, exported, locked) would otherwise have nowhere safe to stand;
 #   - when a signed-in user is in play only the owner and staff of the company may insert a document (accountants
 #     read only, as D45 and the permission service already say for every read-only role);
 #   - a document never moves to another company.
@@ -24,6 +28,9 @@ $$
 DECLARE
     v_role text;
 BEGIN
+    IF TG_OP = 'DELETE' THEN
+        RAISE EXCEPTION 'a document cannot be deleted';
+    END IF;
     IF TG_OP = 'UPDATE' AND NEW.company_id <> OLD.company_id THEN
         RAISE EXCEPTION 'a document cannot move to another company';
     END IF;
@@ -40,8 +47,14 @@ $$
 """
 
 TRIGGERS_FORWARD = [
-    "CREATE TRIGGER a_document_guard BEFORE INSERT OR UPDATE ON core_document "
+    "CREATE TRIGGER a_document_guard BEFORE INSERT OR UPDATE OR DELETE ON core_document "
     "FOR EACH ROW EXECUTE FUNCTION document_guard()",
+]
+
+# The worker only ever updates storage_key (core.documents.store_uploaded_document); it never inserts or deletes.
+PRIVILEGES_FORWARD = [
+    "REVOKE DELETE ON core_document FROM web",
+    "REVOKE INSERT, DELETE ON core_document FROM worker",
 ]
 
 REVERSE = [
@@ -78,5 +91,6 @@ class Migration(migrations.Migration):
         ),
         enable_tenant_rls("core_document", worker=True),
         enable_audit("core_document"),
+        migrations.RunSQL(PRIVILEGES_FORWARD, migrations.RunSQL.noop),
         migrations.RunSQL([DOCUMENT_GUARD_FUNCTION, *TRIGGERS_FORWARD], REVERSE),
     ]

@@ -464,6 +464,8 @@ class Document(TenantModel):
     `bounce_reason` holds one of `core.quality`'s reason codes, never rendered text: the code is translated to a
     message only when shown, so a document bounced while one viewer's browser was in English still reads in
     Chinese for a viewer whose language is Chinese.
+
+    Never deleted, like an item or a customer (migration 0046 refuses every delete and revokes the privilege).
     """
 
     UPLOADED, QUALITY_CHECKED, RETURNED_FOR_REUPLOAD = "uploaded", "quality_checked", "returned_for_re_upload"
