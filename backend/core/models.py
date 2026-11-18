@@ -446,6 +446,47 @@ class InvoiceLine(TenantModel):
         ordering = ["id"]
 
 
+class Document(TenantModel):
+    """A bookkeeping document a client uploads: a sales or purchase invoice, receipt or other paper (D20, ticket #14).
+
+    States are fixed (D20): uploaded, quality-checked, classified, extracted, in review, verified, exported, with
+    returned-for-re-upload and rejected as side states. This ticket only ever writes `uploaded`, `quality_checked`
+    and `returned_for_re_upload`; later tickets own the rest and extend the choices and the check constraint below.
+    The blurry-or-cropped check runs during the upload (D20), so a row is created `uploaded` and, in the same
+    transaction, moved on to `quality_checked` or `returned_for_re_upload` with a reason: the two-step write (rather
+    than one insert at the final status) means an unhandled failure between the steps leaves the row observably
+    `uploaded`, not silently missing.
+
+    `storage_key` is blank until the queued job (`core.documents.store_uploaded_document`) has written the bytes
+    through the object storage port; it stays blank for a bounced upload, which is never stored (D53 (3): the port
+    call happens only in that job, never inside this row's own request transaction).
+
+    `bounce_reason` holds one of `core.quality`'s reason codes, never rendered text: the code is translated to a
+    message only when shown, so a document bounced while one viewer's browser was in English still reads in
+    Chinese for a viewer whose language is Chinese.
+    """
+
+    UPLOADED, QUALITY_CHECKED, RETURNED_FOR_REUPLOAD = "uploaded", "quality_checked", "returned_for_re_upload"
+
+    uploaded_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
+    original_filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100)
+    status = models.CharField(max_length=24, default=UPLOADED, db_default=UPLOADED)
+    bounce_reason = models.CharField(max_length=200, blank=True, default="", db_default="")
+    storage_key = models.CharField(max_length=255, blank=True, default="", db_default="")
+    created_at = models.DateTimeField(db_default=Now())
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(status__in=["uploaded", "quality_checked", "returned_for_re_upload"]),
+                name="document_status_known",
+            ),
+        ]
+        indexes = [models.Index(fields=["company", "-created_at"], name="document_company_created")]
+        ordering = ["-created_at", "-id"]
+
+
 class Job(models.Model):
     """A queued background job (D10, D36, ADR 0001).
 

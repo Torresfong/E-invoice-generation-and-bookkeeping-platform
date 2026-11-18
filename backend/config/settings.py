@@ -129,6 +129,13 @@ except ValueError:
 if JOB_RETENTION_DAYS < 1:
     raise RuntimeError("JOB_RETENTION_DAYS must be a whole number of days, at least 1")
 
+# Where an uploaded document's bytes wait, on local disk, between the upload request and the queued job that writes
+# them through the object storage port (ticket #14, D53 (3)): the object storage write itself must happen only in
+# that job, never inside the request's own transaction, and the job's payload holds the document id only, so the
+# bytes need somewhere to sit in between. This assumes the worker reads the same disk as the web process, true for
+# the pilot's single-host deployment; a multi-host deployment would need a different handoff.
+DOCUMENT_STAGING_ROOT = Path(os.environ.get("DOCUMENT_STAGING_ROOT", BASE_DIR / "var" / "pending_documents"))
+
 # Every signing is logged (D13); Django's defaults would drop this line in production.
 LOGGING = {
     "version": 1,

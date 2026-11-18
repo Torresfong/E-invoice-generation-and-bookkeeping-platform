@@ -39,3 +39,6 @@ handoff-*.md
 *.p12
 *.pfx
 *.key
+
+# Local staging for uploaded documents waiting on the storage job (ticket #14); never a client document in the repo
+backend/var/

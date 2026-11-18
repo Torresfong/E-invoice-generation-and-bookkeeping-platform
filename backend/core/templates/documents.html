@@ -1,0 +1,57 @@
+{% load i18n permissions quality_tags %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% trans "Documents" %} · {{ company.name }}</title>
+</head>
+<body>
+  <h1>{% trans "Documents" %}</h1>
+  <p>{{ company.name }}</p>
+  {% if error %}<p role="alert">{{ error }}</p>{% endif %}
+  {% if saved %}
+    {% if saved.status == "returned_for_re_upload" %}
+      <p role="alert">{{ saved.bounce_reason|reason_text }}</p>
+    {% else %}
+      <p role="status">{% trans "Uploaded." %}</p>
+    {% endif %}
+  {% endif %}
+  {% can "upload_documents" company as may_upload %}
+  {% if may_upload %}
+    <form method="post" action="/companies/{{ company.pk }}/documents/" enctype="multipart/form-data">
+      {% csrf_token %}
+      <p><label>{% trans "File (PDF, JPEG or PNG)" %} <input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required></label></p>
+      <button type="submit">{% trans "Upload" %}</button>
+    </form>
+  {% endif %}
+  {% if documents %}
+    <table>
+      <thead>
+        <tr>
+          <th>{% trans "File" %}</th>
+          <th>{% trans "Status" %}</th>
+          <th>{% trans "Reason" %}</th>
+          <th>{% trans "Uploaded" %}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for document in documents %}
+          <tr>
+            <td>{{ document.original_filename }}</td>
+            <td>
+              {% if document.status == "uploaded" %}{% trans "Uploaded" %}
+              {% elif document.status == "quality_checked" %}{% trans "Quality checked" %}
+              {% else %}{% trans "Returned for re-upload" %}{% endif %}
+            </td>
+            <td>{{ document.bounce_reason|reason_text }}</td>
+            <td>{{ document.created_at }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>{% trans "No documents yet." %}</p>
+  {% endif %}
+  <p><a href="/companies/{{ company.pk }}/">{% trans "Back to the company" %}</a></p>
+</body>
+</html>

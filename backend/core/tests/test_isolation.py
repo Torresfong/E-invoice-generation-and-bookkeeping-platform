@@ -47,6 +47,7 @@ ENDPOINTS = [
     ("POST", "/companies/{pk}/items/1/", "companies/<int:pk>/items/<int:item_pk>/"),
     ("POST", "/companies/{pk}/items/1/deactivate/", "companies/<int:pk>/items/<int:item_pk>/deactivate/"),
     ("POST", "/companies/{pk}/items/1/activate/", "companies/<int:pk>/items/<int:item_pk>/activate/"),
+    ("POST", "/companies/{pk}/documents/", "companies/<int:pk>/documents/"),
     ("POST", "/companies/{pk}/customers/", "companies/<int:pk>/customers/"),
     ("POST", "/companies/{pk}/customers/1/", "companies/<int:pk>/customers/<int:customer_pk>/"),
     ("POST", "/companies/{pk}/customers/1/deactivate/", "companies/<int:pk>/customers/<int:customer_pk>/deactivate/"),

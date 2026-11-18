@@ -12,7 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, customers, einvoicing, firm_admin, firm_applications, invoices, items, numbering, permissions, registration, throttle, tokens
+from . import audit, customers, documents, einvoicing, firm_admin, firm_applications, invoices, items, numbering, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Invoice, Item, SupplierDetails
 from .signin import complete_sign_in
 
@@ -319,6 +319,38 @@ def item_deactivate(request, pk, item_pk):
 @require_POST
 def item_activate(request, pk, item_pk):
     return _set_item_active(request, pk, item_pk, True)
+
+
+def _documents_url(company_id, *rest):
+    return "/".join([f"/companies/{company_id}/documents", *map(str, rest), ""])
+
+
+@audit.audited_read("documents")
+def document_list(request, pk):
+    """The company's uploaded documents (ticket #14, D20): everyone with access reads them, the owner and staff upload."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "view_documents", access.company)
+    page = {"company": access.company, "access": access, "documents": documents.list_documents(access.company)}
+    if request.method == "POST":
+        permissions.require(request.user, "upload_documents", access.company)
+        upload = request.FILES.get("file")
+        if upload is None:
+            page["error"] = _("Choose a file to upload.")
+            return render(request, "documents.html", page)
+        document = documents.upload_document(
+            request.user, access.company, filename=upload.name, content_type=upload.content_type, data=upload.read()
+        )
+        return redirect(_documents_url(pk) + f"?saved={document.pk}")
+    if request.method not in ("GET", "HEAD"):
+        return HttpResponse(status=405)
+    saved_id = request.GET.get("saved")
+    if saved_id:
+        saved = next((d for d in page["documents"] if str(d.pk) == saved_id), None)
+        if saved is not None:
+            page["saved"] = saved
+    return render(request, "documents.html", page)
 
 
 # The draft form always offers at least this many line rows, and never fewer than two blank ones.
