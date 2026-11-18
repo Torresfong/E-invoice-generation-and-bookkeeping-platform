@@ -15,8 +15,12 @@ from core.rls import enable_tenant_rls
 # for every operation"):
 #   - a document is never deleted, as an item or a customer is not: nothing in this ticket deletes one, and D20's
 #     later states (classified, exported, locked) would otherwise have nowhere safe to stand;
-#   - when a signed-in user is in play only the owner and staff of the company may insert a document (accountants
-#     read only, as D45 and the permission service already say for every read-only role);
+#   - when a signed-in user is in play only the owner and staff of the company may insert or update a document
+#     (accountants read only, as D45 and the permission service already say for every read-only role). The worker
+#     has no signed-in user (tenancy.md, "Background jobs": it sets only `app.company_id`), so this does not stop
+#     `store_uploaded_document` updating `storage_key`, and the owner/staff check it runs on INSERT (uploading it)
+#     runs again, harmlessly, for the update that follows in the same request (`documents.upload_document` moves
+#     the row on from `uploaded` as the same user);
 #   - a document never moves to another company.
 # No other write is restricted here: the status machine (classified, extracted, review, verified, exported,
 # rejected) belongs to the later tickets that build those states, and restricting transitions now would only have
@@ -34,11 +38,11 @@ BEGIN
     IF TG_OP = 'UPDATE' AND NEW.company_id <> OLD.company_id THEN
         RAISE EXCEPTION 'a document cannot move to another company';
     END IF;
-    IF TG_OP = 'INSERT' AND app_user_id() IS NOT NULL THEN
+    IF app_user_id() IS NOT NULL THEN
         SELECT role INTO v_role FROM core_companyaccess
         WHERE user_id = app_user_id() AND company_id = NEW.company_id;
         IF v_role IS NULL OR v_role NOT IN ('owner', 'staff') THEN
-            RAISE EXCEPTION 'only the owner and staff of the company may upload a document' USING ERRCODE = '42501';
+            RAISE EXCEPTION 'only the owner and staff of the company may change a document' USING ERRCODE = '42501';
         END IF;
     END IF;
     RETURN NEW;

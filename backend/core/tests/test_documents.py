@@ -135,6 +135,21 @@ def test_the_database_refuses_an_accountants_insert_even_when_the_service_is_ski
 
 
 @pytest.mark.django_db
+def test_the_database_refuses_an_accountants_update_even_when_the_service_is_skipped(world, as_user):
+    with as_user(world["acme_owner"]):
+        document = Document.objects.create(
+            company=world["acme"], uploaded_by=world["acme_owner"], original_filename="invoice.png",
+            content_type="image/png",
+        )
+
+    with as_user(world["accountant"]):
+        attempt(lambda: Document.objects.filter(pk=document.pk).update(original_filename="hijacked.png"))
+
+    document.refresh_from_db()
+    assert document.original_filename == "invoice.png"
+
+
+@pytest.mark.django_db
 def test_a_document_cannot_be_moved_to_another_company(world, as_user):
     """The accountant has access to both companies (`world`), so row-level security alone would allow the move:
     this pins that the guard trigger itself refuses it, not merely each company's own isolation."""

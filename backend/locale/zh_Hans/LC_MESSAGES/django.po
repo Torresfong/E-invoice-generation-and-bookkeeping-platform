@@ -318,6 +318,10 @@ msgstr "照片太小或被裁切，请重新拍摄并将整页都纳入画面。
 msgid "The photo is too large to check. Try a smaller photo, or compress it first."
 msgstr "照片太大，无法检查。请使用较小的照片，或先压缩后再上传。"
 
+#: core/quality.py:68
+msgid "Upload it again."
+msgstr "请重新上传。"
+
 #: core/quality.py:64
 msgid ""
 "The photo is too blurry. Retake it in good light, holding the phone steady."

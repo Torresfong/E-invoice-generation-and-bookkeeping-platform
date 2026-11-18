@@ -81,3 +81,8 @@ def test_every_reason_code_has_a_message():
         quality.TOO_SMALL, quality.TOO_LARGE, quality.TOO_BLURRY,
     ):
         assert quality.reason_text(code)
+
+
+def test_an_unrecognised_code_renders_a_generic_message_instead_of_raising():
+    """A list of several documents must not fail to render because one row holds a code this module never made."""
+    assert quality.reason_text("whatever-reached-the-column-some-other-way")

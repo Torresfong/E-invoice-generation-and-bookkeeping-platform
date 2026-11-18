@@ -53,7 +53,12 @@ def check(data, content_type):
 
 
 def reason_text(code):
-    """The client-facing message for a bounce reason code, in whichever language is active right now."""
+    """The client-facing message for a bounce reason code, in whichever language is active right now.
+
+    A code this module never produced (stored data outlives the code, or reaches the database by some other
+    path than `check()`) renders as a generic message rather than raising: a list screen showing several
+    documents must not fail to render one bad row.
+    """
     return {
         EMPTY: _("The file is empty. Upload it again."),
         UNSUPPORTED_TYPE: _("Upload a PDF, a scan or a phone photo (JPEG or PNG)."),
@@ -63,7 +68,7 @@ def reason_text(code):
         TOO_SMALL: _("The photo is too small or cropped. Retake it with the whole page in frame."),
         TOO_LARGE: _("The photo is too large to check. Try a smaller photo, or compress it first."),
         TOO_BLURRY: _("The photo is too blurry. Retake it in good light, holding the phone steady."),
-    }[code]
+    }.get(code, _("Upload it again."))
 
 
 def _check_pdf(data):
