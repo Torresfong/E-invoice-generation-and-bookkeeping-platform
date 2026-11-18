@@ -17,6 +17,7 @@
     <li><a href="/companies/{{ company.pk }}/items/">{% trans "Items" %}</a></li>
     <li><a href="/companies/{{ company.pk }}/customers/">{% trans "Customers" %}</a></li>
     <li><a href="/companies/{{ company.pk }}/invoices/">{% trans "Invoices" %}</a></li>
+    <li><a href="/companies/{{ company.pk }}/documents/">{% trans "Documents" %}</a></li>
     <li><a href="/companies/{{ company.pk }}/activity/">{% trans "My activity" %}</a></li>
   </ul>
   {% can "invite_staff" company as may_invite %}

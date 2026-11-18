@@ -71,6 +71,14 @@ def test_a_users_own_company_only(client, world, as_production_connection):
     assert refused_list.status_code == 404 and refused_upload.status_code == 404
 
 
+def test_the_company_page_links_to_documents(client, world, as_production_connection):
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        page = client.get(f"/companies/{world['acme'].pk}/").content.decode()
+
+    assert documents_url(world["acme"]) in page
+
+
 def test_the_bounce_reason_reads_in_chinese(client, world, as_production_connection):
     with as_production_connection():
         sign_in(client, world["acme_owner"])

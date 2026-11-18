@@ -148,8 +148,10 @@ def test_a_document_cannot_be_moved_to_another_company(world, as_user):
         attempt(lambda: Document.objects.filter(pk=document.pk).update(company=world["beta"]))
 
 
-@pytest.mark.django_db
+@pytest.mark.django_db(transaction=True)
 def test_the_staged_file_is_removed_once_the_job_stores_it():
+    """`transaction=True`: the cleanup runs on the job's transaction commit (`transaction.on_commit`), which never
+    fires under the ordinary wrapping rollback (see the other `document_guard` tests above, which do not need it)."""
     from core.models import CompanyAccess
 
     company = make_company("Acme")

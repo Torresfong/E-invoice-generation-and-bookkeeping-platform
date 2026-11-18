@@ -48,6 +48,13 @@ def test_a_corrupted_image_is_bounced():
     assert quality.check(b"not an image", quality.JPEG) == quality.CORRUPTED
 
 
+def test_an_image_past_pillows_decompression_safety_limit_is_bounced_not_a_500(monkeypatch):
+    """A declared size far past Pillow's own guard must bounce with a reason, never raise an unhandled 500."""
+    monkeypatch.setattr(Image, "MAX_IMAGE_PIXELS", 100)
+
+    assert quality.check(sharp_page(size=200), quality.PNG) == quality.TOO_LARGE
+
+
 def test_an_empty_file_is_bounced():
     assert quality.check(b"", quality.PNG) == quality.EMPTY
 
@@ -71,6 +78,6 @@ def test_a_file_with_no_pdf_header_is_bounced():
 def test_every_reason_code_has_a_message():
     for code in (
         quality.EMPTY, quality.UNSUPPORTED_TYPE, quality.NOT_A_PDF, quality.PDF_INCOMPLETE, quality.CORRUPTED,
-        quality.TOO_SMALL, quality.TOO_BLURRY,
+        quality.TOO_SMALL, quality.TOO_LARGE, quality.TOO_BLURRY,
     ):
         assert quality.reason_text(code)

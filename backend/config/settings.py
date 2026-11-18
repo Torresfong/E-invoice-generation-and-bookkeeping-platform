@@ -83,6 +83,12 @@ BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 EMAIL_SENDER_ADDRESS = os.environ.get("EMAIL_SENDER_ADDRESS", "")
 EMAIL_REGION = os.environ.get("EMAIL_REGION", "ap-southeast-5")
 
+# Uploaded documents go out through Amazon S3 (ticket #14, D14, D53 (3)). With no bucket configured no storage
+# adapter is installed, and `check --deploy` warns: an accepted upload would then queue a job that can never finish.
+# No credential is a setting: boto3 finds the task's IAM role itself.
+OBJECT_STORAGE_BUCKET = os.environ.get("OBJECT_STORAGE_BUCKET", "")
+OBJECT_STORAGE_REGION = os.environ.get("OBJECT_STORAGE_REGION", "ap-southeast-5")
+
 # Password reset links last an hour, invitations a week (D40 (5)).
 RESET_LINK_HOURS = 1
 # The link a new firm administrator or accountant gets to choose a first password (D49).

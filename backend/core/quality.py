@@ -30,6 +30,7 @@ NOT_A_PDF = "not_a_pdf"
 PDF_INCOMPLETE = "pdf_incomplete"
 CORRUPTED = "corrupted"
 TOO_SMALL = "too_small"
+TOO_LARGE = "too_large"
 TOO_BLURRY = "too_blurry"
 
 # A page shorter or narrower than this is not a readable document: a crude stand-in for "page found" (D20).
@@ -60,6 +61,7 @@ def reason_text(code):
         PDF_INCOMPLETE: _("The PDF looks incomplete. Upload it again."),
         CORRUPTED: _("The file is corrupted. Upload it again."),
         TOO_SMALL: _("The photo is too small or cropped. Retake it with the whole page in frame."),
+        TOO_LARGE: _("The photo is too large to check. Try a smaller photo, or compress it first."),
         TOO_BLURRY: _("The photo is too blurry. Retake it in good light, holding the phone steady."),
     }[code]
 
@@ -80,6 +82,9 @@ def _check_image(data):
         image.load()
     except (UnidentifiedImageError, OSError):
         return CORRUPTED
+    except Image.DecompressionBombError:
+        # Pillow's own safety guard against a declared size built to exhaust memory; kept on, not caught away.
+        return TOO_LARGE
     width, height = image.size
     if width < MIN_PIXELS_PER_SIDE or height < MIN_PIXELS_PER_SIDE:
         return TOO_SMALL
