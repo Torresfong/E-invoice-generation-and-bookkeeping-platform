@@ -21,6 +21,7 @@ from django.utils import timezone
 from core import customers, einvoicing, items, invoices, numbering
 from core.jobs import PermanentError
 from core.models import CompanyEInvoiceSetting, Invoice
+from myinvois import document
 from myinvois.document import InvalidDocument, StaleIssueTime, map_invoice
 
 from core.tests.test_customers import BRN_VALUE, CONTACT, TIN, switch_einvoicing_on
@@ -521,6 +522,13 @@ def test_a_document_over_300kb_is_refused(world, books, monkeypatch):
         map_invoice(invoice, document_version="1.1", now=invoice.approved_at)
 
     assert "size" in str(refused.value)
+
+
+def test_the_300kb_limit_is_the_stricter_decimal_reading_not_a_binary_one(world, books):
+    # Torres's review (NB-c on PR #191): nothing else pins this value, so reverting it to the looser 300 * 1024
+    # left every other test green. LHDN's own wording ("300 KB maximum per e-Invoice") wins over the binary
+    # reading (document.py's own comment on this constant).
+    assert document.MAX_DOCUMENT_BYTES == 300_000
 
 
 # No test here reaches LHDN's 50-character invoice-number limit (the other half of this ticket's size/length

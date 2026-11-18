@@ -62,10 +62,13 @@ CENTS = Decimal("0.01")
 
 # `InvoiceLine.quantity` and `.unit_price` are each NUMERIC(18,4): up to 14 integer and 4 fractional digits
 # (`core/models.py`). Their exact product can need up to 36 significant digits (14+14 integer, 4+4 fractional),
-# more than Python's default 28-digit Decimal context. Multiplying in the ambient context would silently round
-# the product under ROUND_HALF_EVEN before `.quantize(..., ROUND_HALF_UP)` ever saw it, for inputs well inside
-# what `core.invoices._amount` already accepts, and `quantize` itself raises `InvalidOperation` once the exact
-# product needs more digits than the context allows. 50 is comfortable headroom above the 36-digit maximum.
+# more than Python's default 28-digit Decimal context, and summing several such products, or adding the tax
+# total to reach the inclusive total, can need a few digits more again. Computing in the ambient context would
+# silently round under ROUND_HALF_EVEN before `.quantize(..., ROUND_HALF_UP)` ever saw a result, for inputs well
+# inside what `core.invoices._amount` already accepts, and `quantize` itself raises `InvalidOperation` once an
+# exact result needs more digits than the context allows (both seen in review on PR #191, NB3/B2). `map_invoice`
+# runs every amount calculation - each line, their sum, and the inclusive total - inside one context set to this
+# precision; 50 is comfortable headroom for the sizes an LHDN-accepted invoice can actually reach.
 LINE_AMOUNT_PRECISION = 50
 
 
