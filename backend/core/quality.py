@@ -85,7 +85,10 @@ def _check_image(data):
         probe.verify()
         image = Image.open(io.BytesIO(data))
         image.load()
-    except (UnidentifiedImageError, OSError):
+    # SyntaxError is not a real syntax error: several Pillow plugins (PNG among them) still raise it for malformed
+    # chunk data, a convention inherited from very old PIL releases. Scoped to Pillow's own calls here, so it is
+    # never a real syntax error from this module's own code.
+    except (UnidentifiedImageError, OSError, SyntaxError):
         return CORRUPTED
     except Image.DecompressionBombError:
         # Pillow's own safety guard against a declared size built to exhaust memory; kept on, not caught away.

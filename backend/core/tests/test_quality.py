@@ -32,6 +32,14 @@ def tiny_photo():
     return _png_bytes(Image.new("L", (50, 50), color=0))
 
 
+def png_with_a_damaged_idat_checksum():
+    """A valid PNG header with its pixel data chunk corrupted: Pillow raises `SyntaxError` for this, not `OSError`."""
+    data = bytearray(sharp_page())
+    idat = data.index(b"IDAT")
+    data[idat + 20] ^= 0xFF
+    return bytes(data)
+
+
 def test_a_sharp_photo_is_accepted():
     assert quality.check(sharp_page(), quality.PNG) is None
 
@@ -46,6 +54,11 @@ def test_a_too_small_photo_is_bounced_as_cropped():
 
 def test_a_corrupted_image_is_bounced():
     assert quality.check(b"not an image", quality.JPEG) == quality.CORRUPTED
+
+
+def test_a_png_with_a_damaged_checksum_is_bounced_not_a_500():
+    """Pillow raises SyntaxError, not OSError, for this; it must still bounce with a reason."""
+    assert quality.check(png_with_a_damaged_idat_checksum(), quality.PNG) == quality.CORRUPTED
 
 
 def test_an_image_past_pillows_decompression_safety_limit_is_bounced_not_a_500(monkeypatch):
