@@ -99,6 +99,19 @@ def idempotency_key(step=""):
     return f"job-{job.pk}:{step}" if step else f"job-{job.pk}"
 
 
+def current_attempt():
+    """The 1-based attempt number of the job running in this thread (companion to `idempotency_key`).
+
+    Set by `_claim()` before the handler runs, so it survives a handler's own writes being rolled back on
+    failure (#47): a handler that must tell a retry from a first try cannot rely on anything it itself wrote on
+    an earlier, failed attempt, only on state the runner itself keeps.
+    """
+    job = _running.get()
+    if job is None:
+        raise RuntimeError("current_attempt belongs to a running job")
+    return job.attempts
+
+
 def _identifier(key, value):
     if value is None or isinstance(value, (bool, int)):
         return value

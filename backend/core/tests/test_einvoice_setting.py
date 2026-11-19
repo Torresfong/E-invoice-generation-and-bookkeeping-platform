@@ -12,7 +12,7 @@ import pytest
 from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError, IntegrityError, connection, transaction
 
-from core import einvoicing
+from core import einvoicing, jobs
 from core.models import AuditEntry, CompanyAccess, CompanyEInvoiceSetting, CompanyEInvoiceSettingChange
 
 from .factories import PASSWORD, make_company, make_member
@@ -93,19 +93,27 @@ def test_switching_off_later_does_not_change_the_answer_for_earlier_dates(world)
 
 
 def test_the_owner_email_is_the_companys_owner_not_staff_or_an_accountant(world):
-    assert einvoicing.owner_email(world["acme"]) == world["acme_owner"].email
+    """#47's submission job is the only caller, as the worker, which has no ordinary grant on the membership
+    table (`company_owner_email` is SECURITY DEFINER instead); every call here runs in that same context."""
+    with jobs.as_worker_in(world["acme"]):
+        assert einvoicing.owner_email(world["acme"]) == world["acme_owner"].email
 
 
 def test_the_owner_email_of_one_company_says_nothing_about_another(world):
-    assert einvoicing.owner_email(world["beta"]) == world["beta_owner"].email
+    with jobs.as_worker_in(world["beta"]):
+        assert einvoicing.owner_email(world["beta"]) == world["beta_owner"].email
 
 
-def test_a_job_handler_running_as_the_worker_can_still_read_the_owner_email(world):
-    """#47's submission job calls this as the worker, which has no ordinary grant on the membership table."""
-    from core import jobs
-
+def test_a_worker_in_one_companys_context_cannot_read_another_companys_owner_email(world):
+    """A Codex finding on PR #194: SECURITY DEFINER bypasses RLS, so without its own `app_company_id()` guard
+    `company_owner_email` would answer for any company id a caller passed, not only the one it is scoped to."""
     with jobs.as_worker_in(world["acme"]):
-        assert einvoicing.owner_email(world["acme"]) == world["acme_owner"].email
+        assert einvoicing.owner_email(world["beta"]) is None
+
+
+def test_owner_email_answers_nothing_with_no_company_context(db):
+    """A system job (no company) has no `app.company_id` at all; the same guard refuses it too."""
+    assert einvoicing.owner_email(make_company("Uncontexted Sdn Bhd")) is None
 
 
 def test_one_company_being_on_says_nothing_about_another(world):

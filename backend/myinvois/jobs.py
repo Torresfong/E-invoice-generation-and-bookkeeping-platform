@@ -29,19 +29,20 @@ def _document_version():
 
 
 def _record_attempt(invoice):
-    """`record_attempt` for `submission.submit_invoice`: the row this job itself also records the outcome on."""
+    """`record_attempt` for `submission.submit_invoice`: writes the row this job also records the outcome on.
+
+    `followed_a_failure` reads `jobs.current_attempt()`, not this write's own effect: `core.jobs._execute()` rolls
+    back everything a failed attempt wrote, this row included, so a crash between LHDN accepting the document and
+    our commit would otherwise look like a first attempt again on retry and resubmit instead of recovering (a
+    Codex finding on PR #194). The job's own attempt count survives that rollback, because the runner sets it
+    before the handler ever runs.
+    """
 
     def record(code_number, document_hash):
-        row, created = SubmittedInvoice.objects.get_or_create(
+        SubmittedInvoice.objects.update_or_create(
             invoice_id=invoice.pk, defaults={"company": invoice.company, "document_hash": document_hash}
         )
-        if created:
-            return False
-        followed_a_failure = row.document_hash == document_hash
-        if not followed_a_failure:
-            row.document_hash = document_hash
-            row.save(update_fields=["document_hash"])
-        return followed_a_failure
+        return jobs.current_attempt() > 1
 
     return record
 
@@ -49,6 +50,12 @@ def _record_attempt(invoice):
 @jobs.register(SUBMIT_INVOICE_JOB)
 def _submit_invoice(*, invoice_id):
     invoice = Invoice.objects.get(pk=invoice_id)
+    # A replacement job (D60 (2) re-approval) can name an invoice an earlier, separate job already finished: that
+    # earlier job's own `jobs.current_attempt()` cannot be seen here, since this is a fresh job row starting again
+    # at attempt 1 (a Torres review finding on PR #194). The persisted outcome is checked directly instead, so a
+    # second job for an already-submitted invoice does nothing rather than submitting it again.
+    if SubmittedInvoice.objects.filter(invoice_id=invoice.pk).exclude(uuid="").exists():
+        return
     setting = einvoicing.current_setting(invoice.company)
     gateway = get_ports().gateway
     credentials = credentials_from_environment(settings.MYINVOIS_ENVIRONMENT)

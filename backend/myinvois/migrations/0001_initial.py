@@ -5,13 +5,32 @@ import django.db.models.functions.datetime
 from django.db import migrations, models
 
 from core.audit import enable_audit
-from core.rls import enable_tenant_rls
+from core.rls import JOB_COMPANY_CHECK, WORKER_ROLE
+
+TABLE = "myinvois_submittedinvoice"
 
 # The first myinvois tenant table (#47, D61 (4)): one row per invoice the submission job has queued, recovered or
-# had LHDN accept. `worker=True` because the submission job (running as the worker, in the job's own company
-# context) is the only writer; no signed-in user ever writes this table directly, so there is no owner/staff guard
-# to add here, unlike 0046_documents's `document_guard`. Audited by trigger like every other tenant table
-# (docs/architecture/tenancy.md).
+# had LHDN accept. No signed-in user ever writes or reads this table; the submission job (running as the worker,
+# in the job's own company context) is its only writer. `enable_tenant_rls(..., worker=True)` would still grant
+# the web role a full SELECT/INSERT/UPDATE/DELETE through `tenant_isolation`, so SQL run as `web` (D40 (3)'s
+# accepted residual risk) could forge or delete `document_hash`, `uuid` or `recovered` despite having no
+# application write path to do so (a Torres review finding on PR #194) - unlike 0046_documents's `document_guard`,
+# which narrows a *used* web write path rather than closing one that does not exist. The table is closed to `web`
+# entirely instead, and `worker` keeps only the operations `update_or_create` ever performs: select, insert,
+# update, never delete. Audited by trigger like every other tenant table (docs/architecture/tenancy.md).
+RLS_FORWARD = [
+    f"GRANT SELECT, INSERT, UPDATE ON {TABLE} TO {WORKER_ROLE}",
+    f"ALTER TABLE {TABLE} ENABLE ROW LEVEL SECURITY",
+    f"ALTER TABLE {TABLE} FORCE ROW LEVEL SECURITY",
+    f"CREATE POLICY worker_company_context ON {TABLE} TO {WORKER_ROLE} "
+    f"USING ({JOB_COMPANY_CHECK}) WITH CHECK ({JOB_COMPANY_CHECK})",
+]
+RLS_REVERSE = [
+    f"DROP POLICY IF EXISTS worker_company_context ON {TABLE}",
+    f"ALTER TABLE {TABLE} NO FORCE ROW LEVEL SECURITY",
+    f"ALTER TABLE {TABLE} DISABLE ROW LEVEL SECURITY",
+    f"REVOKE ALL ON {TABLE} FROM {WORKER_ROLE}",
+]
 
 
 class Migration(migrations.Migration):
@@ -38,6 +57,6 @@ class Migration(migrations.Migration):
                 'abstract': False,
             },
         ),
-        enable_tenant_rls('myinvois_submittedinvoice', worker=True),
-        enable_audit('myinvois_submittedinvoice'),
+        migrations.RunSQL(RLS_FORWARD, RLS_REVERSE),
+        enable_audit(TABLE),
     ]

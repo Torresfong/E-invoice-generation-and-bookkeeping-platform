@@ -221,3 +221,31 @@ def test_a_document_lhdn_already_holds_is_recovered_even_when_the_retry_comes_af
 
     assert result.recovered is True and len(gateway.submissions) == 1
     assert fake_ports.email.sent == []  # the owner is not asked to approve a document LHDN already has
+
+
+# --- D60 (3): an invalid document at LHDN is never recovered as a successful submission -----------------------------
+
+
+def test_check_not_stale_does_not_recover_an_invalid_document(gateway, fake_ports):
+    first = run(gateway, Attempts(gateway))
+    gateway.invalidate(first.uuid, "buyer rejected")
+
+    with pytest.raises(StaleDocument):
+        check_not_stale(
+            gateway=gateway, session=_session(gateway), code_number=CODE,
+            issued_at=NOW - timedelta(days=4), now=NOW, owner_email="owner@acme.example", key=_key,
+        )
+
+    (mail,) = fake_ports.email.sent
+    assert mail["to"] == "owner@acme.example" and CODE in mail["subject"]
+
+
+def test_a_duplicate_lookup_does_not_recover_an_invalid_document(gateway):
+    first = run(gateway, Attempts(gateway))
+    gateway.invalidate(first.uuid, "buyer rejected")
+
+    with pytest.raises(DocumentRejected) as rejected:
+        run(gateway, Attempts(gateway))  # same number and hash, within the 10-minute payload-repeat window
+
+    assert isinstance(rejected.value, jobs.PermanentError)
+    assert CODE in str(rejected.value)

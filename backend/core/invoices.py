@@ -210,6 +210,13 @@ def approve_invoice(user, invoice, *, acknowledged=False):
             audit.record(
                 AuditEntry.APPROVED, current.company, user, "invoice", current.pk, ["approved_at", "approved_by"]
             )
+            if current.is_einvoice:
+                # D60 (2): a stale or otherwise permanently failed job stops and tells the owner, who approves
+                # again; that one action both renews the issue time above and queues a fresh attempt, so the
+                # invoice is not stranded (a Torres review finding on PR #194). This module still does not know
+                # whether an earlier attempt already succeeded (#48's status display); the job guards itself
+                # against resubmitting an invoice it already has a recorded outcome for.
+                jobs.enqueue(SUBMIT_INVOICE_JOB, company=current.company, invoice_id=current.pk)
             invoice.refresh_from_db()
             return invoice
         if not current.lines.exists():
@@ -244,8 +251,8 @@ def approve_invoice(user, invoice, *, acknowledged=False):
         )
         if is_einvoice:
             # One owner action, "Approve & submit" (D44): a normal invoice finishes here with no submission (D59
-            # (3)). Re-approval (the branch above, after 72 hours) never reaches this line, so a repeated approval
-            # never queues a second job; deciding whether a stuck submission is offered a fresh one is #48's.
+            # (3)). Re-approval (the branch above) is the D60 (2) path for a stuck or stale submission and queues
+            # its own replacement job; this first approval always starts the first one.
             jobs.enqueue(SUBMIT_INVOICE_JOB, company=company, invoice_id=current.pk)
     invoice.refresh_from_db()
     return invoice

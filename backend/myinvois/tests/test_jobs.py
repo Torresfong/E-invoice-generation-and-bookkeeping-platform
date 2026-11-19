@@ -62,13 +62,37 @@ def test_approving_a_normal_invoice_queues_no_submission_job(world, books):
     assert not Job.objects.filter(name=SUBMIT_INVOICE_JOB).exists()
 
 
-def test_re_approving_after_72_hours_does_not_queue_a_second_job(world, books):
+def test_re_approving_after_a_stale_failure_queues_a_replacement_job_that_submits(world, books, fake_ports):
+    """D60 (2): the stale job stops and tells the owner, who approves again; that one action resumes submission
+    rather than stranding the e-invoice (a Torres review finding on PR #194)."""
     invoice = approve_as_einvoice(world, books)
     Invoice.objects.filter(pk=invoice.pk).update(approved_at=timezone.now() - timedelta(hours=73))
 
-    invoices.approve_invoice(world["acme_owner"], Invoice.objects.get(pk=invoice.pk))
+    jobs.run_pending()  # StaleDocument: the first job fails permanently, nothing reaches LHDN
+    assert Job.objects.get(name=SUBMIT_INVOICE_JOB).status == Job.FAILED
+    assert fake_ports.gateway.submissions == []
 
-    assert Job.objects.filter(name=SUBMIT_INVOICE_JOB).count() == 1
+    invoices.approve_invoice(world["acme_owner"], Invoice.objects.get(pk=invoice.pk))
+    assert Job.objects.filter(name=SUBMIT_INVOICE_JOB).count() == 2
+
+    jobs.run_pending()
+
+    assert len(fake_ports.gateway.submissions) == 1
+    row = SubmittedInvoice.objects.get(invoice_id=invoice.pk)
+    assert row.uuid and row.recovered is False
+
+
+def test_a_second_job_for_an_already_submitted_invoice_does_nothing(world, books, fake_ports):
+    """The myinvois-side guard, independent of why a second job got enqueued (a Torres review finding on PR #194):
+    a fresh job naming an invoice that already has a recorded uuid must not resubmit it."""
+    invoice = approve_as_einvoice(world, books)
+    jobs.run_pending()
+    assert len(fake_ports.gateway.submissions) == 1
+
+    jobs.enqueue(SUBMIT_INVOICE_JOB, company=world["acme"], invoice_id=invoice.pk)
+    jobs.run_pending()
+
+    assert len(fake_ports.gateway.submissions) == 1
 
 
 # --- the job itself: submits through the gateway using the locked buyer details ------------------------------------
@@ -90,6 +114,26 @@ def test_a_retried_job_never_submits_the_same_invoice_twice(world, books, fake_p
     jobs.run_pending()  # TransientError: retried later
     Job.objects.filter(name=SUBMIT_INVOICE_JOB).update(run_after=None)  # don't wait out the backoff in the test
     jobs.run_pending()  # the retry must recover the first attempt's uuid, not submit a second time
+
+    assert len(fake_ports.gateway.submissions) == 1
+    row = SubmittedInvoice.objects.get(invoice_id=invoice.pk)
+    assert row.recovered is True
+
+
+def test_a_retry_outside_lhdns_own_duplicate_detection_window_still_recovers_not_resubmits(world, books, fake_ports, monkeypatch):
+    """Codex finding on PR #194: the attempt row this job writes before calling LHDN is rolled back with the rest
+    of a failed attempt, so a naive retry would look like a first attempt again and resubmit for real once LHDN's
+    own short-lived duplicate detection (its 10-minute payload window, its 2-hour number window) has passed."""
+    invoice = approve_as_einvoice(world, books)
+    moment = {"now": timezone.now()}
+    monkeypatch.setattr(jobs, "clock", lambda: moment["now"])
+    fake_ports.gateway.now = lambda: moment["now"]
+    fake_ports.gateway.lose_next_response = True
+
+    jobs.run_pending()  # LHDN accepts it; the answer back to us is lost -> TransientError, retried later
+    moment["now"] += timedelta(hours=3)  # past both of the fake's own duplicate-detection windows
+    Job.objects.filter(name=SUBMIT_INVOICE_JOB).update(run_after=None)
+    jobs.run_pending()
 
     assert len(fake_ports.gateway.submissions) == 1
     row = SubmittedInvoice.objects.get(invoice_id=invoice.pk)
