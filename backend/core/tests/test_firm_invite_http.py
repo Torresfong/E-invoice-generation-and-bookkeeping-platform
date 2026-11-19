@@ -9,7 +9,7 @@ import re
 import pytest
 from django.test import Client
 
-from core.models import CompanyAccess, Firm, FirmInvitation, User
+from core.models import CompanyAccess, Firm, User
 
 from .factories import PASSWORD, make_company, make_member
 
