@@ -11,7 +11,7 @@ from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError, IntegrityError, connection, transaction
 from django.utils import timezone
 
-from core import customers, einvoicing, invoices, items, numbering
+from core import customers, einvoicing, invoices, items, jobs, numbering
 from core.models import AuditEntry, CompanyEInvoiceSetting, Invoice
 
 from .test_customers import BRN_VALUE, CONTACT, TIN, switch_einvoicing_on
@@ -356,6 +356,39 @@ def test_the_owner_sees_the_approve_button_on_a_draft(client, world, books, as_p
         page = client.get(page_url(world["acme"], draft)).content.decode()
 
     assert page_url(world["acme"], draft, "approve") in page
+    assert "Approve & submit" in page  # D44 names the one owner action this
+
+
+def test_approving_an_e_invoice_shows_submitted_queued_on_the_page(
+    client, world, books, as_production_connection, fake_ports
+):
+    """Issue #47 asks for submission through the fake MyInvois port at the HTTP seam: the owner's POST, not a
+    direct service call, must be what the gateway sees reach it (a Torres review finding on PR #194)."""
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+    draft = new_draft(world, books)
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        client.post(page_url(world["acme"], draft, "approve"))
+        page = client.get(page_url(world["acme"], draft)).content.decode()
+    customers.update_customer(world["acme_owner"], books["customer"], legal_name="Renamed Sdn Bhd")
+
+    jobs.run_pending()
+
+    assert "Submitted (queued)" in page
+    assert len(fake_ports.gateway.submissions) == 1
+    (signed,) = fake_ports.gateway.submissions[0]["signed"]
+    body = signed.document.decode()
+    assert "Buyer Sdn Bhd" in body and "Renamed" not in body  # the locked buyer snapshot, not the live customer
+
+
+def test_approving_a_normal_invoice_shows_no_submitted_text(client, world, books, as_production_connection):
+    draft = new_draft(world, books)  # e-invoicing stays off
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        client.post(page_url(world["acme"], draft, "approve"))
+        page = client.get(page_url(world["acme"], draft)).content.decode()
+
+    assert "Submitted" not in page
 
 
 def test_an_incomplete_buyer_shows_the_reason_and_approves_nothing(client, world, books, as_production_connection):

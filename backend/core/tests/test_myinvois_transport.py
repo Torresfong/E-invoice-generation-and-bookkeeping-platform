@@ -7,7 +7,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import pytest
 
 from core.ports.interfaces import IntermediaryCredentials
-from core.ports.myinvois import MyInvoisHttpGateway, gateway_from_environment, urllib_transport
+from core.ports.myinvois import MyInvoisHttpGateway, credentials_from_environment, gateway_from_environment, urllib_transport
 
 
 @pytest.fixture
@@ -93,3 +93,19 @@ def test_a_missing_or_empty_setting_means_not_configured(missing):
 def test_an_unknown_environment_is_refused():
     with pytest.raises(ValueError):
         gateway_from_environment("staging", SANDBOX)
+
+
+# --- the credentials alone, for a caller that only needs to start a taxpayer session (#47) ---------------------------
+
+
+def test_the_credentials_come_from_the_environments_own_settings():
+    assert credentials_from_environment("sandbox", SANDBOX) == IntermediaryCredentials("sandbox-id", "sandbox-secret")
+
+
+def test_a_missing_credential_is_empty_not_a_crash():
+    assert credentials_from_environment("sandbox", {}) == IntermediaryCredentials("", "")
+
+
+def test_credentials_for_an_unknown_environment_are_refused():
+    with pytest.raises(ValueError):
+        credentials_from_environment("staging", SANDBOX)

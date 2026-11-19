@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-17 21:59+0800\n"
+"POT-Creation-Date: 2026-11-19 22:11+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -18,11 +18,11 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: core/customers.py:63 core/customers.py:129 core/einvoicing.py:100
+#: core/customers.py:63 core/customers.py:129 core/einvoicing.py:111
 #: core/templates/customer.html:20 core/templates/customer.html:30
 #: core/templates/customer.html:41 core/templates/customers.html:19
 #: core/templates/customers.html:55 core/templates/einvoice_setting.html:30
-#: core/templates/einvoice_setting.html:58 core/templates/invoice.html:20
+#: core/templates/einvoice_setting.html:58 core/templates/invoice.html:21
 msgid "TIN"
 msgstr "税务识别号 (TIN)"
 
@@ -38,43 +38,43 @@ msgstr "证件类型"
 msgid "ID value"
 msgstr "证件号码"
 
-#: core/customers.py:66 core/einvoicing.py:97
+#: core/customers.py:66 core/einvoicing.py:108
 msgid "phone number"
 msgstr "电话号码"
 
-#: core/customers.py:67 core/einvoicing.py:98 core/templates/customer.html:45
+#: core/customers.py:67 core/einvoicing.py:109 core/templates/customer.html:45
 #: core/templates/customer_contact_fields.html:4
 #: core/templates/einvoice_setting.html:28
 #: core/templates/einvoice_setting.html:56
 msgid "SST registration number"
 msgstr "SST 注册号"
 
-#: core/customers.py:68 core/einvoicing.py:104
+#: core/customers.py:68 core/einvoicing.py:115
 msgid "address line 1"
 msgstr "地址第一行"
 
-#: core/customers.py:69 core/einvoicing.py:105
+#: core/customers.py:69 core/einvoicing.py:116
 msgid "address line 2"
 msgstr "地址第二行"
 
-#: core/customers.py:70 core/einvoicing.py:106
+#: core/customers.py:70 core/einvoicing.py:117
 msgid "city"
 msgstr "城市"
 
-#: core/customers.py:71 core/einvoicing.py:107
+#: core/customers.py:71 core/einvoicing.py:118
 msgid "postcode"
 msgstr "邮政编码"
 
-#: core/customers.py:72 core/einvoicing.py:108
+#: core/customers.py:72 core/einvoicing.py:119
 msgid "state code"
 msgstr "州代码"
 
-#: core/customers.py:73 core/einvoicing.py:109
+#: core/customers.py:73 core/einvoicing.py:120
 msgid "country code"
 msgstr "国家代码"
 
-#: core/customers.py:98 core/einvoicing.py:116 core/einvoicing.py:118
-#: core/einvoicing.py:124 core/items.py:53 core/items.py:60
+#: core/customers.py:98 core/einvoicing.py:127 core/einvoicing.py:129
+#: core/einvoicing.py:135 core/items.py:53 core/items.py:60
 #, python-format
 msgid "Check the %(field)s."
 msgstr "请检查%(field)s。"
@@ -141,89 +141,89 @@ msgstr ""
 "我了解本公司属于强制实施电子发票的纳税人。关闭电子发票意味着其发票将不会提交"
 "至 LHDN MyInvois，我须承担《所得税法》及电子发票指南下的相关后果。"
 
-#: core/einvoicing.py:94
+#: core/einvoicing.py:105
 msgid "status"
 msgstr "状态"
 
-#: core/einvoicing.py:95
+#: core/einvoicing.py:106
 msgid "effective date"
 msgstr "生效日期"
 
-#: core/einvoicing.py:96
+#: core/einvoicing.py:107
 msgid "registered name"
 msgstr "注册名称"
 
-#: core/einvoicing.py:99
+#: core/einvoicing.py:110
 msgid "tourism tax registration number"
 msgstr "旅游税注册号"
 
-#: core/einvoicing.py:101 core/templates/einvoice_setting.html:31
+#: core/einvoicing.py:112 core/templates/einvoice_setting.html:31
 #: core/templates/einvoice_setting.html:59
 msgid "BRN"
 msgstr "公司注册号 (BRN)"
 
-#: core/einvoicing.py:102
+#: core/einvoicing.py:113
 msgid "ROB"
 msgstr "商业注册号 (ROB)"
 
-#: core/einvoicing.py:103 core/templates/einvoice_setting.html:33
+#: core/einvoicing.py:114 core/templates/einvoice_setting.html:33
 #: core/templates/einvoice_setting.html:61
 msgid "MSIC code"
 msgstr "行业分类码 (MSIC)"
 
-#: core/einvoicing.py:122 myinvois/field_rules.py:199
+#: core/einvoicing.py:133 myinvois/field_rules.py:199
 #, python-format
 msgid "Enter the %(field)s."
 msgstr "请填写%(field)s。"
 
-#: core/einvoicing.py:231
+#: core/einvoicing.py:242
 msgid "The change cannot take effect before an earlier change."
 msgstr "更改的生效日期不能早于之前的更改。"
 
-#: core/invoices.py:61
+#: core/invoices.py:65
 #, python-format
 msgid "Check the %(field)s on line %(line)s."
 msgstr "请检查第 %(line)s 行的%(field)s。"
 
-#: core/invoices.py:80
+#: core/invoices.py:84
 msgid "Choose a customer."
 msgstr "请选择客户。"
 
-#: core/invoices.py:84
+#: core/invoices.py:88
 #, python-format
 msgid ""
 "This customer needs these details while e-invoicing is on: %(fields)s. "
 "Update the customer first."
 msgstr "开启电子发票后，该客户必须具备以下资料：%(fields)s。请先更新客户资料。"
 
-#: core/invoices.py:100
+#: core/invoices.py:104
 #, python-format
 msgid "Choose an item on line %(line)s."
 msgstr "请选择第 %(line)s 行的商品。"
 
-#: core/invoices.py:107 core/invoices.py:212
+#: core/invoices.py:111 core/invoices.py:216
 msgid "Add at least one line."
 msgstr "请至少添加一行。"
 
-#: core/invoices.py:112
+#: core/invoices.py:116
 msgid "quantity"
 msgstr "数量"
 
-#: core/invoices.py:113 myinvois/field_rules.py:186
+#: core/invoices.py:117 myinvois/field_rules.py:186
 msgid "unit price"
 msgstr "单价"
 
-#: core/invoices.py:177
+#: core/invoices.py:181
 #, python-format
 msgid "the customer needs: %(fields)s"
 msgstr "客户需要补充:%(fields)s"
 
-#: core/invoices.py:180
+#: core/invoices.py:184
 #, python-format
 msgid "the e-invoice setting needs: %(fields)s"
 msgstr "电子发票设置需要补充:%(fields)s"
 
-#: core/invoices.py:182
+#: core/invoices.py:186
 #, python-format
 msgid "This invoice cannot be approved: %(problems)s."
 msgstr "此发票无法批准:%(problems)s。"
@@ -244,94 +244,97 @@ msgstr "计量单位代码"
 msgid "default tax type"
 msgstr "默认税种"
 
-#: core/models.py:134
+#: core/models.py:138
 msgid "Client owner"
 msgstr "客户所有者"
 
-#: core/models.py:134
+#: core/models.py:138
 msgid "Client staff"
 msgstr "客户员工"
 
-#: core/models.py:134
+#: core/models.py:138
 msgid "Firm accountant"
 msgstr "事务所会计师"
 
-#: core/models.py:589
+#: core/models.py:595
 msgid "Signed in"
 msgstr "已登录"
 
-#: core/models.py:590
+#: core/models.py:596
 msgid "Failed sign-in"
 msgstr "登录失败"
 
-#: core/models.py:591
+#: core/models.py:597
 msgid "Signed out"
 msgstr "已退出登录"
 
-#: core/models.py:592
+#: core/models.py:598
 msgid "Created"
 msgstr "已创建"
 
-#: core/models.py:593
+#: core/models.py:599
 msgid "Updated"
 msgstr "已更新"
 
-#: core/models.py:594
+#: core/models.py:600
 msgid "Deleted"
 msgstr "已删除"
 
-#: core/models.py:595
+#: core/models.py:601
 msgid "Viewed"
 msgstr "已查看"
 
-#: core/models.py:596 core/templates/invoice.html:16
+#: core/models.py:602 core/templates/invoice.html:16
 #: core/templates/invoices.html:28
 msgid "Approved"
 msgstr "已批准"
 
-#: core/quality.py:57
+#: core/quality.py:68
 msgid "The file is empty. Upload it again."
 msgstr "文件为空，请重新上传。"
 
-#: core/quality.py:58
+#: core/quality.py:69
 msgid "Upload a PDF, a scan or a phone photo (JPEG or PNG)."
 msgstr "请上传 PDF、扫描件或手机拍摄的照片（JPEG 或 PNG）。"
 
-#: core/quality.py:59
+#: core/quality.py:70
 msgid "This does not look like a PDF. Upload the original file."
 msgstr "这看起来不是 PDF 文件，请上传原始文件。"
 
-#: core/quality.py:60
+#: core/quality.py:71
 msgid "The PDF looks incomplete. Upload it again."
 msgstr "这份 PDF 看起来不完整，请重新上传。"
 
-#: core/quality.py:61
+#: core/quality.py:72
 msgid "The file is corrupted. Upload it again."
 msgstr "文件已损坏，请重新上传。"
 
-#: core/quality.py:62
+#: core/quality.py:73
 msgid ""
 "The photo is too small or cropped. Retake it with the whole page in frame."
 msgstr "照片太小或被裁切，请重新拍摄并将整页都纳入画面。"
 
-#: core/quality.py:63
-msgid "The photo is too large to check. Try a smaller photo, or compress it first."
+#: core/quality.py:74
+msgid ""
+"The photo is too large to check. Try a smaller photo, or compress it first."
 msgstr "照片太大，无法检查。请使用较小的照片，或先压缩后再上传。"
 
-#: core/quality.py:68
-msgid "Upload it again."
-msgstr "请重新上传。"
-
-#: core/quality.py:69
-msgid ""
-"This looks like a sales invoice dated on or after your go-live date. Issue it in the platform instead of "
-"uploading it."
-msgstr "这似乎是一张上线日期当天或之后开立的销售发票。请直接在平台上开具此发票，而不是上传它。"
-
-#: core/quality.py:64
+#: core/quality.py:75
 msgid ""
 "The photo is too blurry. Retake it in good light, holding the phone steady."
 msgstr "照片太模糊，请在光线充足的地方重新拍摄，并保持手机稳定。"
+
+#: core/quality.py:77
+msgid ""
+"This looks like a sales invoice dated on or after your go-live date. Issue "
+"it in the platform instead of uploading it."
+msgstr ""
+"这似乎是一张上线日期当天或之后开立的销售发票。请直接在平台上开具此发票，而不"
+"是上传它。"
+
+#: core/quality.py:80
+msgid "Upload it again."
+msgstr "请重新上传。"
 
 #: core/registration.py:55 core/registration.py:84
 msgid "Confirm your registration"
@@ -411,24 +414,29 @@ msgstr "客户"
 msgid "Invoices"
 msgstr "发票"
 
-#: core/templates/company.html:20 core/views.py:624
+#: core/templates/company.html:20 core/templates/documents.html:6
+#: core/templates/documents.html:9
+msgid "Documents"
+msgstr "文件"
+
+#: core/templates/company.html:21 core/views.py:624
 msgid "My activity"
 msgstr "我的操作记录"
 
-#: core/templates/company.html:24
+#: core/templates/company.html:25
 msgid "Invite a colleague"
 msgstr "邀请同事"
 
-#: core/templates/company.html:27 core/templates/login.html:13
+#: core/templates/company.html:28 core/templates/login.html:13
 #: core/templates/password_reset.html:15 core/templates/signup.html:16
 msgid "Email address"
 msgstr "电子邮件地址"
 
-#: core/templates/company.html:28
+#: core/templates/company.html:29
 msgid "Send invitation"
 msgstr "发送邀请"
 
-#: core/templates/company.html:31
+#: core/templates/company.html:32
 msgid "All companies"
 msgstr "所有公司"
 
@@ -551,10 +559,6 @@ msgstr "添加客户"
 msgid "Back to the company"
 msgstr "返回公司"
 
-#: core/templates/documents.html:6 core/templates/documents.html:9
-msgid "Documents"
-msgstr "文件"
-
 #: core/templates/documents.html:16
 msgid "Uploaded."
 msgstr "已上传。"
@@ -610,20 +614,6 @@ msgstr ""
 #: core/templates/einvoice_setting.html:52
 msgid "Not checked yet"
 msgstr "尚未核查"
-
-#. SupplierDetails.STATUS_CHOICES labels (core/models.py): plain strings, translated dynamically by
-#. {% trans label %} in einvoice_setting.html, so makemessages finds no static call site for them.
-#: core/models.py
-msgid "Mandatory"
-msgstr "强制"
-
-#: core/models.py
-msgid "Voluntary"
-msgstr "自愿"
-
-#: core/models.py
-msgid "Exempt"
-msgstr "豁免"
 
 #: core/templates/einvoice_setting.html:24
 #: core/templates/einvoice_setting.html:53
@@ -713,46 +703,50 @@ msgid "Normal invoice"
 msgstr "普通发票"
 
 #: core/templates/invoice.html:17
+msgid "Submitted (queued)"
+msgstr "已提交（排队中）"
+
+#: core/templates/invoice.html:18
 msgid "Buyer"
 msgstr "买方"
 
-#: core/templates/invoice.html:23 core/templates/invoice.html:35
-#: core/templates/invoice.html:53 core/templates/invoice.html:59
+#: core/templates/invoice.html:24 core/templates/invoice.html:36
+#: core/templates/invoice.html:54 core/templates/invoice.html:60
 msgid "Item"
 msgstr "商品"
 
-#: core/templates/invoice.html:23 core/templates/invoice.html:35
-#: core/templates/invoice.html:53 core/templates/invoice.html:64
+#: core/templates/invoice.html:24 core/templates/invoice.html:36
+#: core/templates/invoice.html:54 core/templates/invoice.html:65
 msgid "Quantity"
 msgstr "数量"
 
-#: core/templates/invoice.html:23 core/templates/invoice.html:35
-#: core/templates/invoice.html:53 core/templates/invoice.html:65
+#: core/templates/invoice.html:24 core/templates/invoice.html:36
+#: core/templates/invoice.html:54 core/templates/invoice.html:66
 msgid "Unit price"
 msgstr "单价"
 
-#: core/templates/invoice.html:46 core/templates/invoices.html:17
+#: core/templates/invoice.html:47 core/templates/invoices.html:17
 msgid "Customer"
 msgstr "客户"
 
-#: core/templates/invoice.html:70
+#: core/templates/invoice.html:71
 msgid "Save draft"
 msgstr "保存草稿"
 
-#: core/templates/invoice.html:73
+#: core/templates/invoice.html:74
 msgid "Delete draft"
 msgstr "删除草稿"
 
-#: core/templates/invoice.html:80
+#: core/templates/invoice.html:81
 msgid ""
 "Issuing a normal invoice for a mandatory company needs your acknowledgement."
 msgstr "强制电子发票公司开具普通发票需要您的确认。"
 
-#: core/templates/invoice.html:83
-msgid "Approve"
-msgstr "批准"
+#: core/templates/invoice.html:84
+msgid "Approve & submit"
+msgstr "批准并提交"
 
-#: core/templates/invoice.html:86
+#: core/templates/invoice.html:87
 msgid "Back to the invoices"
 msgstr "返回发票列表"
 
@@ -1206,12 +1200,12 @@ msgstr "%(field)s不是有效的LHDN州属代码。"
 msgid "The %(field)s must be a decimal amount."
 msgstr "%(field)s须为十进制金额。"
 
-#: myinvois/submission.py:55
+#: myinvois/submission.py:57
 #, python-format
 msgid "Invoice %(number)s must be approved again"
 msgstr "发票 %(number)s 需要重新批准"
 
-#: myinvois/submission.py:57
+#: myinvois/submission.py:59
 #, python-format
 msgid ""
 "Invoice %(number)s was not sent to LHDN within 72 hours of its issue time, "
@@ -1220,3 +1214,17 @@ msgid ""
 msgstr ""
 "发票 %(number)s 在开具后 72 小时内未能提交给 LHDN，LHDN 已不再接受。您的草稿"
 "已保留，请检查后重新批准。"
+
+#. SupplierDetails.STATUS_CHOICES labels (core/models.py): plain strings, translated dynamically by
+#. {% trans label %} in einvoice_setting.html, so makemessages finds no static call site for them.
+#: core/models.py
+msgid "Mandatory"
+msgstr "强制"
+
+#: core/models.py
+msgid "Voluntary"
+msgstr "自愿"
+
+#: core/models.py
+msgid "Exempt"
+msgstr "豁免"

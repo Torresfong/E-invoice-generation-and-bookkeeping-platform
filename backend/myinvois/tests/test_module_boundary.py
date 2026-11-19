@@ -132,6 +132,97 @@ def _stray_code_list_files(root):
     )
 
 
+# --- what myinvois may read of core (#47, added as an acceptance criterion from the #128 review) -------------------
+#
+# `core.lhdn_codes` and `core.lhdn_fields` predate this check (#122, #172) and are already documented doors in
+# docs/architecture/myinvois-module.md; this whitelist does not reopen that decision, only enforces it alongside
+# the three doors D61 (4) names (the gateway port, the job runner, `einvoicing_enabled`) and the specific core
+# models myinvois reads (the invoice and its buyer snapshot; `TenantModel`, so its own tables carry a company id
+# the same way every other tenant table does).
+
+ALLOWED_CORE_MODULES = {"core.ports", "core.jobs", "core.einvoicing", "core.lhdn_codes", "core.lhdn_fields"}
+ALLOWED_CORE_MODELS = {"Invoice", "TenantModel"}
+
+
+def _myinvois_source_files():
+    root = BACKEND / "myinvois"
+    return sorted(
+        p for p in root.rglob("*.py")
+        if "migrations" not in p.parts and "__pycache__" not in p.parts and p.relative_to(root).parts[0] != "tests"
+    )
+
+
+def _core_leaf_imports(path, package):
+    """Every `core...` name this file imports, resolved to its full dotted path; never the bare base of a
+    `from core.x import y`, only the leaf `core.x.y` it actually names."""
+    leaves = []
+    for node in ast.walk(_parse(path)):
+        if isinstance(node, ast.Import):
+            leaves += [alias.name for alias in node.names if alias.name == "core" or alias.name.startswith("core.")]
+        elif isinstance(node, ast.ImportFrom):
+            base = node.module or ""
+            if node.level:
+                parts = package.split(".")
+                parts = parts[: len(parts) - (node.level - 1)]
+                base = ".".join(parts + ([node.module] if node.module else []))
+            if base == "core" or base.startswith("core."):
+                leaves += [f"{base}.{alias.name}" for alias in node.names]
+    return leaves
+
+
+def _core_violations(leaves):
+    violations = []
+    for leaf in leaves:
+        parts = leaf[len("core."):].split(".") if leaf.startswith("core.") else []
+        if not parts:
+            violations.append(leaf)  # the bare package: no visibility into what is actually used
+        elif parts[0] == "models":
+            if len(parts) < 2 or parts[1] not in ALLOWED_CORE_MODELS:
+                violations.append(leaf)
+        elif f"core.{parts[0]}" not in ALLOWED_CORE_MODULES:
+            violations.append(leaf)
+    return violations
+
+
+@pytest.mark.parametrize("path", _myinvois_source_files(), ids=lambda p: str(p.relative_to(BACKEND)))
+def test_myinvois_reads_only_its_whitelisted_doors_into_core(path):
+    violations = _core_violations(_core_leaf_imports(path, _package_of(path)))
+    assert violations == [], f"{path.relative_to(BACKEND)} reaches outside the core whitelist: {violations}"
+
+
+def test_the_whitelist_catches_an_import_of_a_core_module_outside_it(tmp_path):
+    file = tmp_path / "probe.py"
+    file.write_text("from core import views\n", encoding="utf-8")
+
+    assert _core_violations(_core_leaf_imports(file, "myinvois")) == ["core.views"]
+
+
+def test_the_whitelist_catches_a_core_model_outside_the_two_named(tmp_path):
+    file = tmp_path / "probe.py"
+    file.write_text("from core.models import Customer\n", encoding="utf-8")
+
+    assert _core_violations(_core_leaf_imports(file, "myinvois")) == ["core.models.Customer"]
+
+
+def test_the_whitelist_catches_the_bare_core_package(tmp_path):
+    file = tmp_path / "probe.py"
+    file.write_text("import core\n", encoding="utf-8")
+
+    assert _core_violations(_core_leaf_imports(file, "myinvois")) == ["core"]
+
+
+def test_the_whitelist_lets_every_named_door_through(tmp_path):
+    file = tmp_path / "probe.py"
+    file.write_text(
+        "from core import ports, jobs, einvoicing\nfrom core.ports import myinvois as gw\n"
+        "from core.jobs import register\nfrom core.models import Invoice, TenantModel\n"
+        "from core.lhdn_codes import load\nfrom core.lhdn_fields import phone_ok\n",
+        encoding="utf-8",
+    )
+
+    assert _core_violations(_core_leaf_imports(file, "myinvois")) == []
+
+
 def test_myinvois_holds_no_second_copy_of_the_lhdn_code_lists():
     """The code-list data lives only in `core/lhdn_codes/`, so a refresh has one target and copies cannot drift (#173)."""
     assert _stray_code_list_files(BACKEND / "myinvois") == []

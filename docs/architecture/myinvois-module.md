@@ -42,7 +42,11 @@ The item and customer masters stay in `core`: they are master data the engine ed
 
 An invoice's LHDN fields (`uuid`, `longId`, status, validated time) belong to the MyInvois side, so a normal invoice carries none of them (D59 (3)).
 
-**Recorded for #47, to confirm there:** one table owned by the `myinvois` app, one row per submitted invoice, keyed by the invoice's id (a foreign key by id only, no ORM import of the engine's model into the engine), carrying the company id under the same RLS pattern and audit as every tenant table. The first such migration comes with #47 and needs Torres's RLS review; #128 adds no table. The SQL Account export (#60 to #63, D51) gets the values it needs through a read-only protocol defined in `core.ports` and implemented by the `myinvois` app, so the engine still imports nothing from it.
+**Confirmed by #47:** `myinvois.SubmittedInvoice` (migration `myinvois/0001_initial.py`), one row per invoice the submission job has queued, recovered or had LHDN accept. `invoice_id` is a bare `BigIntegerField`, not a Django `ForeignKey` into `core.models.Invoice`: the two apps' migrations never need to order against each other. It carries the company id (`core.models.TenantModel`) under the standard RLS pattern, `worker=True` (the submission job is its only writer; no signed-in user ever writes it), and the standard audit trigger, matching every other tenant table (`docs/architecture/tenancy.md`). `document_hash` records the attempt before LHDN is called (D58 (5)); `uuid` stays blank while the invoice is "submitted (queued)" (D44) and is set, with `recovered`, once LHDN has answered.
+
+Reading the owner's email for the stale-document notice needed a second new door: `core.einvoicing.owner_email(company)`, backed by a SECURITY DEFINER function (`core/migrations/0048_worker_owner_email.py`) granted to `worker` rather than widening the worker's grant on `core_companyaccess` (which is otherwise web-only and read-only, D40 (2)) — the function answers only "this company's owner's email", never the membership list. This, and the new tenant table, are exactly the RLS changes flagged above as needing Torres's review.
+
+The SQL Account export (#60 to #63, D51) gets the values it needs through a read-only protocol defined in `core.ports` and implemented by the `myinvois` app, so the engine still imports nothing from it.
 
 ## What #128 moved
 
