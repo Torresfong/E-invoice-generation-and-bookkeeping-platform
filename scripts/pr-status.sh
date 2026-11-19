@@ -11,7 +11,10 @@
 # "N new since last check", not their full text again. Items are matched by their own id, not by position, so a
 # comment deleted between polls can't shift the rest of the list out of view and hide a genuinely new one. Each
 # `gh --jq` call always emits the current id list as its first line, by construction, never by scanning later lines
-# for a marker — so a comment body that happens to contain text resembling one can't be mistaken for it. Pass --full
+# for a marker — so a comment body that happens to contain text resembling one can't be mistaken for it. That first
+# line is read out with shell parameter expansion on the already-captured variable, not a `head -n1` pipe, since a
+# pipe reader that exits after one line can SIGPIPE a large writer under `set -o pipefail` and abort the script
+# before later sections run. Pass --full
 # to force every item in full regardless of the tracked state — always do this on the first check of a fresh context
 # window, since "already shown" refers to an earlier run of this script, not to what the current agent has actually
 # read.
@@ -60,7 +63,7 @@ out=$(gh pr view "$pr" --json reviews --jq '
   ($all | map(.id) | tojson),
   "== Reviews (commit vs HEAD) -- \($all | length) total, \($new | length) new since last check",
   ($new | if length == 0 then "(none new)" else .[] | "\(.author.login) \(.state) on \(.commit.oid[0:7]) \(if .commit.oid == $ENV.HEAD_SHA then "CURRENT" else "STALE" end)\n  \(.body[0:300])" end)')
-echo "$out" | head -n1 > "$reviews_state"
+printf '%s\n' "${out%%$'\n'*}" > "$reviews_state"
 echo "$out" | tail -n +2
 
 echo
@@ -77,7 +80,7 @@ out=$(gh pr view "$pr" --json comments --jq '
     | (.body | capture("\"code_review\":\\{\"commit_sha\":\"(?<sha>[0-9a-f]*)\",\"has_any_findings\":(?<any>[a-z]*),\"has_unresolved_findings\":(?<open>[a-z]*),\"status\":\"(?<status>[a-z_]*)\"") // empty)
     | "code_review status=\(.status) any_findings=\(.any) unresolved=\(.open) commit=\(.sha[0:7])"]
    | if length == 0 then "(none)" else .[] end)')
-echo "$out" | head -n1 > "$comments_state"
+printf '%s\n' "${out%%$'\n'*}" > "$comments_state"
 echo "$out" | tail -n +2
 
 echo
@@ -88,7 +91,7 @@ out=$(gh api "repos/{owner}/{repo}/pulls/$pr/comments" --jq '
   ($all | map(.id) | tojson),
   "== Inline review comments (commit vs HEAD) -- \($all | length) total, \($new | length) new since last check",
   ($new | if length == 0 then "(none new)" else .[] | "\(.user.login) \(.path):\(.line) on \(.commit_id[0:7]) \(if .commit_id == $ENV.HEAD_SHA then "CURRENT" else "STALE" end)\n  \(.body[0:300])" end)')
-echo "$out" | head -n1 > "$inline_state"
+printf '%s\n' "${out%%$'\n'*}" > "$inline_state"
 echo "$out" | tail -n +2
 
 echo
