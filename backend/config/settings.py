@@ -83,6 +83,12 @@ BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000")
 EMAIL_SENDER_ADDRESS = os.environ.get("EMAIL_SENDER_ADDRESS", "")
 EMAIL_REGION = os.environ.get("EMAIL_REGION", "ap-southeast-5")
 
+# Uploaded documents go out through Amazon S3 (ticket #14, D14, D53 (3)). With no bucket configured no storage
+# adapter is installed, and `check --deploy` warns: an accepted upload would then queue a job that can never finish.
+# No credential is a setting: boto3 finds the task's IAM role itself.
+OBJECT_STORAGE_BUCKET = os.environ.get("OBJECT_STORAGE_BUCKET", "")
+OBJECT_STORAGE_REGION = os.environ.get("OBJECT_STORAGE_REGION", "ap-southeast-5")
+
 # Password reset links last an hour, invitations a week (D40 (5)).
 RESET_LINK_HOURS = 1
 # The link a new firm administrator or accountant gets to choose a first password (D49).
@@ -128,6 +134,17 @@ except ValueError:
 # Below one day the purge would delete jobs that finished today, or with a negative number every finished job.
 if JOB_RETENTION_DAYS < 1:
     raise RuntimeError("JOB_RETENTION_DAYS must be a whole number of days, at least 1")
+
+# Where an uploaded document's bytes wait, on local disk, between the upload request and the queued job that writes
+# them through the object storage port (ticket #14, D53 (3)): the object storage write itself must happen only in
+# that job, never inside the request's own transaction, and the job's payload holds the document id only, so the
+# bytes need somewhere to sit in between. This assumes the worker reads the same disk as the web process, true for
+# the pilot's single-host deployment; a multi-host deployment would need a different handoff.
+DOCUMENT_STAGING_ROOT = Path(os.environ.get("DOCUMENT_STAGING_ROOT", BASE_DIR / "var" / "pending_documents"))
+
+# Django places no cap of its own on a file upload's size; a phone photo or scanned PDF is a few megabytes at most,
+# so this is a generous bound against a hostile or mistaken giant upload, not a limit a real document should meet.
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(25 * 1024 * 1024)))
 
 # Every signing is logged (D13); Django's defaults would drop this line in production.
 LOGGING = {

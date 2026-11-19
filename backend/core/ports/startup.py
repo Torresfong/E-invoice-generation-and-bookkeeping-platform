@@ -15,6 +15,7 @@ from django.core import checks
 from . import PortsNotConfigured, install_port
 from . import get as get_ports
 from .myinvois import gateway_from_environment, urllib_transport
+from .s3 import s3_client, storage_from_settings
 from .ses import email_from_settings, ses_client
 
 # A web request waits on the TIN check, so a hung LHDN is given up on well before a proxy's idle timeout turns the wait
@@ -23,7 +24,8 @@ REQUEST_TIMEOUT_SECONDS = 10
 
 
 def install_configured_ports(
-    env=os.environ, transport=partial(urllib_transport, timeout=REQUEST_TIMEOUT_SECONDS), email_client=ses_client
+    env=os.environ, transport=partial(urllib_transport, timeout=REQUEST_TIMEOUT_SECONDS), email_client=ses_client,
+    storage_client=s3_client,
 ):
     """Install every real adapter whose settings and secrets are present. One that is missing stays uninstalled."""
     gateway = gateway_from_environment(settings.MYINVOIS_ENVIRONMENT, env, transport)
@@ -32,6 +34,9 @@ def install_configured_ports(
     email = email_from_settings(settings.EMAIL_SENDER_ADDRESS, settings.EMAIL_REGION, email_client)
     if email is not None:
         install_port("email", email)
+    storage = storage_from_settings(settings.OBJECT_STORAGE_BUCKET, settings.OBJECT_STORAGE_REGION, storage_client)
+    if storage is not None:
+        install_port("storage", storage)
 
 
 @checks.register(checks.Tags.security, deploy=True)
@@ -68,6 +73,25 @@ def check_email_installed(app_configs, **kwargs):
                 "no email adapter installed: sign-up, invitation and password-reset emails cannot be sent",
                 hint="Set EMAIL_SENDER_ADDRESS (and EMAIL_REGION if it is not ap-southeast-5); AWS credentials come from the task role.",
                 id="core.W002",
+            )
+        ]
+    return []
+
+
+@checks.register(checks.Tags.security, deploy=True)
+def check_storage_installed(app_configs, **kwargs):
+    """Warn when no object storage adapter is installed, so an upload that can never leave staging (ticket #14) is caught.
+
+    A warning under `check --deploy` only, as for the gateway and email adapters: CI has no bucket configured.
+    """
+    try:
+        get_ports().storage
+    except PortsNotConfigured:
+        return [
+            checks.Warning(
+                "no object storage adapter installed: an accepted upload is staged but never reaches storage",
+                hint="Set OBJECT_STORAGE_BUCKET (and OBJECT_STORAGE_REGION if it is not ap-southeast-5); AWS credentials come from the task role.",
+                id="core.W003",
             )
         ]
     return []

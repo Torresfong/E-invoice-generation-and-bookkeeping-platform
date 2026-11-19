@@ -441,6 +441,11 @@ def test_the_nullable_firm_migration_cannot_reverse_while_a_company_has_no_firm(
             MigrationExecutor(connection).migrate([("core", "0036_item_master")])
         assert company_firm_is_nullable() == [("YES",)]  # the refused reversal changed nothing
 
+        # The refused reversal still ran every migration above 0037 that it reached before 0037 itself failed
+        # (each applies in its own transaction), so the schema below "latest" no longer matches the ORM's model
+        # state. Restore it before using the ORM (`move_company`), which always reflects the newest code, not
+        # whatever the schema happens to be; any later ticket's new column on Company hits this the same way.
+        MigrationExecutor(connection).migrate(latest)
         services.move_company(company, firms_world["alpha"])  # resolve the firm-less row, as the PR's rollback note says
         MigrationExecutor(connection).migrate([("core", "0036_item_master")])
         assert company_firm_is_nullable() == [("NO",)]

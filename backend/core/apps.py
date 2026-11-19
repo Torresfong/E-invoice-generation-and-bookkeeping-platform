@@ -15,3 +15,7 @@ class CoreConfig(AppConfig):
         from core.ports.startup import install_configured_ports
 
         install_configured_ports()
+
+        # Registers core.documents.store_uploaded_document with core.jobs (ticket #14), as myinvois/apps.py
+        # documents doing for its own handlers.
+        from core import documents  # noqa: F401

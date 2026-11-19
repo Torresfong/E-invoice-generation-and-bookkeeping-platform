@@ -31,6 +31,8 @@ ACTIONS = {
     "approve_invoices": {OWNER},  # approve (and approve again), and cancel; no delegation (D17, ticket #46)
     "view_audit_trail": {OWNER, ACCOUNTANT},
     "view_own_activity": {OWNER, STAFF, ACCOUNTANT},
+    "view_documents": {OWNER, STAFF, ACCOUNTANT},
+    "upload_documents": {OWNER, STAFF},  # bookkeeping document uploads (D20, ticket #14)
 }
 
 
