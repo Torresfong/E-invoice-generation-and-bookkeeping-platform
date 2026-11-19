@@ -92,6 +92,22 @@ def test_switching_off_later_does_not_change_the_answer_for_earlier_dates(world)
     assert einvoicing.einvoicing_enabled(world["acme"], D3) is False
 
 
+def test_the_owner_email_is_the_companys_owner_not_staff_or_an_accountant(world):
+    assert einvoicing.owner_email(world["acme"]) == world["acme_owner"].email
+
+
+def test_the_owner_email_of_one_company_says_nothing_about_another(world):
+    assert einvoicing.owner_email(world["beta"]) == world["beta_owner"].email
+
+
+def test_a_job_handler_running_as_the_worker_can_still_read_the_owner_email(world):
+    """#47's submission job calls this as the worker, which has no ordinary grant on the membership table."""
+    from core import jobs
+
+    with jobs.as_worker_in(world["acme"]):
+        assert einvoicing.owner_email(world["acme"]) == world["acme_owner"].email
+
+
 def test_one_company_being_on_says_nothing_about_another(world):
     change(world["acme_owner"], world["acme"])
 

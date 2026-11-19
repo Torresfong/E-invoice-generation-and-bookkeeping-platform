@@ -18,9 +18,13 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from . import audit, customers, einvoicing, items, numbering, permissions
+from . import audit, customers, einvoicing, items, jobs, numbering, permissions
 from .einvoicing import einvoicing_enabled
 from .models import AuditEntry, Customer, Invoice, InvoiceLine, Item
+
+# Enqueued by name only: `core` never imports `myinvois` (D61 (4)). The MyInvois app registers the matching
+# handler under this same literal string from `myinvois/jobs.py`.
+SUBMIT_INVOICE_JOB = "myinvois_submit_invoice"
 
 # The column sizes of InvoiceLine: NUMERIC(18, 4), so at most 14 digits before the point and 4 after it.
 # ASCII digits only: `\d` alone would also accept the digits of other scripts.
@@ -238,6 +242,11 @@ def approve_invoice(user, invoice, *, acknowledged=False):
             AuditEntry.APPROVED, company, user, "invoice", current.pk,
             ["status", "number", "is_einvoice", "approved_at", "approved_by", "buyer"],
         )
+        if is_einvoice:
+            # One owner action, "Approve & submit" (D44): a normal invoice finishes here with no submission (D59
+            # (3)). Re-approval (the branch above, after 72 hours) never reaches this line, so a repeated approval
+            # never queues a second job; deciding whether a stuck submission is offered a fresh one is #48's.
+            jobs.enqueue(SUBMIT_INVOICE_JOB, company=company, invoice_id=current.pk)
     invoice.refresh_from_db()
     return invoice
 

@@ -356,6 +356,28 @@ def test_the_owner_sees_the_approve_button_on_a_draft(client, world, books, as_p
         page = client.get(page_url(world["acme"], draft)).content.decode()
 
     assert page_url(world["acme"], draft, "approve") in page
+    assert "Approve & submit" in page  # D44 names the one owner action this
+
+
+def test_approving_an_e_invoice_shows_submitted_queued_on_the_page(client, world, books, as_production_connection):
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+    draft = new_draft(world, books)
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        client.post(page_url(world["acme"], draft, "approve"))
+        page = client.get(page_url(world["acme"], draft)).content.decode()
+
+    assert "Submitted (queued)" in page
+
+
+def test_approving_a_normal_invoice_shows_no_submitted_text(client, world, books, as_production_connection):
+    draft = new_draft(world, books)  # e-invoicing stays off
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        client.post(page_url(world["acme"], draft, "approve"))
+        page = client.get(page_url(world["acme"], draft)).content.decode()
+
+    assert "Submitted" not in page
 
 
 def test_an_incomplete_buyer_shows_the_reason_and_approves_nothing(client, world, books, as_production_connection):

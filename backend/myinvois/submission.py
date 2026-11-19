@@ -38,6 +38,33 @@ class SubmittedDocument:
     recovered: bool  # True when LHDN already had the document and its uuid was looked up
 
 
+def check_not_stale(*, gateway, session, code_number, issued_at, now, owner_email, key):
+    """None when `issued_at` is fresh enough to submit; otherwise LHDN's existing document, recovered by lookup
+    (`SubmittedDocument`), or `StaleDocument` once the owner has been told (D58 (6), D60 (2)).
+
+    Call this before building the document too (#47): a retry that lands here more than 72 hours after approval
+    must still recover an earlier attempt's uuid by lookup, not fail at the mapping step before `submit_invoice`
+    ever reaches its own copy of this check.
+    """
+    if now - issued_at <= STALE_AFTER:
+        return None
+    # The document may already be at LHDN, accepted before an answer was lost: then there is nothing to re-issue.
+    found = gateway.find_document(session, code_number)
+    if found is not None:
+        return SubmittedDocument(found.uuid, recovered=True)
+    ports.get().email.send(
+        owner_email,
+        _("Invoice %(number)s must be approved again") % {"number": code_number},
+        _(
+            "Invoice %(number)s was not sent to LHDN within 72 hours of its issue time, and LHDN no longer accepts it. "
+            "Your draft is kept. Please review it and approve it again."
+        )
+        % {"number": code_number},
+        idempotency_key=key("stale-notice"),
+    )
+    raise StaleDocument(f"{code_number} is older than 72 hours")
+
+
 def submit_invoice(*, gateway, session, document, code_number, issued_at, now, owner_email, record_attempt, key):
     """Submit `document` (bytes) and return its uuid.
 
@@ -45,22 +72,12 @@ def submit_invoice(*, gateway, session, document, code_number, issued_at, now, o
     attempt for that number was already recorded, so this one may follow an ambiguous failure. `key(step)` is
     `jobs.idempotency_key`.
     """
-    if now - issued_at > STALE_AFTER:
-        # The document may already be at LHDN, accepted before an answer was lost: then there is nothing to re-issue.
-        found = gateway.find_document(session, code_number)
-        if found is not None:
-            return SubmittedDocument(found.uuid, recovered=True)
-        ports.get().email.send(
-            owner_email,
-            _("Invoice %(number)s must be approved again") % {"number": code_number},
-            _(
-                "Invoice %(number)s was not sent to LHDN within 72 hours of its issue time, and LHDN no longer accepts it. "
-                "Your draft is kept. Please review it and approve it again."
-            )
-            % {"number": code_number},
-            idempotency_key=key("stale-notice"),
-        )
-        raise StaleDocument(f"{code_number} is older than 72 hours")
+    stale = check_not_stale(
+        gateway=gateway, session=session, code_number=code_number, issued_at=issued_at, now=now,
+        owner_email=owner_email, key=key,
+    )
+    if stale is not None:
+        return stale
 
     followed_a_failure = record_attempt(code_number, hashlib.sha256(document).hexdigest())
     if followed_a_failure:

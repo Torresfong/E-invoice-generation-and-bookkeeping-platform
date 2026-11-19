@@ -13,7 +13,7 @@ from django.utils import translation
 from core import jobs
 from core.models import Job
 from core.ports.interfaces import IntermediaryCredentials, Submission, SubmissionUid
-from myinvois.submission import DocumentRejected, StaleDocument, submit_invoice
+from myinvois.submission import DocumentRejected, StaleDocument, check_not_stale, submit_invoice
 
 DOCUMENT = b'{"invoice": "INV-0001"}'
 CODE = "INV-0001"
@@ -158,6 +158,50 @@ def test_the_stale_notice_is_available_in_chinese(gateway, fake_ports):
 
     (mail,) = fake_ports.email.sent
     assert "重新批准" in mail["subject"] and CODE in mail["subject"]
+
+
+def _session(gateway):
+    return gateway.login_as_taxpayer(CREDENTIALS, 7, "C1234567890")
+
+
+def _key(step=""):
+    return f"k:{step}"
+
+
+# --- check_not_stale alone: #47 calls this before building the document, so a retry that lands here more than
+# 72 hours after approval still recovers an earlier attempt's uuid instead of failing at the mapping step -----------
+
+
+def test_check_not_stale_returns_none_when_the_issue_time_is_fresh(gateway):
+    result = check_not_stale(
+        gateway=gateway, session=_session(gateway), code_number=CODE,
+        issued_at=NOW - timedelta(hours=1), now=NOW, owner_email="owner@acme.example", key=_key,
+    )
+
+    assert result is None
+
+
+def test_check_not_stale_recovers_a_document_lhdn_already_has(gateway):
+    first = run(gateway, Attempts(gateway))
+
+    result = check_not_stale(
+        gateway=gateway, session=_session(gateway), code_number=CODE,
+        issued_at=NOW - timedelta(days=4), now=NOW, owner_email="owner@acme.example", key=_key,
+    )
+
+    assert result.uuid == first.uuid and result.recovered is True
+
+
+def test_check_not_stale_tells_the_owner_and_raises_when_lhdn_has_nothing(gateway, fake_ports):
+    with pytest.raises(StaleDocument) as stale:
+        check_not_stale(
+            gateway=gateway, session=_session(gateway), code_number=CODE,
+            issued_at=NOW - timedelta(days=4), now=NOW, owner_email="owner@acme.example", key=_key,
+        )
+
+    assert isinstance(stale.value, jobs.PermanentError)
+    (mail,) = fake_ports.email.sent
+    assert mail["to"] == "owner@acme.example" and CODE in mail["subject"]
 
 
 def test_an_answer_with_no_result_for_the_document_is_retried_later(gateway):
