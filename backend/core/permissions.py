@@ -17,6 +17,7 @@ OWNER, STAFF, ACCOUNTANT = CompanyAccess.OWNER, CompanyAccess.STAFF, CompanyAcce
 ACTIONS = {
     "view_company": {OWNER, STAFF, ACCOUNTANT},
     "invite_staff": {OWNER},
+    "invite_firm": {OWNER},  # invite an accounting firm by email (D67 (3)); client staff cannot
     "configure_numbering": {OWNER},  # prefix and starting number of the invoice sequence (D18)
     "view_einvoicing": {OWNER, STAFF, ACCOUNTANT},
     "manage_einvoicing": {OWNER},  # status, on/off switch and supplier details of the e-invoice setting (D59 (2))

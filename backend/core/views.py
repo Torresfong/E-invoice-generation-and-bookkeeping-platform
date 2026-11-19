@@ -9,11 +9,12 @@ from django.core.validators import validate_email
 from django.db import connection
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, customers, documents, einvoicing, firm_admin, firm_applications, invoices, items, numbering, permissions, registration, throttle, tokens
-from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, Invoice, Item, SupplierDetails
+from . import audit, customers, documents, einvoicing, firm_admin, firm_applications, firm_invitations, invoices, items, numbering, permissions, registration, throttle, tokens
+from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, FirmInvitation, Invoice, Item, SupplierDetails
 from .signin import complete_sign_in
 
 logger = logging.getLogger(__name__)
@@ -130,6 +131,17 @@ def _company_page(request, access, **extra):
     context = {"company": access.company, "access": access, **extra}
     if request.GET.get("invited"):
         context["message"] = _("Invitation sent.")
+    if request.GET.get("firm_invited"):
+        context["message"] = _("Invitation sent to the firm.")
+    if permissions.can(request.user, "invite_firm", access.company):
+        invitation = FirmInvitation.objects.filter(company=access.company).order_by("-created_at").first()
+        pending_and_live = (
+            invitation is not None
+            and invitation.status == FirmInvitation.PENDING
+            and invitation.expires_at > timezone.now()
+        )
+        context["firm_invitation"] = invitation
+        context["can_invite_firm"] = access.company.firm_id is None and not pending_and_live
     return render(request, "company.html", context)
 
 
@@ -160,6 +172,29 @@ def invite_staff(request, pk):
     except tokens.TooManyInvitations:
         return _company_page(request, access, error=_("Too many invitations today. Try again tomorrow."))
     return redirect(f"/companies/{pk}/?invited=1")
+
+
+@require_POST
+def invite_firm(request, pk):
+    """The owner invites an accounting firm by email (D67 (3)); the database also checks ownership and that
+    the company has no firm yet, so the rule does not rest on this view alone."""
+    if not request.user.is_authenticated:
+        return HttpResponse(status=401)
+    access = _own_access(request, pk)
+    permissions.require(request.user, "invite_firm", access.company)
+
+    email = request.POST.get("email", "").strip()
+    try:
+        validate_email(email)
+    except ValidationError:
+        return _company_page(request, access, error=_("Enter a valid email address."))
+    try:
+        firm_invitations.send(access.company, email)
+    except firm_invitations.CompanyAlreadyHasFirm:
+        return _company_page(request, access, error=_("This company already has a firm."))
+    except firm_invitations.InvitationAlreadyPending:
+        return _company_page(request, access, error=_("An invitation is already pending. Wait for it to expire before sending another."))
+    return redirect(f"/companies/{pk}/?firm_invited=1")
 
 
 def _einvoice_page(request, access, form=None, **extra):
@@ -598,6 +633,30 @@ def accept_invitation(request, token):
     )
 
 
+def accept_firm_invitation(request, token):
+    """The emailed link's landing page (D67 (3)): English only, like every firm-side page (D49).
+
+    A firm administrator of an approved firm accepts; a person with no firm account registers first (#142) and
+    returns to the same link. The three ways a link can fail to accept (unknown, expired, used or tampered)
+    are told apart from "wrong kind of account" only, never from each other.
+    """
+    if request.method not in ("GET", "HEAD", "POST"):
+        return HttpResponse(status=405)
+    if not request.user.is_authenticated:
+        return render(request, "firm_invite_accept.html", {"signed_in": False})
+    if not permissions.is_firm_admin(request.user):
+        return render(request, "firm_invite_accept.html", {"signed_in": True, "wrong_account": True})
+    if request.method != "POST":
+        return render(request, "firm_invite_accept.html", {"signed_in": True, "ready": True})
+    try:
+        firm_invitations.accept(token)
+    except firm_invitations.NotFirmAdministrator:
+        return render(request, "firm_invite_accept.html", {"signed_in": True, "wrong_account": True})
+    except firm_invitations.InvalidLink:
+        return render(request, "link_invalid.html", status=410)
+    return redirect("/firm/?accepted=1")
+
+
 ENTRIES_SHOWN = 200
 
 
@@ -633,6 +692,10 @@ def _firm_page(request, **extra):
         context["message"] = "Added. They have been emailed a link to choose a password."
     if request.GET.get("deactivated"):
         context["message"] = "Deactivated."
+    if request.GET.get("accepted"):
+        context["message"] = (
+            "Accepted. The company now has your firm; your accountants reach it once the operator reviews and grants access."
+        )
     return render(request, "firm.html", context)
 
 

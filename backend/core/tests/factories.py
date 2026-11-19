@@ -38,4 +38,5 @@ def make_accountant(email, *companies, password=PASSWORD):
 
 
 def make_company(name="Acme Sdn Bhd", firm=None):
-    return Company.objects.create(name=name, firm=firm or default_firm())
+    """`firm` left out uses the default test firm; pass `firm=False` for a company with no firm yet (D67 (2))."""
+    return Company.objects.create(name=name, firm=None if firm is False else (firm or default_firm()))

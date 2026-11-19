@@ -643,3 +643,32 @@ class FirmAuditEntry(models.Model):
     class Meta:
         indexes = [models.Index(fields=["firm", "-occurred_at"], name="firm_audit_firm_time")]
         ordering = ["-occurred_at", "-id"]
+
+
+class FirmInvitation(TenantModel):
+    """A company owner's invitation to a firm by email (D67 (3)).
+
+    The web role may only read its own company's rows (migration 0048); creating and accepting both run
+    through SECURITY DEFINER functions, like the invitation link style of D40 (5), because accepting is done
+    by a firm administrator who has no `CompanyAccess` row for this company at all.
+    """
+
+    PENDING = "pending"
+    ACCEPTED = "accepted"
+    EXPIRED = "expired"
+    STATUSES = [(PENDING, _("Pending")), (ACCEPTED, _("Accepted")), (EXPIRED, _("Expired"))]
+
+    email = models.EmailField()
+    token_hash = models.CharField(max_length=64, unique=True)
+    status = models.CharField(max_length=10, choices=STATUSES, default=PENDING)
+    created_by = models.ForeignKey("core.User", on_delete=models.PROTECT, related_name="+")
+    created_at = models.DateTimeField(db_default=Now())
+    expires_at = models.DateTimeField()
+    accepted_at = models.DateTimeField(null=True, blank=True)
+    accepted_by = models.ForeignKey("core.User", null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+    accepted_firm = models.ForeignKey(Firm, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["company"], condition=models.Q(status="pending"), name="one_pending_firm_invitation_per_company")
+        ]

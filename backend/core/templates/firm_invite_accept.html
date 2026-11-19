@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Accept a client's invitation</title>
+</head>
+<body>
+  <h1>Accept a client's invitation</h1>
+  {% if not signed_in %}
+    <p>Sign in with your firm administrator account to accept this invitation, or apply to register your firm first if you have none.</p>
+    <p><a href="/login/">Sign in</a></p>
+    <p><a href="/apply/">Apply as an accounting firm</a></p>
+  {% elif wrong_account %}
+    <p>Only a firm administrator of an approved firm can accept this invitation. Sign in with that account, or apply to register your firm first.</p>
+    <p><a href="/login/">Sign in</a></p>
+    <p><a href="/apply/">Apply as an accounting firm</a></p>
+  {% else %}
+    <p>Accepting lets your firm act for the company that invited you. Your accountants reach it only once the platform operator reviews and grants access.</p>
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit">Accept</button>
+    </form>
+  {% endif %}
+</body>
+</html>

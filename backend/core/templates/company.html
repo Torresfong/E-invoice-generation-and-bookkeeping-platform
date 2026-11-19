@@ -29,6 +29,27 @@
       <button type="submit">{% trans "Send invitation" %}</button>
     </form>
   {% endif %}
+  {% can "invite_firm" company as may_invite_firm %}
+  {% if may_invite_firm %}
+    <h2>{% trans "Your accounting firm" %}</h2>
+    {% if company.firm %}
+      <p>{% trans "This company already has a firm." %}</p>
+    {% elif firm_invitation %}
+      <p>
+        {% blocktrans with email=firm_invitation.email %}Invitation to {{ email }}:{% endblocktrans %}
+        {% if firm_invitation.status == "accepted" %}{% trans "Accepted" %}
+        {% elif can_invite_firm %}{% trans "Expired" %}
+        {% else %}{% trans "Sent, waiting for the firm" %}{% endif %}
+      </p>
+    {% endif %}
+    {% if can_invite_firm %}
+      <form method="post" action="/companies/{{ company.pk }}/invite-firm/">
+        {% csrf_token %}
+        <p><label>{% trans "Firm's email address" %} <input type="email" name="email" required></label></p>
+        <button type="submit">{% trans "Send invitation" %}</button>
+      </form>
+    {% endif %}
+  {% endif %}
   <p><a href="/companies/">{% trans "All companies" %}</a></p>
 </body>
 </html>
