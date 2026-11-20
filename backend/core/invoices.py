@@ -18,7 +18,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from . import audit, customers, einvoicing, items, jobs, numbering, permissions
+from . import audit, customers, einvoicing, items, jobs, lhdn_codes, numbering, permissions, rates
 from .einvoicing import einvoicing_enabled
 from .models import AuditEntry, Customer, Invoice, InvoiceLine, Item
 
@@ -34,6 +34,12 @@ AMOUNT = re.compile(r"[0-9]{1,14}(\.[0-9]{1,4})?")
 # digit would pass AMOUNT's own 4-place limit but then be rounded silently on save, so it is checked against this
 # tighter pattern instead of the column doing the rounding (Codex's review of PR #196).
 TAX_RATE = re.compile(r"[0-9]{1,3}(\.[0-9]{1,2})?")
+
+# `Invoice.exchange_rate` is NUMERIC(18, 6): at most 12 digits before the point and 6 after.
+EXCHANGE_RATE = re.compile(r"[0-9]{1,12}(\.[0-9]{1,6})?")
+
+# The only currency with no exchange rate (D24): the platform's own books and SQL Account are both in ringgit.
+BASE_CURRENCY = "MYR"
 
 CENTS = Decimal("0.01")
 # A tax rate is a percentage from 0 to 100: both the validation ceiling and the divisor that turns it into a
@@ -127,6 +133,33 @@ def _tax_type(raw, line_number):
     return value
 
 
+def _currency_and_rate(currency_raw, exchange_rate_raw):
+    """The invoice's currency and its exchange rate to MYR, or `InvalidInvoice` naming what is wrong (D24, ticket #53).
+
+    MYR carries no rate, whatever was typed. A foreign currency always needs a positive one: when none was typed,
+    the day's rate is proposed (`core.rates`); with nothing proposed either, the owner must type one. A typed rate
+    is never checked against the proposal, so the owner's override always stands (D24's "overridable"). A proposed
+    rate passes through the same checks as a typed one: a buggy or malicious source must not bypass them and reach
+    the database as a zero, negative or over-precise rate (a Codex review finding on #53).
+    """
+    currency = (currency_raw or BASE_CURRENCY).strip().upper()
+    if currency not in lhdn_codes.currency_codes():
+        raise InvalidInvoice(_("Check the currency."))
+    if currency == BASE_CURRENCY:
+        return currency, None
+    text = format(exchange_rate_raw, "f") if isinstance(exchange_rate_raw, Decimal) else str(exchange_rate_raw or "").strip()
+    if not text:
+        proposed = rates.propose_rate(currency, timezone.localdate())
+        if proposed is None:
+            raise InvalidInvoice(_("Check the exchange rate."))
+        if not isinstance(proposed, Decimal):
+            raise TypeError("a proposed rate is a Decimal or None, never anything else")
+        text = format(proposed, "f")
+    if not EXCHANGE_RATE.fullmatch(text) or Decimal(text) <= 0:
+        raise InvalidInvoice(_("Check the exchange rate."))
+    return currency, Decimal(text)
+
+
 def _customer(company, customer_id, *, current=None):
     """The customer the draft names. A customer deactivated since the draft was started may stay on it.
 
@@ -197,19 +230,23 @@ def _write_lines(invoice, resolved):
     )
 
 
-def create_draft(user, company, *, customer_id, lines):
+def create_draft(user, company, *, customer_id, lines, currency=BASE_CURRENCY, exchange_rate=None):
     """Save a new draft for `company` as `user`, who must be its owner or staff; it has no number.
 
     `lines` is a list of dicts with `item` (an item id), `quantity`, `unit_price`, `tax_type` (one of
     `core.lhdn_codes.tax_types()`) and `tax_rate` (a percentage from 0 to 100), each as a string or a Decimal except
-    `tax_type`. Raises `PermissionDenied` for anyone else and `InvalidInvoice` for a missing customer, no lines, an
-    item or customer of another company or a deactivated one, a quantity that is not above zero, a price that is
-    negative or too long, a tax type that is not on LHDN's list, or a tax rate outside 0 to 100.
+    `tax_type`. `currency` is an ISO 4217 code (`core.lhdn_codes.currency_codes()`); MYR, the default, carries no
+    rate. A foreign currency takes `exchange_rate` if given, or else the day's proposed rate (D24, ticket #53).
+    Raises `PermissionDenied` for anyone else and `InvalidInvoice` for a missing customer, no lines, an item or
+    customer of another company or a deactivated one, a quantity that is not above zero, a price that is negative
+    or too long, a tax type that is not on LHDN's list, a tax rate outside 0 to 100, an unknown currency, or a
+    foreign currency with no positive rate typed or proposed.
     """
     permissions.require(user, "manage_invoices", company)
     customer, resolved = _resolve(company, customer_id, lines)
+    currency, exchange_rate = _currency_and_rate(currency, exchange_rate)
     with transaction.atomic():
-        invoice = Invoice.objects.create(company=company, customer=customer)
+        invoice = Invoice.objects.create(company=company, customer=customer, currency=currency, exchange_rate=exchange_rate)
         _write_lines(invoice, resolved)
     return invoice
 
@@ -221,19 +258,29 @@ def _locked_draft(invoice):
     return current
 
 
-def update_draft(user, invoice, *, customer_id, lines):
-    """Replace the customer and the lines of a draft. Raises `InvoiceLocked` once it is no longer a draft.
+_UNCHANGED = object()  # distinct from any real currency or rate, so an omitted argument is told apart from "" or None
+
+
+def update_draft(user, invoice, *, customer_id, lines, currency=_UNCHANGED, exchange_rate=_UNCHANGED):
+    """Replace the customer, currency, rate and lines of a draft. Raises `InvoiceLocked` once it is no longer a draft.
 
     The customer and the items already on the draft may stay on it after they were deactivated (D59 (10)); anything
-    new must be active. The rest is as for `create_draft`.
+    new must be active. Omitting `currency` (and so `exchange_rate`) keeps the draft's current ones; a caller that
+    means to change them, including to MYR, must pass `currency` explicitly (a Codex review finding on #53: a bare
+    default here would silently reset a foreign-currency draft to MYR whenever a caller touches only its lines).
+    The rest is as for `create_draft`.
     """
     permissions.require(user, "manage_invoices", invoice.company)
     with transaction.atomic():
         current = _locked_draft(invoice)
         customer, resolved = _resolve(current.company, customer_id, lines, current=current)
+        if currency is _UNCHANGED:
+            currency, exchange_rate = current.currency, current.exchange_rate
+        else:
+            currency, exchange_rate = _currency_and_rate(currency, exchange_rate)
         current.lines.all().delete()
-        current.customer = customer
-        current.save(update_fields=["customer"])
+        current.customer, current.currency, current.exchange_rate = customer, currency, exchange_rate
+        current.save(update_fields=["customer", "currency", "exchange_rate"])
         _write_lines(current, resolved)
     invoice.refresh_from_db()
     return invoice

@@ -14,6 +14,7 @@
   {% can "approve_invoices" company as may_approve %}
   {% if invoice and invoice.status != "draft" %}{# an approved invoice reads its own copy of the buyer and the item names #}
     <p>{{ invoice.number }} · {% if invoice.status == "cancelled" %}{% trans "Cancelled" %}{% else %}{% trans "Approved" %}{% endif %} · {% if invoice.is_einvoice %}{% trans "E-invoice" %}{% else %}{% trans "Normal invoice" %}{% endif %}</p>
+    {% if invoice.currency != "MYR" %}<p>{% trans "Currency" %}: {{ invoice.currency }} · {% trans "Exchange rate to MYR" %}: {{ invoice.exchange_rate }}</p>{% endif %}
     {% if invoice.is_einvoice and invoice.status == "approved" %}<p>{% trans "Submitted (queued)" %}</p>{% endif %}
     <h2>{% trans "Buyer" %}</h2>
     <p>{{ invoice.buyer_legal_name }}</p>
@@ -40,6 +41,7 @@
     <p>{% trans "Subtotal" %}: {{ totals.total_excluding_tax }} · {% trans "Tax" %}: {{ totals.total_tax }} · {% trans "Total" %}: {{ totals.total_including_tax }}</p>
   {% elif invoice and not may_manage %}
     <p>{{ invoice.customer.legal_name }}</p>
+    {% if invoice.currency != "MYR" %}<p>{% trans "Currency" %}: {{ invoice.currency }} · {% trans "Exchange rate to MYR" %}: {{ invoice.exchange_rate }}</p>{% endif %}
     <table>
       <thead>
         <tr>
@@ -67,6 +69,13 @@
           <option value="">—</option>
           {% for customer in customers %}<option value="{{ customer.pk }}" {% if form.customer_id|stringformat:"s" == customer.pk|stringformat:"s" %}selected{% endif %}>{{ customer.legal_name }}</option>{% endfor %}
         </select></label></p>
+      <p><label>{% trans "Currency" %}
+        <select name="currency">
+          {% for code, name in currencies %}<option value="{{ code }}" {% if form.currency == code %}selected{% endif %}>{{ code }} · {{ name }}</option>{% endfor %}
+        </select></label>
+      <label>{% trans "Exchange rate to MYR" %}
+        <input name="exchange_rate" inputmode="decimal" value="{{ form.exchange_rate|default_if_none:'' }}">
+      </label> {% trans "Leave blank to use the day's proposed rate for a foreign currency." %}</p>
       <table>
         <thead>
           <tr>

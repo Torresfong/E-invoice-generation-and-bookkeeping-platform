@@ -7,12 +7,13 @@ from decimal import Decimal
 
 import pytest
 from django.core.exceptions import PermissionDenied
-from django.utils import translation
+from django.utils import timezone, translation
 
-from core import customers, invoices, items
+from core import customers, invoices, items, rates
 from core.models import Customer, Invoice, InvoiceLine
 
 from .test_customers import BRN_VALUE, CONTACT, TIN, switch_einvoicing_on
+from .test_rates import FakeRateSource
 
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
 
@@ -406,3 +407,151 @@ def test_one_retained_line_of_a_deactivated_item_cannot_become_two(world, stock)
 
     assert "line 2" in str(refused.value)
     assert saved.lines.count() == 1
+
+
+# --- foreign currency with a proposed, overridable rate (D24, ticket #53) -------------------------------------------
+
+
+@pytest.fixture
+def fake_rate_source():
+    fake = FakeRateSource()
+    rates.install(fake)
+    yield fake
+    rates.uninstall()
+
+
+def test_a_draft_defaults_to_myr_with_no_rate(world, stock):
+    saved = draft(world, stock)
+
+    assert saved.currency == "MYR" and saved.exchange_rate is None
+
+
+def test_a_blank_currency_also_defaults_to_myr(world, stock):
+    saved = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)], currency="",
+    )
+
+    assert saved.currency == "MYR" and saved.exchange_rate is None
+
+
+def test_a_foreign_currency_takes_the_typed_rate_and_never_converts_the_amount(world, stock):
+    saved = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock, "2", "10")],
+        currency="usd", exchange_rate="4.470000",
+    )
+
+    saved.refresh_from_db()
+    assert saved.currency == "USD" and saved.exchange_rate == Decimal("4.470000")
+    assert saved.lines.get().unit_price == Decimal("10")  # the typed amount, in USD, never multiplied by the rate
+
+
+def test_a_foreign_currency_with_no_typed_rate_takes_the_proposed_rate(world, stock, fake_rate_source):
+    fake_rate_source.answers[("USD", timezone.localdate())] = Decimal("4.47")
+
+    saved = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)], currency="USD",
+    )
+
+    assert saved.exchange_rate == Decimal("4.47")
+
+
+def test_a_foreign_currency_with_no_typed_rate_and_nothing_proposed_is_refused(world, stock, fake_rate_source):
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        invoices.create_draft(
+            world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)], currency="USD",
+        )
+
+    assert "exchange rate" in str(refused.value)
+    assert not Invoice.objects.exists()
+
+
+@pytest.mark.parametrize("bad", ["ZZZ", "US", "usd1", "123"])
+def test_an_unknown_currency_is_refused(world, stock, bad):
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        invoices.create_draft(
+            world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)],
+            currency=bad, exchange_rate="4.47",
+        )
+
+    assert "currency" in str(refused.value)
+    assert not Invoice.objects.exists()
+
+
+@pytest.mark.parametrize("bad", ["0", "-1", "abc", "1e3", "NaN", "Infinity", "1" * 13])
+def test_a_malformed_or_non_positive_rate_is_refused(world, stock, bad):
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        invoices.create_draft(
+            world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)],
+            currency="USD", exchange_rate=bad,
+        )
+
+    assert "exchange rate" in str(refused.value)
+    assert not Invoice.objects.exists()
+
+
+def test_myr_carries_no_rate_even_if_one_was_typed(world, stock):
+    saved = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)],
+        currency="MYR", exchange_rate="4.47",
+    )
+
+    assert saved.currency == "MYR" and saved.exchange_rate is None
+
+
+def test_editing_a_draft_can_switch_currency_and_override_the_proposed_rate(world, stock, fake_rate_source):
+    saved = draft(world, stock)
+    fake_rate_source.answers[("USD", timezone.localdate())] = Decimal("4.47")
+
+    invoices.update_draft(
+        world["acme_owner"], saved, customer_id=stock["customer"].pk, lines=[line(stock)],
+        currency="USD", exchange_rate="5.10",
+    )
+
+    saved.refresh_from_db()
+    assert saved.currency == "USD" and saved.exchange_rate == Decimal("5.10")  # the owner's override, not the proposal
+    assert fake_rate_source.asked == []  # a typed rate is never second-guessed against the source
+
+
+def test_switching_a_draft_back_to_myr_drops_its_rate(world, stock):
+    saved = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)],
+        currency="USD", exchange_rate="4.47",
+    )
+
+    invoices.update_draft(
+        world["acme_owner"], saved, customer_id=stock["customer"].pk, lines=[line(stock)], currency="MYR",
+    )
+
+    saved.refresh_from_db()
+    assert saved.currency == "MYR" and saved.exchange_rate is None
+
+
+def test_editing_only_the_lines_of_a_foreign_currency_draft_keeps_its_currency_and_rate(world, stock):
+    # A Codex review finding on #53: a caller that edits only the lines must not silently reset currency to MYR.
+    saved = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)],
+        currency="USD", exchange_rate="4.47",
+    )
+
+    invoices.update_draft(world["acme_owner"], saved, customer_id=stock["customer"].pk, lines=[line(stock, "2")])
+
+    saved.refresh_from_db()
+    assert saved.currency == "USD" and saved.exchange_rate == Decimal("4.47")
+    assert saved.lines.get().quantity == Decimal("2")
+
+
+def test_a_proposed_rate_that_is_not_a_positive_decimal_is_refused_rather_than_trusted(world, stock, fake_rate_source):
+    # A Codex review finding on #53: a buggy or malicious rate source must not bypass the usual rate checks.
+    fake_rate_source.answers[("USD", timezone.localdate())] = Decimal("0")
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        invoices.create_draft(
+            world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)], currency="USD",
+        )
+    assert "exchange rate" in str(refused.value)
+
+    fake_rate_source.answers[("USD", timezone.localdate())] = "4.47"  # a str, not a Decimal
+    with pytest.raises(TypeError):
+        invoices.create_draft(
+            world["acme_owner"], world["acme"], customer_id=stock["customer"].pk, lines=[line(stock)], currency="USD",
+        )
+    assert not Invoice.objects.exists()

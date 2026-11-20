@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST, require_safe
 
-from . import audit, customers, documents, einvoicing, firm_admin, firm_applications, firm_invitations, invoices, items, numbering, permissions, registration, throttle, tokens
+from . import audit, customers, documents, einvoicing, firm_admin, firm_applications, firm_invitations, invoices, items, lhdn_codes, numbering, permissions, registration, throttle, tokens
 from .models import AuditEntry, AuthToken, CompanyAccess, Customer, FirmAuditEntry, FirmInvitation, Invoice, Item, SupplierDetails
 from .signin import complete_sign_in
 
@@ -415,7 +415,12 @@ def _invoice_fields(post):
             post.getlist("tax_type"), post.getlist("tax_rate"), fillvalue="",
         )
     ]
-    return {"customer_id": post.get("customer", "").strip(), "lines": [row for row in rows if any(row.values())]}
+    return {
+        "customer_id": post.get("customer", "").strip(),
+        "lines": [row for row in rows if any(row.values())],
+        "currency": post.get("currency", "").strip(),
+        "exchange_rate": post.get("exchange_rate", "").strip(),
+    }
 
 
 def _invoice_context(access, invoice=None, **extra):
@@ -428,6 +433,8 @@ def _invoice_context(access, invoice=None, **extra):
     if form is None:
         form = {
             "customer_id": chosen or "",
+            "currency": invoice.currency if invoice else "MYR",
+            "exchange_rate": invoice.exchange_rate if invoice else "",
             "lines": [
                 {
                     "item": line.item_id, "quantity": line.quantity, "unit_price": line.unit_price,
@@ -446,6 +453,7 @@ def _invoice_context(access, invoice=None, **extra):
         "customers": [c for c in customers.list_customers(company) if c.is_active or c.pk == chosen],
         "items": [i for i in items.list_items(company) if i.is_active or i.pk in kept_items],
         "tax_types": sorted(items.tax_types().items()),
+        "currencies": sorted(lhdn_codes.currency_codes().items(), key=lambda pair: pair[1]),
         "form": form,
         "rows": [*form["lines"], *({} for _ in range(blanks))],
         "lines_with_totals": [(line, invoices.line_totals(line)) for line in invoice.lines.all()] if invoice else [],

@@ -8,12 +8,14 @@ import re
 from decimal import Decimal
 
 import pytest
+from django.utils import timezone
 
-from core import customers, invoices, items
+from core import customers, invoices, items, rates
 from core.models import Invoice, InvoiceLine
 
 from .factories import PASSWORD, make_accountant
 from .test_customers import switch_einvoicing_on
+from .test_rates import FakeRateSource
 
 OTHERS, ONE, NOT_APPLICABLE = "022", "C62", "06"
 
@@ -36,9 +38,10 @@ def make_item(user, company, name="Consulting hour"):
     )
 
 
-def draft_form(customer, *lines):
+def draft_form(customer, *lines, currency="", exchange_rate=""):
     """The posted form. Each line is (item, quantity, unit_price) or (item, quantity, unit_price, tax_type, tax_rate);
-    the fields repeat once per line. A line without a tax type and rate defaults to LHDN's "Not Applicable" at 0%."""
+    the fields repeat once per line. A line without a tax type and rate defaults to LHDN's "Not Applicable" at 0%.
+    A blank `currency` defaults to MYR, as the select does when nothing else is chosen (D24, ticket #53)."""
     full = [line if len(line) == 5 else (*line, NOT_APPLICABLE, "0") for line in lines]
     return {
         "customer": customer.pk,
@@ -47,6 +50,8 @@ def draft_form(customer, *lines):
         "unit_price": [line[2] for line in full],
         "tax_type": [line[3] for line in full],
         "tax_rate": [line[4] for line in full],
+        "currency": currency,
+        "exchange_rate": exchange_rate,
     }
 
 
@@ -313,4 +318,56 @@ def test_a_customer_without_an_identity_is_refused_in_chinese_once_einvoicing_is
 
     assert "TIN" in english and "phone number" in english and "e-invoicing is on" in english
     assert "TIN" in chinese and "电话" in chinese and "电子发票" in chinese and "phone number" not in chinese
+    assert not Invoice.objects.exists()
+
+
+# --- foreign currency with a proposed, overridable rate (D24, ticket #53) -------------------------------------------
+
+
+@pytest.fixture
+def fake_rate_source():
+    fake = FakeRateSource()
+    rates.install(fake)
+    yield fake
+    rates.uninstall()
+
+
+def test_the_owner_drafts_a_foreign_currency_invoice_with_the_proposed_rate(
+    client, world, stock, as_production_connection, fake_rate_source
+):
+    fake_rate_source.answers[("USD", timezone.localdate())] = Decimal("4.47")
+    form = draft_form(stock["customer"], (stock["item"], "2", "10"), currency="USD")
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        created = client.post(invoices_url(world["acme"], "new"), form)
+        page = client.get(created["Location"]).content.decode()
+
+    assert created.status_code == 302
+    invoice = Invoice.objects.get(company=world["acme"])
+    assert invoice.currency == "USD" and invoice.exchange_rate == Decimal("4.47")
+    assert invoice.lines.get().unit_price == Decimal("10")  # typed in USD, never converted
+    assert "USD" in page and "4.47" in page
+
+
+def test_the_owner_overrides_the_proposed_rate(client, world, stock, as_production_connection, fake_rate_source):
+    fake_rate_source.answers[("USD", timezone.localdate())] = Decimal("4.47")
+    form = draft_form(stock["customer"], (stock["item"], "1", "5"), currency="USD", exchange_rate="5.10")
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        created = client.post(invoices_url(world["acme"], "new"), form)
+
+    invoice = Invoice.objects.get(company=world["acme"])
+    assert invoice.exchange_rate == Decimal("5.10")  # the owner's own value, not the proposed one
+
+
+def test_a_foreign_currency_with_no_rate_and_nothing_proposed_is_refused_and_named(
+    client, world, stock, as_production_connection
+):
+    form = draft_form(stock["customer"], (stock["item"], "1", "5"), currency="USD")
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = client.post(invoices_url(world["acme"], "new"), form)
+
+    page = response.content.decode()
+    assert response.status_code == 200 and 'role="alert"' in page and "exchange rate" in page
     assert not Invoice.objects.exists()

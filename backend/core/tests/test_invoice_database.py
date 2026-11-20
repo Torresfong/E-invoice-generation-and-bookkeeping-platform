@@ -73,6 +73,14 @@ def test_a_tax_rate_outside_0_to_100_is_refused_by_the_database_itself(world, bo
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(tax_rate=Decimal("100.01")))
 
 
+def test_the_database_refuses_a_currency_and_rate_that_do_not_match(world, books):
+    # D24, ticket #53: MYR carries no rate and a foreign currency always has a positive one.
+    attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(currency="USD"))  # no rate at all
+    attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(currency="USD", exchange_rate=Decimal("0")))
+    attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(exchange_rate=Decimal("4.47")))  # MYR, a rate
+    assert Invoice.objects.get(pk=books["acme_draft"].pk).currency == "MYR"
+
+
 def test_the_database_refuses_a_numbered_draft_an_unknown_status_and_bad_amounts(world, books):
     attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(number="INV-1"))
     attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(status="approved"))  # no number, buyer or time
@@ -158,6 +166,15 @@ def test_an_invoice_that_has_left_the_draft_state_is_locked_with_its_lines(world
     with pytest.raises(invoices.InvoiceLocked):
         invoices.update_draft(world["acme_owner"], invoice, customer_id=books["acme_customer"].pk, lines=[])
     assert Invoice.objects.filter(pk=invoice.pk).exists() and InvoiceLine.objects.filter(pk=line.pk).exists()
+
+
+def test_an_approved_invoices_currency_and_rate_are_frozen_with_everything_else(world, books):
+    # No new trigger code for this (migration 0051): invoice_guard() already diffs the whole row once approved.
+    numbering.configure_sequence(world["acme"], numbering.INVOICE, prefix="INV-", start_number=1)
+    invoice = invoices.approve_invoice(world["acme_owner"], books["acme_draft"])
+
+    attempt(lambda: Invoice.objects.filter(pk=invoice.pk).update(currency="USD", exchange_rate=Decimal("4.47")))
+    assert Invoice.objects.get(pk=invoice.pk).currency == "MYR"
 
 
 def test_an_accountant_cannot_delete_a_draft_or_a_line_through_the_web_role_but_staff_can(world, books, as_user):
