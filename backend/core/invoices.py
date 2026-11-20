@@ -11,7 +11,7 @@ value. Anything specific to LHDN (the codes on a line, the document mapping) is 
 """
 
 import re
-from collections import Counter
+from collections import Counter, namedtuple
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 
 from django.db import transaction
@@ -31,7 +31,9 @@ SUBMIT_INVOICE_JOB = "myinvois_submit_invoice"
 AMOUNT = re.compile(r"[0-9]{1,14}(\.[0-9]{1,4})?")
 
 CENTS = Decimal("0.01")
-MAX_TAX_RATE = Decimal("100")
+# A tax rate is a percentage from 0 to 100: both the validation ceiling and the divisor that turns it into a
+# fraction of the subtotal.
+PERCENT = Decimal("100")
 
 # `InvoiceLine.quantity` and `.unit_price` are each NUMERIC(18,4); their exact product, and the tax on it, can need
 # more significant digits than Python's default 28-digit context before rounding to the sen (same reasoning as
@@ -67,7 +69,7 @@ def line_totals(line):
     with localcontext() as ctx:
         ctx.prec = LINE_AMOUNT_PRECISION
         subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
-        tax_amount = (subtotal * line.tax_rate / MAX_TAX_RATE).quantize(CENTS, rounding=ROUND_HALF_UP)
+        tax_amount = (subtotal * line.tax_rate / PERCENT).quantize(CENTS, rounding=ROUND_HALF_UP)
     return {"subtotal": subtotal, "tax_amount": tax_amount, "total": subtotal + tax_amount}
 
 
@@ -152,9 +154,11 @@ def _item(company, item_id, line_number, *, kept):
         raise InvalidInvoice(_("Choose an item on line %(line)s.") % {"line": line_number}) from None
 
 
+ResolvedLine = namedtuple("ResolvedLine", ["item", "quantity", "unit_price", "tax_type", "tax_rate"])
+
+
 def _resolve(company, customer_id, lines, *, current=None):
-    """The customer and the (item, quantity, unit price, tax type, tax rate) of each line, or `InvalidInvoice`
-    naming what is wrong."""
+    """The customer and a `ResolvedLine` for each line, or `InvalidInvoice` naming what is wrong."""
     customer = _customer(company, customer_id, current=current.customer if current else None)
     if not lines:
         raise InvalidInvoice(_("Add at least one line."))
@@ -165,18 +169,18 @@ def _resolve(company, customer_id, lines, *, current=None):
         quantity = _amount(line.get("quantity", ""), _("quantity"), number, allow_zero=False)
         price = _amount(line.get("unit_price", ""), _("unit price"), number, allow_zero=True)
         tax_type = _tax_type(line.get("tax_type"), number)
-        tax_rate = _amount(line.get("tax_rate", ""), _("tax rate"), number, allow_zero=True, maximum=MAX_TAX_RATE)
-        resolved.append((item, quantity, price, tax_type, tax_rate))
+        tax_rate = _amount(line.get("tax_rate", ""), _("tax rate"), number, allow_zero=True, maximum=PERCENT)
+        resolved.append(ResolvedLine(item, quantity, price, tax_type, tax_rate))
     return customer, resolved
 
 
 def _write_lines(invoice, resolved):
     InvoiceLine.objects.bulk_create(
         InvoiceLine(
-            company_id=invoice.company_id, invoice=invoice, item=item, quantity=quantity, unit_price=price,
-            tax_type=tax_type, tax_rate=tax_rate,
+            company_id=invoice.company_id, invoice=invoice, item=line.item, quantity=line.quantity,
+            unit_price=line.unit_price, tax_type=line.tax_type, tax_rate=line.tax_rate,
         )
-        for item, quantity, price, tax_type, tax_rate in resolved
+        for line in resolved
     )
 
 
