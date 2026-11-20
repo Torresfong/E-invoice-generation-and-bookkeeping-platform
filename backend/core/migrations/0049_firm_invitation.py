@@ -126,7 +126,7 @@ RLS_REVERSE = [
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0047_company_go_live_date'),
+        ('core', '0048_worker_owner_email'),
     ]
 
     operations = [

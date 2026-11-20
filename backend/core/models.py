@@ -650,7 +650,7 @@ class FirmAuditEntry(models.Model):
 class FirmInvitation(TenantModel):
     """A company owner's invitation to a firm by email (D67 (3)).
 
-    The web role may only read its own company's rows (migration 0048); creating and accepting both run
+    The web role may only read its own company's rows (migration 0049); creating and accepting both run
     through SECURITY DEFINER functions, like the invitation link style of D40 (5), because accepting is done
     by a firm administrator who has no `CompanyAccess` row for this company at all.
     """

@@ -1,6 +1,6 @@
 """A client owner invites a firm by email and a firm administrator accepts (D67 (3)).
 
-Sending and accepting both run in a SECURITY DEFINER function (migration 0048), like the invitation link style
+Sending and accepting both run in a SECURITY DEFINER function (migration 0049), like the invitation link style
 of D40 (5): sending checks, inside the database, that the caller owns the company and that it has no firm yet;
 accepting is done by a firm administrator who has no `CompanyAccess` row for this company at all. Tokens are
 random and only their hashes are stored, as with every other single-use link (see `tokens`).
@@ -17,7 +17,7 @@ from . import ports
 from .db import scalar
 from .tokens import InvalidLink, hash_token, link, new_token
 
-# SQLSTATEs the functions of migration 0048 raise.
+# SQLSTATEs the functions of migration 0049 raise.
 ALREADY_HAS_FIRM = "55000"
 UNIQUE_VIOLATION = "23505"
 NOT_OWNER_OR_NOT_ADMIN = "42501"

@@ -1,10 +1,10 @@
 """A client owner invites a firm by email and a firm administrator accepts (ticket #144; D67 (3), D40 (5)).
 
-Sending and accepting both run through SECURITY DEFINER functions (migration 0048): the service module is
+Sending and accepting both run through SECURITY DEFINER functions (migration 0049): the service module is
 exercised directly here, with `as_user` where the row-level security itself is under test, matching the style
 of test_firm_applications.py.
 
-Accepting never touches `Company.firm`: only the operator's later review does that (see migration 0048's
+Accepting never touches `Company.firm`: only the operator's later review does that (see migration 0049's
 comment). `services.create_accountant` grants a new accountant access to every company that already carries a
 firm's id, so setting it here would hand the firm's accountants access the moment anyone next adds one, before
 the operator ever reviews the pair.
