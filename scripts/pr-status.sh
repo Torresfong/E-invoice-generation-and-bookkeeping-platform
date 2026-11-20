@@ -62,7 +62,7 @@ out=$(gh pr view "$pr" --json reviews --jq '
   ($all | map(select(.id as $id | ($seen | index($id)) == null))) as $new |
   ($all | map(.id) | tojson),
   "== Reviews (commit vs HEAD) -- \($all | length) total, \($new | length) new since last check",
-  ($new | if length == 0 then "(none new)" else .[] | "\(.author.login) \(.state) on \(.commit.oid[0:7]) \(if .commit.oid == $ENV.HEAD_SHA then "CURRENT" else "STALE" end)\n  \(.body[0:300])" end)')
+  ($new | if length == 0 then "(none new)" else .[] | "\(.author.login) \(.state) on \(.commit.oid[0:7]) \(if .commit.oid == $ENV.HEAD_SHA then "CURRENT" else "STALE" end) [\(.body | length) chars]\n  \(.body[0:150])" end)')
 printf '%s\n' "${out%%$'\n'*}" > "$reviews_state"
 echo "$out" | tail -n +2
 
@@ -73,7 +73,7 @@ out=$(gh pr view "$pr" --json comments --jq '
   ($all | map(select(.id as $id | ($seen | index($id)) == null))) as $new |
   ($all | map(.id) | tojson),
   "== PR conversation comments (independent reviews and Codex summaries land here) -- \($all | length) total, \($new | length) new since last check",
-  ($new | if length == 0 then "(none new)" else .[] | "--- \(.author.login) \(.createdAt) [\(.body | length) chars]\n\(.body[0:500])" end),
+  ($new | if length == 0 then "(none new)" else .[] | "--- \(.author.login) \(.createdAt) [\(.body | length) chars]\n\(.body[0:200])" end),
   "",
   "-- Codex receipts (reviewed commit must equal HEAD; always checked against every comment, not just new ones)",
   ([$all[] | select(.body | contains("codex-review-state"))
@@ -90,7 +90,7 @@ out=$(gh api "repos/{owner}/{repo}/pulls/$pr/comments" --jq '
   ($all | map(select(.id as $id | ($seen | index($id)) == null))) as $new |
   ($all | map(.id) | tojson),
   "== Inline review comments (commit vs HEAD) -- \($all | length) total, \($new | length) new since last check",
-  ($new | if length == 0 then "(none new)" else .[] | "\(.user.login) \(.path):\(.line) on \(.commit_id[0:7]) \(if .commit_id == $ENV.HEAD_SHA then "CURRENT" else "STALE" end)\n  \(.body[0:300])" end)')
+  ($new | if length == 0 then "(none new)" else .[] | "\(.user.login) \(.path):\(.line) on \(.commit_id[0:7]) \(if .commit_id == $ENV.HEAD_SHA then "CURRENT" else "STALE" end) [\(.body | length) chars]\n  \(.body[0:150])" end)')
 printf '%s\n' "${out%%$'\n'*}" > "$inline_state"
 echo "$out" | tail -n +2
 
