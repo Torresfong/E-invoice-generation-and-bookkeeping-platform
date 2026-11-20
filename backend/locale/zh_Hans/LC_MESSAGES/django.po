@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-20 15:06+0800\n"
+"POT-Creation-Date: 2026-11-20 21:24+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -22,7 +22,7 @@ msgstr ""
 #: core/templates/customer.html:20 core/templates/customer.html:30
 #: core/templates/customer.html:41 core/templates/customers.html:19
 #: core/templates/customers.html:55 core/templates/einvoice_setting.html:30
-#: core/templates/einvoice_setting.html:58 core/templates/invoice.html:21
+#: core/templates/einvoice_setting.html:58 core/templates/invoice.html:22
 msgid "TIN"
 msgstr "税务识别号 (TIN)"
 
@@ -199,59 +199,71 @@ msgstr ""
 "\n"
 "%(url)s\n"
 
-#: core/invoices.py:114 core/invoices.py:117
+#: core/invoices.py:120 core/invoices.py:123
 #, python-format
 msgid "Check the %(field)s on line %(line)s."
 msgstr "请检查第 %(line)s 行的%(field)s。"
 
-#: core/invoices.py:126
+#: core/invoices.py:132
 #, python-format
 msgid "Choose a tax type on line %(line)s."
 msgstr "请选择第 %(line)s 行的税种。"
 
-#: core/invoices.py:145
+#: core/invoices.py:147
+msgid "Check the currency."
+msgstr "请检查货币。"
+
+#: core/invoices.py:154 core/invoices.py:159
+msgid "Check the exchange rate."
+msgstr "请检查汇率。"
+
+#: core/invoices.py:178
 msgid "Choose a customer."
 msgstr "请选择客户。"
 
-#: core/invoices.py:149
+#: core/invoices.py:182
 #, python-format
 msgid ""
 "This customer needs these details while e-invoicing is on: %(fields)s. "
 "Update the customer first."
 msgstr "开启电子发票后，该客户必须具备以下资料：%(fields)s。请先更新客户资料。"
 
-#: core/invoices.py:165
+#: core/invoices.py:198
 #, python-format
 msgid "Choose an item on line %(line)s."
 msgstr "请选择第 %(line)s 行的商品。"
 
-#: core/invoices.py:175 core/invoices.py:296
+#: core/invoices.py:208 core/invoices.py:348
 msgid "Add at least one line."
 msgstr "请至少添加一行。"
 
-#: core/invoices.py:180
+#: core/invoices.py:213
 msgid "quantity"
 msgstr "数量"
 
-#: core/invoices.py:181 myinvois/field_rules.py:186
+#: core/invoices.py:214 myinvois/field_rules.py:186
 msgid "unit price"
 msgstr "单价"
 
-#: core/invoices.py:184
+#: core/invoices.py:217
 msgid "tax rate"
 msgstr "税率"
 
-#: core/invoices.py:254
+#: core/invoices.py:303
+msgid "a foreign-currency invoice cannot be submitted as an e-invoice yet"
+msgstr "外币发票目前还不能作为电子发票提交"
+
+#: core/invoices.py:306
 #, python-format
 msgid "the customer needs: %(fields)s"
 msgstr "客户需要补充:%(fields)s"
 
-#: core/invoices.py:257
+#: core/invoices.py:309
 #, python-format
 msgid "the e-invoice setting needs: %(fields)s"
 msgstr "电子发票设置需要补充:%(fields)s"
 
-#: core/invoices.py:259
+#: core/invoices.py:311
 #, python-format
 msgid "This invoice cannot be approved: %(problems)s."
 msgstr "此发票无法批准:%(problems)s。"
@@ -296,48 +308,48 @@ msgstr "自愿"
 msgid "Exempt"
 msgstr "豁免"
 
-#: core/models.py:609
+#: core/models.py:618
 msgid "Signed in"
 msgstr "已登录"
 
-#: core/models.py:610
+#: core/models.py:619
 msgid "Failed sign-in"
 msgstr "登录失败"
 
-#: core/models.py:611
+#: core/models.py:620
 msgid "Signed out"
 msgstr "已退出登录"
 
-#: core/models.py:612
+#: core/models.py:621
 msgid "Created"
 msgstr "已创建"
 
-#: core/models.py:613
+#: core/models.py:622
 msgid "Updated"
 msgstr "已更新"
 
-#: core/models.py:614
+#: core/models.py:623
 msgid "Deleted"
 msgstr "已删除"
 
-#: core/models.py:615
+#: core/models.py:624
 msgid "Viewed"
 msgstr "已查看"
 
-#: core/models.py:616 core/templates/invoice.html:16
+#: core/models.py:625 core/templates/invoice.html:16
 #: core/templates/invoices.html:28
 msgid "Approved"
 msgstr "已批准"
 
-#: core/models.py:673
+#: core/models.py:682
 msgid "Pending"
 msgstr "待处理"
 
-#: core/models.py:673
+#: core/models.py:682
 msgid "Accepted"
 msgstr "已接受"
 
-#: core/models.py:673 core/templates/company.html:42
+#: core/models.py:682 core/templates/company.html:42
 msgid "Expired"
 msgstr "已过期"
 
@@ -442,7 +454,7 @@ msgstr "您还没有任何公司的访问权限。"
 msgid "Your role: %(role)s"
 msgstr "您的角色：%(role)s"
 
-#: core/templates/company.html:15 core/views.py:695
+#: core/templates/company.html:15 core/views.py:703
 msgid "Audit trail"
 msgstr "审计记录"
 
@@ -471,7 +483,7 @@ msgstr "发票"
 msgid "Documents"
 msgstr "文件"
 
-#: core/templates/company.html:21 core/views.py:701
+#: core/templates/company.html:21 core/views.py:709
 msgid "My activity"
 msgstr "我的操作记录"
 
@@ -779,79 +791,93 @@ msgstr "电子发票"
 msgid "Normal invoice"
 msgstr "普通发票"
 
-#: core/templates/invoice.html:17
+#: core/templates/invoice.html:17 core/templates/invoice.html:44
+#: core/templates/invoice.html:72
+msgid "Currency"
+msgstr "货币"
+
+#: core/templates/invoice.html:17 core/templates/invoice.html:44
+#: core/templates/invoice.html:76
+msgid "Exchange rate to MYR"
+msgstr "兑令吉汇率"
+
+#: core/templates/invoice.html:18
 msgid "Submitted (queued)"
 msgstr "已提交（排队中）"
 
-#: core/templates/invoice.html:18
+#: core/templates/invoice.html:19
 msgid "Buyer"
 msgstr "买方"
 
-#: core/templates/invoice.html:25 core/templates/invoice.html:46
-#: core/templates/invoice.html:73 core/templates/invoice.html:81
+#: core/templates/invoice.html:26 core/templates/invoice.html:48
+#: core/templates/invoice.html:82 core/templates/invoice.html:90
 msgid "Item"
 msgstr "商品"
 
-#: core/templates/invoice.html:25 core/templates/invoice.html:46
-#: core/templates/invoice.html:73 core/templates/invoice.html:86
+#: core/templates/invoice.html:26 core/templates/invoice.html:48
+#: core/templates/invoice.html:82 core/templates/invoice.html:95
 msgid "Quantity"
 msgstr "数量"
 
-#: core/templates/invoice.html:25 core/templates/invoice.html:46
-#: core/templates/invoice.html:73 core/templates/invoice.html:87
+#: core/templates/invoice.html:26 core/templates/invoice.html:48
+#: core/templates/invoice.html:82 core/templates/invoice.html:96
 msgid "Unit price"
 msgstr "单价"
 
-#: core/templates/invoice.html:26 core/templates/invoice.html:47
-#: core/templates/invoice.html:74 core/templates/invoice.html:89
+#: core/templates/invoice.html:27 core/templates/invoice.html:49
+#: core/templates/invoice.html:83 core/templates/invoice.html:98
 msgid "Tax type"
 msgstr "税种"
 
-#: core/templates/invoice.html:26 core/templates/invoice.html:47
-#: core/templates/invoice.html:74 core/templates/invoice.html:94
+#: core/templates/invoice.html:27 core/templates/invoice.html:49
+#: core/templates/invoice.html:83 core/templates/invoice.html:103
 msgid "Tax rate"
 msgstr "税率"
 
-#: core/templates/invoice.html:26 core/templates/invoice.html:40
-#: core/templates/invoice.html:47 core/templates/invoice.html:61
-#: core/templates/invoice.html:101
+#: core/templates/invoice.html:27 core/templates/invoice.html:41
+#: core/templates/invoice.html:49 core/templates/invoice.html:63
+#: core/templates/invoice.html:110
 msgid "Subtotal"
 msgstr "小计"
 
-#: core/templates/invoice.html:27 core/templates/invoice.html:40
-#: core/templates/invoice.html:48 core/templates/invoice.html:61
-#: core/templates/invoice.html:101
+#: core/templates/invoice.html:28 core/templates/invoice.html:41
+#: core/templates/invoice.html:50 core/templates/invoice.html:63
+#: core/templates/invoice.html:110
 msgid "Tax"
 msgstr "税额"
 
-#: core/templates/invoice.html:27 core/templates/invoice.html:40
-#: core/templates/invoice.html:48 core/templates/invoice.html:61
-#: core/templates/invoice.html:101
+#: core/templates/invoice.html:28 core/templates/invoice.html:41
+#: core/templates/invoice.html:50 core/templates/invoice.html:63
+#: core/templates/invoice.html:110
 msgid "Total"
 msgstr "总计"
 
-#: core/templates/invoice.html:65 core/templates/invoices.html:17
+#: core/templates/invoice.html:67 core/templates/invoices.html:17
 msgid "Customer"
 msgstr "客户"
 
-#: core/templates/invoice.html:99
+#: core/templates/invoice.html:78
+msgid "Leave blank to use the day's proposed rate for a foreign currency."
+msgstr "外币留空则采用当日建议汇率。"
+
+#: core/templates/invoice.html:108
 msgid "Save draft"
 msgstr "保存草稿"
 
-#: core/templates/invoice.html:103
+#: core/templates/invoice.html:112
 msgid "Delete draft"
 msgstr "删除草稿"
 
-#: core/templates/invoice.html:110
+#: core/templates/invoice.html:119
 msgid ""
 "Issuing a normal invoice for a mandatory company needs your acknowledgement."
 msgstr "强制电子发票公司开具普通发票需要您的确认。"
 
-#: core/templates/invoice.html:113
+#: core/templates/invoice.html:122
 msgid "Approve & submit"
 msgstr "批准并提交"
 
-#: core/templates/invoice.html:116
+#: core/templates/invoice.html:125
 msgid "Back to the invoices"
 msgstr "返回发票列表"
 
@@ -1056,7 +1082,7 @@ msgstr "邀请已发送。"
 msgid "Invitation sent to the firm."
 msgstr "邀请已发送给事务所。"
 
-#: core/views.py:178 core/views.py:200 core/views.py:835
+#: core/views.py:178 core/views.py:200 core/views.py:843
 msgid "Enter a valid email address."
 msgstr "请输入有效的电子邮件地址。"
 
@@ -1082,39 +1108,39 @@ msgstr "商品或服务已保存。"
 msgid "Choose a file to upload."
 msgstr "请选择要上传的文件。"
 
-#: core/views.py:468
+#: core/views.py:476
 msgid "Draft deleted."
 msgstr "草稿已删除。"
 
-#: core/views.py:514
+#: core/views.py:522
 msgid "Draft saved."
 msgstr "草稿已保存。"
 
-#: core/views.py:516
+#: core/views.py:524
 msgid "Invoice approved."
 msgstr "发票已批准。"
 
-#: core/views.py:537
+#: core/views.py:545
 msgid "Set the invoice numbering before approving."
 msgstr "批准前请先设置发票编号。"
 
-#: core/views.py:599 core/views.py:624
+#: core/views.py:607 core/views.py:632
 msgid "Customer saved."
 msgstr "客户已保存。"
 
-#: core/views.py:650 core/views.py:904
+#: core/views.py:658 core/views.py:912
 msgid "Choose your password"
 msgstr "设置您的密码"
 
-#: core/views.py:837
+#: core/views.py:845
 msgid "Enter your company name (up to 200 characters)."
 msgstr "请输入公司名称（最多 200 个字符）。"
 
-#: core/views.py:853 core/views.py:877
+#: core/views.py:861 core/views.py:885
 msgid "Too many attempts. Try again later."
 msgstr "尝试次数过多，请稍后再试。"
 
-#: core/views.py:860
+#: core/views.py:868
 msgid "Say whether your company issues e-invoices."
 msgstr "请说明贵公司是否开具电子发票。"
 

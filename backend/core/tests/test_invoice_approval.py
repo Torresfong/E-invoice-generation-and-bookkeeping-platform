@@ -265,6 +265,24 @@ def test_an_incomplete_buyer_is_refused_rather_than_snapshotted_blank(world, boo
     assert (draft.status, draft.number) == ("draft", None) and next_number(world["acme"]) == 1
 
 
+def test_a_foreign_currency_invoice_cannot_be_approved_as_an_e_invoice_yet(world, books):
+    # A Codex review finding on #53: the MyInvois mapper (#123) still maps every e-invoice as MYR (#125 is not
+    # built yet), so submitting a foreign-currency invoice would silently tell LHDN the wrong amount.
+    draft = invoices.create_draft(
+        world["acme_owner"], world["acme"], customer_id=books["customer"].pk,
+        lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "5", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
+        currency="USD", exchange_rate="4.47",
+    )
+    switch_einvoicing_on(world["acme_owner"], world["acme"])
+
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        approve(world, draft)
+
+    assert "foreign-currency" in str(refused.value)
+    draft.refresh_from_db()
+    assert (draft.status, draft.number) == ("draft", None) and next_number(world["acme"]) == 1
+
+
 def test_an_incomplete_supplier_is_refused_rather_than_snapshotted_blank(world, books):
     switch_einvoicing_on(world["acme_owner"], world["acme"])
     draft = new_draft(world, books)

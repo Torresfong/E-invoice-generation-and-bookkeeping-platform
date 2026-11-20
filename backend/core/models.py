@@ -377,6 +377,10 @@ class Invoice(TenantModel):
     document_type = models.CharField(max_length=12, default="invoice", db_default="invoice")
     status = models.CharField(max_length=10, default=DRAFT, db_default=DRAFT)
     number = models.CharField(max_length=20, null=True, blank=True)
+    # ISO 4217 (core.lhdn_codes.currency_codes()). MYR carries no rate; a foreign currency always does, proposed from
+    # the day's reference rate and overridable (D24, ticket #53). Never converted or overwritten once saved.
+    currency = models.CharField(max_length=3, default="MYR", db_default="MYR")
+    exchange_rate = models.DecimalField(max_digits=18, decimal_places=6, null=True, blank=True)
     created_at = models.DateTimeField(db_default=Now())
     # Set at approval. `approved_at` is the issue time; it is renewed when the owner approves again (D60 (2)).
     approved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name="+")
@@ -424,6 +428,11 @@ class Invoice(TenantModel):
                 name="invoice_approved_is_complete",
             ),
             models.UniqueConstraint(fields=["company", "document_type", "number"], name="invoice_number_unique"),
+            models.CheckConstraint(
+                condition=models.Q(currency="MYR", exchange_rate__isnull=True)
+                | (~models.Q(currency="MYR") & models.Q(exchange_rate__isnull=False) & models.Q(exchange_rate__gt=0)),
+                name="invoice_exchange_rate_matches_currency",
+            ),
         ]
         indexes = [models.Index(fields=["company", "-created_at"], name="invoice_company_created")]
         ordering = ["-created_at", "-id"]
