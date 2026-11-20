@@ -2,7 +2,7 @@
 
 ## Independence
 - The default reviewer is a new Codex task/session; another independent reviewer (Torres, another human, or a separate AI session) may review instead, without a per-PR approval. Start a new task/session for every review round; do not reuse the implementing developer's conversation or conclusions.
-- Review the exact PR base and current HEAD commit, issue/spec and relevant code. Do not assume handoff notes are correct.
+- Review the exact PR base and current HEAD commit, issue/spec and relevant code. Do not assume handoff notes are correct. For the first review round, read the full base-to-HEAD diff. For a later round on the same PR, it is sufficient to read the diff between the previously reviewed SHA and the current HEAD, plus the prior round's published findings; re-read a wider span only when the incremental diff does not make sense without it (e.g. it touches a file never seen before, or a prior finding needs re-checking against code outside that range).
 - Code-read-only: no code edits, pushes, GitHub approvals, merges, or destructive actions. When findings exist, publishing specific GitHub review comments is required; it is reporting, not approval. When none exist, the reviewer publishes only a no-findings receipt: Codex's completed review summary or, for any other reviewer, a PR comment that names the exact reviewed HEAD SHA and says there are no findings and no unresolved findings.
 - If the implementation was written by the same model as the reviewer (for example Codex reviewing Codex), the fresh review reduces shared-context bias but does not provide cross-model independence.
 
