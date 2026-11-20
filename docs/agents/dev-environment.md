@@ -12,6 +12,10 @@ Gotchas that no config file confesses. Read before the first command in a sessio
 - After migrations are renumbered or you switch from another branch, `docker compose up` can fail in `migrate` with `column ... already exists`: the dev database applied the old numbers (`django_migrations` lists names the code no longer has). Rebuild it with `docker compose down -v` and `up -d --build`; it holds no real data.
 - The container's dev database persists between sessions and can differ from the fresh test database (old tables, un-migrated state). Trust the test run; for a migration, check it both ways: `python manage.py migrate core <previous>` then `python manage.py migrate`.
 
+## Pre-commit hook
+
+- `scripts/git-hooks/pre-commit` runs `ruff check .`, `manage.py check`, the migration drift check and `check_translations.py` against the running `backend` container before each commit (not the full `pytest` suite, which stays CI-only). Activate it once per clone: `git config core.hooksPath scripts/git-hooks`.
+
 ## Editing files from the shell
 
 - Write or change code with the Write and Edit tools. Bash heredocs fail on long Python or SQL with quotes and backslashes (`unexpected EOF`), and a backslash can arrive changed (`\b` became a real backspace character).

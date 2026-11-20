@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Fast, deterministic checks before every commit: ruff and the Chinese translation catalog, the first and
+# fourth steps of .github/workflows/ci.yml's backend job (`manage.py check` and the migration drift check run
+# in well under a second in CI and are cheap enough to add here too; the full `pytest` suite is deliberately
+# left out, since it takes 5-10+ minutes, and CI still runs it).
+#
+# Install once per clone: git config core.hooksPath scripts/git-hooks
+set -euo pipefail
+
+if ! docker compose ps --status running --services 2>/dev/null | grep -qx backend; then
+    echo "pre-commit: the backend container isn't running (docker compose up -d backend) -- skipping ruff/check/translations" >&2
+    exit 0
+fi
+
+echo "pre-commit: ruff check ..."
+docker compose exec -T backend ruff check .
+
+echo "pre-commit: python manage.py check ..."
+docker compose exec -T backend python manage.py check
+
+echo "pre-commit: migration drift ..."
+docker compose exec -T backend python manage.py makemigrations --check --dry-run
+
+echo "pre-commit: Chinese translation catalog ..."
+docker compose exec -T backend sh -c '
+    command -v msgfmt >/dev/null 2>&1 || (apt-get update -qq && apt-get install -y -qq gettext >/dev/null)
+    python check_translations.py
+'
