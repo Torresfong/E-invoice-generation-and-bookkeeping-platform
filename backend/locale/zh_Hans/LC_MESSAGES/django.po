@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-20 17:30+0800\n"
+"POT-Creation-Date: 2026-11-20 21:24+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -209,57 +209,61 @@ msgstr "请检查第 %(line)s 行的%(field)s。"
 msgid "Choose a tax type on line %(line)s."
 msgstr "请选择第 %(line)s 行的税种。"
 
-#: core/invoices.py:145
+#: core/invoices.py:147
 msgid "Check the currency."
 msgstr "请检查货币。"
 
-#: core/invoices.py:152 core/invoices.py:155
+#: core/invoices.py:154 core/invoices.py:159
 msgid "Check the exchange rate."
 msgstr "请检查汇率。"
 
-#: core/invoices.py:174
+#: core/invoices.py:178
 msgid "Choose a customer."
 msgstr "请选择客户。"
 
-#: core/invoices.py:178
+#: core/invoices.py:182
 #, python-format
 msgid ""
 "This customer needs these details while e-invoicing is on: %(fields)s. "
 "Update the customer first."
 msgstr "开启电子发票后，该客户必须具备以下资料：%(fields)s。请先更新客户资料。"
 
-#: core/invoices.py:194
+#: core/invoices.py:198
 #, python-format
 msgid "Choose an item on line %(line)s."
 msgstr "请选择第 %(line)s 行的商品。"
 
-#: core/invoices.py:204 core/invoices.py:330
+#: core/invoices.py:208 core/invoices.py:348
 msgid "Add at least one line."
 msgstr "请至少添加一行。"
 
-#: core/invoices.py:209
+#: core/invoices.py:213
 msgid "quantity"
 msgstr "数量"
 
-#: core/invoices.py:210 myinvois/field_rules.py:186
+#: core/invoices.py:214 myinvois/field_rules.py:186
 msgid "unit price"
 msgstr "单价"
 
-#: core/invoices.py:213
+#: core/invoices.py:217
 msgid "tax rate"
 msgstr "税率"
 
-#: core/invoices.py:288
+#: core/invoices.py:303
+msgid "a foreign-currency invoice cannot be submitted as an e-invoice yet"
+msgstr "外币发票目前还不能作为电子发票提交"
+
+#: core/invoices.py:306
 #, python-format
 msgid "the customer needs: %(fields)s"
 msgstr "客户需要补充:%(fields)s"
 
-#: core/invoices.py:291
+#: core/invoices.py:309
 #, python-format
 msgid "the e-invoice setting needs: %(fields)s"
 msgstr "电子发票设置需要补充:%(fields)s"
 
-#: core/invoices.py:293
+#: core/invoices.py:311
 #, python-format
 msgid "This invoice cannot be approved: %(problems)s."
 msgstr "此发票无法批准:%(problems)s。"
