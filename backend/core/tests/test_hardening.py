@@ -60,8 +60,9 @@ def test_every_security_definer_function_pins_a_search_path_that_starts_with_pg_
     )
 
     # A new definer function must be added here on purpose (0033: claim_job -> claim_next_job, +3; 0040: +1; 0045: +1;
-    # 0048: create_firm_invitation, accept_firm_invitation, +2).
-    assert len(rows) == 25
+    # 0048 (worker_owner_email, #47): +1, company_owner_email; 0048 (firm_invitation, #144): +2,
+    # create_firm_invitation, accept_firm_invitation).
+    assert len(rows) == 26
     assert {tuple(config) for _, config in rows} == {("search_path=pg_catalog, public, pg_temp",)}
 
 

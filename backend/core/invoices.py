@@ -18,9 +18,13 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.translation import gettext as _
 
-from . import audit, customers, einvoicing, items, numbering, permissions
+from . import audit, customers, einvoicing, items, jobs, numbering, permissions
 from .einvoicing import einvoicing_enabled
 from .models import AuditEntry, Customer, Invoice, InvoiceLine, Item
+
+# Enqueued by name only: `core` never imports `myinvois` (D61 (4)). The MyInvois app registers the matching
+# handler under this same literal string from `myinvois/jobs.py`.
+SUBMIT_INVOICE_JOB = "myinvois_submit_invoice"
 
 # The column sizes of InvoiceLine: NUMERIC(18, 4), so at most 14 digits before the point and 4 after it.
 # ASCII digits only: `\d` alone would also accept the digits of other scripts.
@@ -206,6 +210,13 @@ def approve_invoice(user, invoice, *, acknowledged=False):
             audit.record(
                 AuditEntry.APPROVED, current.company, user, "invoice", current.pk, ["approved_at", "approved_by"]
             )
+            if current.is_einvoice:
+                # D60 (2): a stale or otherwise permanently failed job stops and tells the owner, who approves
+                # again; that one action both renews the issue time above and queues a fresh attempt, so the
+                # invoice is not stranded (a Torres review finding on PR #194). This module still does not know
+                # whether an earlier attempt already succeeded (#48's status display); the job guards itself
+                # against resubmitting an invoice it already has a recorded outcome for.
+                jobs.enqueue(SUBMIT_INVOICE_JOB, company=current.company, invoice_id=current.pk)
             invoice.refresh_from_db()
             return invoice
         if not current.lines.exists():
@@ -238,6 +249,11 @@ def approve_invoice(user, invoice, *, acknowledged=False):
             AuditEntry.APPROVED, company, user, "invoice", current.pk,
             ["status", "number", "is_einvoice", "approved_at", "approved_by", "buyer"],
         )
+        if is_einvoice:
+            # One owner action, "Approve & submit" (D44): a normal invoice finishes here with no submission (D59
+            # (3)). Re-approval (the branch above) is the D60 (2) path for a stuck or stale submission and queues
+            # its own replacement job; this first approval always starts the first one.
+            jobs.enqueue(SUBMIT_INVOICE_JOB, company=company, invoice_id=current.pk)
     invoice.refresh_from_db()
     return invoice
 

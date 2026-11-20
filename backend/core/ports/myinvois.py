@@ -227,15 +227,27 @@ class MyInvoisHttpGateway:
 ENVIRONMENTS = ("sandbox", "production")
 
 
+def credentials_from_environment(environment, env=os.environ):
+    """Our intermediary client ID and secret for `environment`, empty when not set (#47).
+
+    For a caller that only needs to start a taxpayer session (`login_as_taxpayer`), not the whole gateway: the
+    installed port may be a fake with no credentials of its own, so this reads the same configuration
+    `gateway_from_environment` does rather than reaching into whatever gateway happens to be installed.
+    """
+    if environment not in ENVIRONMENTS:
+        raise ValueError(f"environment must be one of {', '.join(ENVIRONMENTS)}")
+    prefix = f"MYINVOIS_{environment.upper()}_"
+    client_id, client_secret = (env.get(prefix + name, "") for name in ("CLIENT_ID", "CLIENT_SECRET"))
+    return IntermediaryCredentials(client_id, client_secret)
+
+
 def gateway_from_environment(environment, env=os.environ, transport=urllib_transport):
     """The gateway for `environment`, or None when its base URL, client ID or client secret is not set.
 
     The three values come from configuration outside the repository, one set per environment, and are never logged.
     """
-    if environment not in ENVIRONMENTS:
-        raise ValueError(f"environment must be one of {', '.join(ENVIRONMENTS)}")
-    prefix = f"MYINVOIS_{environment.upper()}_"
-    base_url, client_id, client_secret = (env.get(prefix + name, "") for name in ("BASE_URL", "CLIENT_ID", "CLIENT_SECRET"))
-    if not (base_url and client_id and client_secret):
+    credentials = credentials_from_environment(environment, env)
+    base_url = env.get(f"MYINVOIS_{environment.upper()}_BASE_URL", "")
+    if not (base_url and credentials.client_id and credentials.client_secret):
         return None
-    return MyInvoisHttpGateway(base_url, environment, IntermediaryCredentials(client_id, client_secret), transport)
+    return MyInvoisHttpGateway(base_url, environment, credentials, transport)

@@ -89,6 +89,17 @@ def is_mandatory(company):
     return setting is not None and setting.status == SupplierDetails.MANDATORY
 
 
+def owner_email(company):
+    """The company owner's email, for a notice only the owner can act on (D17: no delegation, #47).
+
+    The second door `myinvois` reads a signed-in user's address through, beside the setting itself. Reads through
+    `company_owner_email` (migration 0048), a SECURITY DEFINER function: the worker role, which the submission job
+    runs as, has no grant on `core_companyaccess` (D40 (2); web is read-only and user-scoped there), and widening
+    that grant would let every job handler enumerate a company's whole membership instead of just its owner.
+    """
+    return scalar("SELECT company_owner_email(%s)", [company.pk])
+
+
 def _labels():
     return {
         "status": _("status"),
