@@ -1,6 +1,7 @@
 from django.urls import path
 
 from core.views import (
+    accept_firm_invitation,
     accept_invitation,
     add_firm_person,
     apply_as_firm,
@@ -18,6 +19,7 @@ from core.views import (
     firm_audit_trail,
     health,
     home,
+    invite_firm,
     invite_staff,
     invoice_approve,
     invoice_delete,
@@ -47,6 +49,7 @@ urlpatterns = [
     path("companies/", companies),
     path("companies/<int:pk>/", company),
     path("companies/<int:pk>/invite/", invite_staff),
+    path("companies/<int:pk>/invite-firm/", invite_firm),
     path("companies/<int:pk>/einvoicing/", einvoice_setting),
     path("companies/<int:pk>/items/", item_list),
     path("companies/<int:pk>/items/<int:item_pk>/", item_detail),
@@ -74,6 +77,7 @@ urlpatterns = [
     path("signup/<str:token>/", sign_up),
     path("register/<str:token>/", register),
     path("accept/<str:token>/", accept_invitation),
+    path("firm-invite/<str:token>/", accept_firm_invitation),
     path("password-reset/", password_reset_request),
     path("reset/<str:token>/", password_reset_confirm),
 ]

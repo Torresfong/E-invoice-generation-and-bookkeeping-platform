@@ -328,7 +328,10 @@ def test_the_web_role_cannot_create_or_change_firms_firm_links_or_accountants(fi
 def test_the_only_web_routes_about_firms_or_accountants_are_the_firm_administrators_pages():
     """Firms are created only by the operator and accountants only by a firm administrator (D49): no other route may.
 
-    The one public route is the firm's application (D67 (1)), which stores a request for the operator and creates nothing.
+    The one public route is the firm's application (D67 (1)), which stores a request for the operator and creates
+    nothing. Ticket #144 (D67 (3)) adds two more: the owner's firm invitation, which reads and writes only the
+    inviting company's own data through a SECURITY DEFINER function; and the emailed link a firm administrator
+    accepts it with, which grants no `CompanyAccess`.
     """
 
     def routes(patterns, prefix=""):
@@ -344,6 +347,8 @@ def test_the_only_web_routes_about_firms_or_accountants_are_the_firm_administrat
 
     assert found == [
         "apply/ apply_as_firm",
+        "companies/<int:pk>/invite-firm/ invite_firm",
+        "firm-invite/<str:token>/ accept_firm_invitation",
         "firm/ firm",
         "firm/<int:pk>/deactivate/ deactivate_firm_person",
         "firm/add/ add_firm_person",
