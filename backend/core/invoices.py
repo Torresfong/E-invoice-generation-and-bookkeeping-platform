@@ -30,6 +30,11 @@ SUBMIT_INVOICE_JOB = "myinvois_submit_invoice"
 # ASCII digits only: `\d` alone would also accept the digits of other scripts.
 AMOUNT = re.compile(r"[0-9]{1,14}(\.[0-9]{1,4})?")
 
+# `tax_rate` is NUMERIC(5, 2): at most 3 digits before the point (0 to 100) and 2 after it. A third fractional
+# digit would pass AMOUNT's own 4-place limit but then be rounded silently on save, so it is checked against this
+# tighter pattern instead of the column doing the rounding (Codex's review of PR #196).
+TAX_RATE = re.compile(r"[0-9]{1,3}(\.[0-9]{1,2})?")
+
 CENTS = Decimal("0.01")
 # A tax rate is a percentage from 0 to 100: both the validation ceiling and the divisor that turns it into a
 # fraction of the subtotal.
@@ -70,7 +75,12 @@ def line_totals(line):
         ctx.prec = LINE_AMOUNT_PRECISION
         subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
         tax_amount = (subtotal * line.tax_rate / PERCENT).quantize(CENTS, rounding=ROUND_HALF_UP)
-    return {"subtotal": subtotal, "tax_amount": tax_amount, "total": subtotal + tax_amount}
+        # Still inside the widened context: a large subtotal plus its tax can need more significant digits to add
+        # exactly than the default 28-digit context allows, even though each addend is already quantized to the
+        # sen (Codex's review of PR #196, with a worked example: quantity 99999999999999.1234, unit price
+        # 99999999999999.5678, rate 6 - the exact total needs 31 significant digits).
+        total = subtotal + tax_amount
+    return {"subtotal": subtotal, "tax_amount": tax_amount, "total": total}
 
 
 def invoice_totals(invoice):
@@ -80,10 +90,11 @@ def invoice_totals(invoice):
         ctx.prec = LINE_AMOUNT_PRECISION
         total_excluding_tax = sum((amount["subtotal"] for amount in amounts), Decimal("0.00"))
         total_tax = sum((amount["tax_amount"] for amount in amounts), Decimal("0.00"))
+        total_including_tax = total_excluding_tax + total_tax
     return {
         "total_excluding_tax": total_excluding_tax,
         "total_tax": total_tax,
-        "total_including_tax": total_excluding_tax + total_tax,
+        "total_including_tax": total_including_tax,
     }
 
 
@@ -95,11 +106,11 @@ def _pk(value):
     return found if found > 0 else None
 
 
-def _amount(raw, label, line_number, *, allow_zero, maximum=None):
+def _amount(raw, label, line_number, *, allow_zero, maximum=None, pattern=AMOUNT):
     if isinstance(raw, float):
         raise TypeError("an amount is a Decimal or a string, never a float")
     text = format(raw, "f") if isinstance(raw, Decimal) else str(raw).strip()
-    if not AMOUNT.fullmatch(text) or (not allow_zero and Decimal(text) == 0):
+    if not pattern.fullmatch(text) or (not allow_zero and Decimal(text) == 0):
         raise InvalidInvoice(_("Check the %(field)s on line %(line)s.") % {"field": label, "line": line_number})
     value = Decimal(text)
     if maximum is not None and value > maximum:
@@ -169,7 +180,9 @@ def _resolve(company, customer_id, lines, *, current=None):
         quantity = _amount(line.get("quantity", ""), _("quantity"), number, allow_zero=False)
         price = _amount(line.get("unit_price", ""), _("unit price"), number, allow_zero=True)
         tax_type = _tax_type(line.get("tax_type"), number)
-        tax_rate = _amount(line.get("tax_rate", ""), _("tax rate"), number, allow_zero=True, maximum=PERCENT)
+        tax_rate = _amount(
+            line.get("tax_rate", ""), _("tax rate"), number, allow_zero=True, maximum=PERCENT, pattern=TAX_RATE
+        )
         resolved.append(ResolvedLine(item, quantity, price, tax_type, tax_rate))
     return customer, resolved
 
