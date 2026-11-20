@@ -34,10 +34,12 @@ def books(world):
     acme_customer, acme_item = buyer_and_item(world["acme_owner"], world["acme"], "Acme")
     beta_customer, beta_item = buyer_and_item(world["beta_owner"], world["beta"], "Beta")
     acme_draft = invoices.create_draft(
-        world["acme_owner"], world["acme"], customer_id=acme_customer.pk, lines=[{"item": acme_item.pk, "quantity": "1", "unit_price": "5"}]
+        world["acme_owner"], world["acme"], customer_id=acme_customer.pk,
+        lines=[{"item": acme_item.pk, "quantity": "1", "unit_price": "5", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     beta_draft = invoices.create_draft(
-        world["beta_owner"], world["beta"], customer_id=beta_customer.pk, lines=[{"item": beta_item.pk, "quantity": "1", "unit_price": "5"}]
+        world["beta_owner"], world["beta"], customer_id=beta_customer.pk,
+        lines=[{"item": beta_item.pk, "quantity": "1", "unit_price": "5", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     return {
         "acme_customer": acme_customer, "acme_item": acme_item, "acme_draft": acme_draft,
@@ -61,7 +63,14 @@ def test_amounts_are_numeric_columns_and_a_draft_number_may_be_empty(db):
 
     assert columns["core_invoiceline.quantity"] == "numeric:NO"
     assert columns["core_invoiceline.unit_price"] == "numeric:NO"
+    assert columns["core_invoiceline.tax_rate"] == "numeric:NO"
     assert columns["core_invoice.number"].endswith(":YES")
+
+
+def test_a_tax_rate_outside_0_to_100_is_refused_by_the_database_itself(world, books):
+    line = books["acme_draft"].lines.get()
+    attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(tax_rate=Decimal("-0.01")))
+    attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(tax_rate=Decimal("100.01")))
 
 
 def test_the_database_refuses_a_numbered_draft_an_unknown_status_and_bad_amounts(world, books):
@@ -83,7 +92,8 @@ def test_another_companys_invoices_are_invisible_and_unwritable_for_every_role(w
             assert Invoice.objects.filter(pk=books[f"{theirs}_draft"].pk).delete() == (0, {})
             attempt(lambda: Invoice.objects.create(company=world[theirs], customer=books[f"{theirs}_customer"]))
             attempt(lambda: InvoiceLine.objects.create(
-                company=world[theirs], invoice=books[f"{theirs}_draft"], item=books[f"{theirs}_item"], quantity=1, unit_price=1))
+                company=world[theirs], invoice=books[f"{theirs}_draft"], item=books[f"{theirs}_item"], quantity=1,
+                unit_price=1, tax_type=NOT_APPLICABLE, tax_rate=0))
     assert Invoice.objects.count() == 2 and InvoiceLine.objects.count() == 2
 
 
@@ -92,9 +102,11 @@ def test_an_invoice_cannot_name_another_companys_customer_or_item_even_for_its_o
     attempt(lambda: Invoice.objects.create(company=world["acme"], customer=books["beta_customer"]))
     attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(customer=books["beta_customer"]))
     attempt(lambda: InvoiceLine.objects.create(
-        company=world["acme"], invoice=books["acme_draft"], item=books["beta_item"], quantity=1, unit_price=1))
+        company=world["acme"], invoice=books["acme_draft"], item=books["beta_item"], quantity=1, unit_price=1,
+        tax_type=NOT_APPLICABLE, tax_rate=0))
     attempt(lambda: InvoiceLine.objects.create(
-        company=world["beta"], invoice=books["acme_draft"], item=books["beta_item"], quantity=1, unit_price=1))
+        company=world["beta"], invoice=books["acme_draft"], item=books["beta_item"], quantity=1, unit_price=1,
+        tax_type=NOT_APPLICABLE, tax_rate=0))
     attempt(lambda: Invoice.objects.filter(pk=books["acme_draft"].pk).update(company=world["beta"]))
     attempt(lambda: InvoiceLine.objects.filter(invoice=books["acme_draft"]).update(invoice=books["beta_draft"]))
     assert books["acme_draft"].lines.count() == 1 and books["acme_draft"].customer == books["acme_customer"]
@@ -109,7 +121,8 @@ def test_an_accountant_and_a_stranger_cannot_write_drafts_but_staff_can(world, b
         attempt(new_invoice)
         attempt(lambda: InvoiceLine.objects.filter(pk=books["acme_draft"].lines.get().pk).update(quantity=2))
         attempt(lambda: InvoiceLine.objects.create(
-            company=world["acme"], invoice=books["acme_draft"], item=books["acme_item"], quantity=1, unit_price=1))
+            company=world["acme"], invoice=books["acme_draft"], item=books["acme_item"], quantity=1, unit_price=1,
+            tax_type=NOT_APPLICABLE, tax_rate=0))
     with as_user(world["acme_staff"]):
         new_invoice()
     assert Invoice.objects.filter(company=world["acme"]).count() == 2
@@ -137,7 +150,8 @@ def test_an_invoice_that_has_left_the_draft_state_is_locked_with_its_lines(world
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).update(quantity=2))
     attempt(lambda: InvoiceLine.objects.filter(pk=line.pk).delete())
     attempt(lambda: InvoiceLine.objects.create(
-        company=world["acme"], invoice=invoice, item=books["acme_item"], quantity=1, unit_price=1))
+        company=world["acme"], invoice=invoice, item=books["acme_item"], quantity=1, unit_price=1,
+        tax_type=NOT_APPLICABLE, tax_rate=0))
     # The service says so before the database has to (the page answers 403).
     with pytest.raises(invoices.InvoiceLocked):
         invoices.delete_draft(world["acme_owner"], invoice)

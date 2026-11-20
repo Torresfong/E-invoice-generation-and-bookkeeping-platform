@@ -12,7 +12,7 @@ value. Anything specific to LHDN (the codes on a line, the document mapping) is 
 
 import re
 from collections import Counter
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 
 from django.db import transaction
 from django.utils import timezone
@@ -30,9 +30,17 @@ SUBMIT_INVOICE_JOB = "myinvois_submit_invoice"
 # ASCII digits only: `\d` alone would also accept the digits of other scripts.
 AMOUNT = re.compile(r"[0-9]{1,14}(\.[0-9]{1,4})?")
 
+CENTS = Decimal("0.01")
+MAX_TAX_RATE = Decimal("100")
+
+# `InvoiceLine.quantity` and `.unit_price` are each NUMERIC(18,4); their exact product, and the tax on it, can need
+# more significant digits than Python's default 28-digit context before rounding to the sen (same reasoning as
+# `myinvois.document`'s own `LINE_AMOUNT_PRECISION`, for the same column sizes).
+LINE_AMOUNT_PRECISION = 50
+
 __all__ = [
     "InvalidInvoice", "InvoiceLocked", "approve_invoice", "cancel_invoice", "create_draft", "delete_draft",
-    "list_invoices", "update_draft",
+    "invoice_totals", "line_totals", "list_invoices", "update_draft",
 ]
 
 
@@ -49,6 +57,34 @@ def list_invoices(company):
     return Invoice.objects.filter(company=company).select_related("customer")
 
 
+def line_totals(line):
+    """The subtotal, tax and total of one invoice line, calculated fresh from its stored quantity, price and rate.
+
+    `InvoiceLine` stores none of these itself (D59 (9), ticket #52): quantity times unit price is the subtotal, and
+    the rate applies to that, both rounded to the sen under ROUND_HALF_UP (1 x 0.005 rounds up to 0.01, matching
+    `myinvois.document`'s own rounding rule for the same column sizes).
+    """
+    with localcontext() as ctx:
+        ctx.prec = LINE_AMOUNT_PRECISION
+        subtotal = (line.quantity * line.unit_price).quantize(CENTS, rounding=ROUND_HALF_UP)
+        tax_amount = (subtotal * line.tax_rate / MAX_TAX_RATE).quantize(CENTS, rounding=ROUND_HALF_UP)
+    return {"subtotal": subtotal, "tax_amount": tax_amount, "total": subtotal + tax_amount}
+
+
+def invoice_totals(invoice):
+    """The invoice's totals: the sum of every line's subtotal, tax and total."""
+    amounts = [line_totals(line) for line in invoice.lines.all()]
+    with localcontext() as ctx:
+        ctx.prec = LINE_AMOUNT_PRECISION
+        total_excluding_tax = sum((amount["subtotal"] for amount in amounts), Decimal("0.00"))
+        total_tax = sum((amount["tax_amount"] for amount in amounts), Decimal("0.00"))
+    return {
+        "total_excluding_tax": total_excluding_tax,
+        "total_tax": total_tax,
+        "total_including_tax": total_excluding_tax + total_tax,
+    }
+
+
 def _pk(value):
     try:
         found = int(value)
@@ -57,13 +93,25 @@ def _pk(value):
     return found if found > 0 else None
 
 
-def _amount(raw, label, line_number, *, allow_zero):
+def _amount(raw, label, line_number, *, allow_zero, maximum=None):
     if isinstance(raw, float):
         raise TypeError("an amount is a Decimal or a string, never a float")
     text = format(raw, "f") if isinstance(raw, Decimal) else str(raw).strip()
     if not AMOUNT.fullmatch(text) or (not allow_zero and Decimal(text) == 0):
         raise InvalidInvoice(_("Check the %(field)s on line %(line)s.") % {"field": label, "line": line_number})
-    return Decimal(text)
+    value = Decimal(text)
+    if maximum is not None and value > maximum:
+        raise InvalidInvoice(_("Check the %(field)s on line %(line)s.") % {"field": label, "line": line_number})
+    return value
+
+
+def _tax_type(raw, line_number):
+    """One of LHDN's tax-type codes, chosen by the owner. Never read from the item's `default_tax_type`: an
+    uncertain or missing tax type is refused rather than guessed (the brief's "the system never decides")."""
+    value = (raw or "").strip()
+    if value not in items.tax_types():
+        raise InvalidInvoice(_("Choose a tax type on line %(line)s.") % {"line": line_number})
+    return value
 
 
 def _customer(company, customer_id, *, current=None):
@@ -105,7 +153,8 @@ def _item(company, item_id, line_number, *, kept):
 
 
 def _resolve(company, customer_id, lines, *, current=None):
-    """The customer and the (item, quantity, unit price) of each line, or `InvalidInvoice` naming what is wrong."""
+    """The customer and the (item, quantity, unit price, tax type, tax rate) of each line, or `InvalidInvoice`
+    naming what is wrong."""
     customer = _customer(company, customer_id, current=current.customer if current else None)
     if not lines:
         raise InvalidInvoice(_("Add at least one line."))
@@ -115,23 +164,30 @@ def _resolve(company, customer_id, lines, *, current=None):
         item = _item(company, line.get("item"), number, kept=kept)
         quantity = _amount(line.get("quantity", ""), _("quantity"), number, allow_zero=False)
         price = _amount(line.get("unit_price", ""), _("unit price"), number, allow_zero=True)
-        resolved.append((item, quantity, price))
+        tax_type = _tax_type(line.get("tax_type"), number)
+        tax_rate = _amount(line.get("tax_rate", ""), _("tax rate"), number, allow_zero=True, maximum=MAX_TAX_RATE)
+        resolved.append((item, quantity, price, tax_type, tax_rate))
     return customer, resolved
 
 
 def _write_lines(invoice, resolved):
     InvoiceLine.objects.bulk_create(
-        InvoiceLine(company_id=invoice.company_id, invoice=invoice, item=item, quantity=quantity, unit_price=price)
-        for item, quantity, price in resolved
+        InvoiceLine(
+            company_id=invoice.company_id, invoice=invoice, item=item, quantity=quantity, unit_price=price,
+            tax_type=tax_type, tax_rate=tax_rate,
+        )
+        for item, quantity, price, tax_type, tax_rate in resolved
     )
 
 
 def create_draft(user, company, *, customer_id, lines):
     """Save a new draft for `company` as `user`, who must be its owner or staff; it has no number.
 
-    `lines` is a list of dicts with `item` (an item id), `quantity` and `unit_price` (strings or Decimals). Raises
-    `PermissionDenied` for anyone else and `InvalidInvoice` for a missing customer, no lines, an item or customer of
-    another company or a deactivated one, a quantity that is not above zero, or a price that is negative or too long.
+    `lines` is a list of dicts with `item` (an item id), `quantity`, `unit_price`, `tax_type` (one of
+    `core.lhdn_codes.tax_types()`) and `tax_rate` (a percentage from 0 to 100), each as a string or a Decimal except
+    `tax_type`. Raises `PermissionDenied` for anyone else and `InvalidInvoice` for a missing customer, no lines, an
+    item or customer of another company or a deactivated one, a quantity that is not above zero, a price that is
+    negative or too long, a tax type that is not on LHDN's list, or a tax rate outside 0 to 100.
     """
     permissions.require(user, "manage_invoices", company)
     customer, resolved = _resolve(company, customer_id, lines)

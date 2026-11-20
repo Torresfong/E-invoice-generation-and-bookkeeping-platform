@@ -428,9 +428,13 @@ class Invoice(TenantModel):
 
 
 class InvoiceLine(TenantModel):
-    """One line of an invoice: an item from the item master, a quantity and a unit price (D59 (9)).
+    """One line of an invoice: an item from the item master, a quantity, a unit price and its own SST type and rate
+    (D59 (9); ticket #52).
 
-    The LHDN codes come from the item. Money is NUMERIC in the database and Decimal in code, never a float.
+    The LHDN classification and unit codes come from the item, but the tax type and rate are the owner's own choice
+    for this line: never read from the item's `default_tax_type`, which is only a suggestion for a future draft, so
+    an uncertain tax is always asked rather than guessed (the brief's "the system never decides an uncertain tax").
+    Money is NUMERIC in the database and Decimal in code, never a float.
     """
 
     invoice = models.ForeignKey(Invoice, on_delete=models.CASCADE, related_name="lines")
@@ -440,11 +444,19 @@ class InvoiceLine(TenantModel):
     item_name = models.CharField(max_length=200, blank=True, default="", db_default="")
     quantity = models.DecimalField(max_digits=18, decimal_places=4)
     unit_price = models.DecimalField(max_digits=18, decimal_places=4)
+    # One of LHDN's tax-type codes (core.lhdn_codes.tax_types()), chosen by the owner for this line.
+    tax_type = models.CharField(max_length=2)
+    # A percentage from 0 to 100, chosen by the owner; the tax amount is calculated from it, never typed directly.
+    tax_rate = models.DecimalField(max_digits=5, decimal_places=2)
 
     class Meta:
         constraints = [
             models.CheckConstraint(condition=models.Q(quantity__gt=0), name="invoiceline_quantity_positive"),
             models.CheckConstraint(condition=models.Q(unit_price__gte=0), name="invoiceline_price_not_negative"),
+            models.CheckConstraint(
+                condition=models.Q(tax_rate__gte=0) & models.Q(tax_rate__lte=100),
+                name="invoiceline_tax_rate_in_range",
+            ),
         ]
         indexes = [models.Index(fields=["invoice", "id"], name="invoiceline_lookup")]
         ordering = ["id"]

@@ -37,7 +37,7 @@ def books(world):
 def new_draft(world, books):
     return invoices.create_draft(
         world["acme_owner"], world["acme"], customer_id=books["customer"].pk,
-        lines=[{"item": books["item"].pk, "quantity": "2", "unit_price": "5.50"}],
+        lines=[{"item": books["item"].pk, "quantity": "2", "unit_price": "5.50", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
 
 

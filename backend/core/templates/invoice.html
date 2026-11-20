@@ -21,26 +21,44 @@
     <p>{% if invoice.buyer_tin %}{% trans "TIN" %}: {{ invoice.buyer_tin }}{% endif %} {% if invoice.buyer_id_value %}{{ invoice.buyer_id_type }}: {{ invoice.buyer_id_value }}{% endif %}</p>
     <table>
       <thead>
-        <tr><th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th></tr>
+        <tr>
+          <th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th>
+          <th>{% trans "Tax type" %}</th><th>{% trans "Tax rate" %}</th><th>{% trans "Subtotal" %}</th>
+          <th>{% trans "Tax" %}</th><th>{% trans "Total" %}</th>
+        </tr>
       </thead>
       <tbody>
-        {% for line in invoice.lines.all %}
-          <tr><td>{{ line.item_name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td></tr>
+        {% for line, line_totals in lines_with_totals %}
+          <tr>
+            <td>{{ line.item_name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td>
+            <td>{{ line.tax_type }}</td><td>{{ line.tax_rate }}</td><td>{{ line_totals.subtotal }}</td>
+            <td>{{ line_totals.tax_amount }}</td><td>{{ line_totals.total }}</td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
+    <p>{% trans "Subtotal" %}: {{ totals.total_excluding_tax }} · {% trans "Tax" %}: {{ totals.total_tax }} · {% trans "Total" %}: {{ totals.total_including_tax }}</p>
   {% elif invoice and not may_manage %}
     <p>{{ invoice.customer.legal_name }}</p>
     <table>
       <thead>
-        <tr><th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th></tr>
+        <tr>
+          <th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th>
+          <th>{% trans "Tax type" %}</th><th>{% trans "Tax rate" %}</th><th>{% trans "Subtotal" %}</th>
+          <th>{% trans "Tax" %}</th><th>{% trans "Total" %}</th>
+        </tr>
       </thead>
       <tbody>
-        {% for line in invoice.lines.all %}
-          <tr><td>{{ line.item.name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td></tr>
+        {% for line, line_totals in lines_with_totals %}
+          <tr>
+            <td>{{ line.item.name }}</td><td>{{ line.quantity }}</td><td>{{ line.unit_price }}</td>
+            <td>{{ line.tax_type }}</td><td>{{ line.tax_rate }}</td><td>{{ line_totals.subtotal }}</td>
+            <td>{{ line_totals.tax_amount }}</td><td>{{ line_totals.total }}</td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
+    <p>{% trans "Subtotal" %}: {{ totals.total_excluding_tax }} · {% trans "Tax" %}: {{ totals.total_tax }} · {% trans "Total" %}: {{ totals.total_including_tax }}</p>
   {% else %}
     <form method="post" action="/companies/{{ company.pk }}/invoices/{% if invoice %}{{ invoice.pk }}/{% else %}new/{% endif %}">
       {% csrf_token %}
@@ -51,7 +69,10 @@
         </select></label></p>
       <table>
         <thead>
-          <tr><th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th></tr>
+          <tr>
+            <th>{% trans "Item" %}</th><th>{% trans "Quantity" %}</th><th>{% trans "Unit price" %}</th>
+            <th>{% trans "Tax type" %}</th><th>{% trans "Tax rate" %}</th>
+          </tr>
         </thead>
         <tbody>
           {% for row in rows %}
@@ -64,12 +85,20 @@
               </td>
               <td><input name="quantity" inputmode="decimal" value="{{ row.quantity|default_if_none:'' }}" aria-label="{% trans 'Quantity' %}"></td>
               <td><input name="unit_price" inputmode="decimal" value="{{ row.unit_price|default_if_none:'' }}" aria-label="{% trans 'Unit price' %}"></td>
+              <td>
+                <select name="tax_type" aria-label="{% trans 'Tax type' %}">
+                  <option value="">—</option>
+                  {% for code, description in tax_types %}<option value="{{ code }}" {% if row.tax_type == code %}selected{% endif %}>{{ code }} · {{ description }}</option>{% endfor %}
+                </select>
+              </td>
+              <td><input name="tax_rate" inputmode="decimal" value="{{ row.tax_rate|default_if_none:'' }}" aria-label="{% trans 'Tax rate' %}"></td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
       <button type="submit">{% trans "Save draft" %}</button>
     </form>
+    {% if totals %}<p>{% trans "Subtotal" %}: {{ totals.total_excluding_tax }} · {% trans "Tax" %}: {{ totals.total_tax }} · {% trans "Total" %}: {{ totals.total_including_tax }}</p>{% endif %}
     {% if invoice %}
       <form method="post" action="/companies/{{ company.pk }}/invoices/{{ invoice.pk }}/delete/">{% csrf_token %}<button type="submit">{% trans "Delete draft" %}</button></form>
     {% endif %}
