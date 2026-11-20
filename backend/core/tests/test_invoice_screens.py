@@ -354,7 +354,7 @@ def test_the_owner_overrides_the_proposed_rate(client, world, stock, as_producti
     form = draft_form(stock["customer"], (stock["item"], "1", "5"), currency="USD", exchange_rate="5.10")
     with as_production_connection():
         sign_in(client, world["acme_owner"])
-        created = client.post(invoices_url(world["acme"], "new"), form)
+        client.post(invoices_url(world["acme"], "new"), form)
 
     invoice = Invoice.objects.get(company=world["acme"])
     assert invoice.exchange_rate == Decimal("5.10")  # the owner's own value, not the proposed one

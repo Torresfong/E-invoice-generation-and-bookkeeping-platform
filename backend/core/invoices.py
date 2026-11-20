@@ -292,10 +292,15 @@ BUYER_FIELDS = (
 )
 
 
-def _refuse_incomplete(company, customer):
-    """With e-invoicing on, refuse a buyer or supplier with gaps. The draft checked the buyer only when it picked the
-    customer and the supplier setting only when it was saved, so either can have become incomplete since (#172)."""
+def _refuse_incomplete(company, customer, currency):
+    """With e-invoicing on, refuse a foreign currency, or a buyer or supplier with gaps. The draft checked the buyer
+    only when it picked the customer and the supplier setting only when it was saved, so either can have become
+    incomplete since (#172). The MyInvois mapper still maps every e-invoice as MYR (#123; foreign currency is #125,
+    not yet built), so submitting one in another currency would silently tell LHDN the wrong amount (a Codex review
+    finding on #53)."""
     problems = []
+    if currency != BASE_CURRENCY:
+        problems.append(_("a foreign-currency invoice cannot be submitted as an e-invoice yet"))
     buyer = customers.einvoice_gaps(customer)
     if buyer:
         problems.append(_("the customer needs: %(fields)s") % {"fields": ", ".join(buyer)})
@@ -347,7 +352,7 @@ def approve_invoice(user, invoice, *, acknowledged=False):
         customer = Customer.objects.select_for_update().get(pk=current.customer_id)
         is_einvoice = einvoicing_enabled(company, today)
         if is_einvoice:
-            _refuse_incomplete(company, customer)
+            _refuse_incomplete(company, customer, current.currency)
         elif einvoicing.is_mandatory(company):
             if not acknowledged:
                 raise einvoicing.AcknowledgementRequired
