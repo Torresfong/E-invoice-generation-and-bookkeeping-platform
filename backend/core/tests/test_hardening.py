@@ -8,7 +8,7 @@ from django.db import DatabaseError, connection, transaction
 from django.utils import timezone
 
 from core import services, throttle
-from core.models import AuthToken, CompanyAccess
+from core.models import AuthToken, CompanyAccess, FirmInvitation
 
 from .factories import make_company, make_member, make_user
 from .test_tenancy import query, role_migration
@@ -60,7 +60,7 @@ def test_every_security_definer_function_pins_a_search_path_that_starts_with_pg_
     )
 
     # A new definer function must be added here on purpose (0033: claim_job -> claim_next_job, +3; 0040: +1; 0045: +1;
-    # 0049: create_firm_invitation, accept_firm_invitation, +2).
+    # 0048: create_firm_invitation, accept_firm_invitation, +2).
     assert len(rows) == 25
     assert {tuple(config) for _, config in rows} == {("search_path=pg_catalog, public, pg_temp",)}
 
@@ -91,6 +91,19 @@ def test_an_invitation_cannot_be_given_a_longer_life_than_a_week(as_user, db):
         query("SELECT create_invitation(%s, %s, %s, now() + interval '100 years')", [HASH, "x@acme.example", company.pk])
 
     assert AuthToken.objects.get().expires_at <= database_now() + timedelta(days=7)
+
+
+def test_a_firm_invitation_cannot_be_given_a_longer_life_than_a_week(as_user, db):
+    company = make_company(firm=False)
+    owner = make_member("owner@acme.example", company, CompanyAccess.OWNER)
+
+    with as_user(owner):
+        query(
+            "SELECT create_firm_invitation(%s, %s, %s, now() + interval '100 years')",
+            [company.pk, "firm@limpartners.example", HASH],
+        )
+
+    assert FirmInvitation.objects.get().expires_at <= database_now() + timedelta(days=7)
 
 
 @pytest.mark.parametrize(

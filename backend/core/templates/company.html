@@ -37,9 +37,9 @@
     {% elif firm_invitation %}
       <p>
         {% blocktrans with email=firm_invitation.email %}Invitation to {{ email }}:{% endblocktrans %}
-        {% if firm_invitation.status == "accepted" %}{% trans "Accepted" %}
-        {% elif can_invite_firm %}{% trans "Expired" %}
-        {% else %}{% trans "Sent, waiting for the firm" %}{% endif %}
+        {% if firm_invitation.status == "accepted" %}{% trans "Accepted; waiting for the operator's review." %}
+        {% elif firm_invitation_is_live %}{% trans "Sent, waiting for the firm" %}
+        {% else %}{% trans "Expired" %}{% endif %}
       </p>
     {% endif %}
     {% if can_invite_firm %}

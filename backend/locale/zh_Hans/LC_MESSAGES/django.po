@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: PACKAGE VERSION\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-11-19 22:18+0800\n"
+"POT-Creation-Date: 2026-11-20 11:08+0800\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -208,6 +208,15 @@ msgstr "客户员工"
 msgid "Firm accountant"
 msgstr "事务所会计师"
 
+msgid "Mandatory"
+msgstr "强制"
+
+msgid "Voluntary"
+msgstr "自愿"
+
+msgid "Exempt"
+msgstr "豁免"
+
 msgid "Signed in"
 msgstr "已登录"
 
@@ -360,6 +369,9 @@ msgstr "此公司已有事务所。"
 #, python-format
 msgid "Invitation to %(email)s:"
 msgstr "发给 %(email)s 的邀请："
+
+msgid "Accepted; waiting for the operator's review."
+msgstr "已接受，等待操作员审核。"
 
 msgid "Sent, waiting for the firm"
 msgstr "已发送，等待事务所回应"
@@ -940,12 +952,3 @@ msgid ""
 msgstr ""
 "发票 %(number)s 在开具后 72 小时内未能提交给 LHDN，LHDN 已不再接受。您的草稿"
 "已保留，请检查后重新批准。"
-
-#~ msgid "Mandatory"
-#~ msgstr "强制"
-
-#~ msgid "Voluntary"
-#~ msgstr "自愿"
-
-#~ msgid "Exempt"
-#~ msgstr "豁免"

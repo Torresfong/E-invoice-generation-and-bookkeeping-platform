@@ -9,11 +9,17 @@
   <h1>Accept a client's invitation</h1>
   {% if not signed_in %}
     <p>Sign in with your firm administrator account to accept this invitation, or apply to register your firm first if you have none.</p>
-    <p><a href="/login/">Sign in</a></p>
+    <p>If you have just applied, this link stays valid: wait for the operator's approval and the emailed link to choose your password, sign in, then return to this page.</p>
+    <p><a href="/login/?next=/firm-invite/{{ token }}/">Sign in</a></p>
     <p><a href="/apply/">Apply as an accounting firm</a></p>
   {% elif wrong_account %}
-    <p>Only a firm administrator of an approved firm can accept this invitation. Sign in with that account, or apply to register your firm first.</p>
-    <p><a href="/login/">Sign in</a></p>
+    <p>Only a firm administrator of an approved firm can accept this invitation. Sign out and sign in with that account, or apply to register your firm first.</p>
+    <p>If you have just applied, this link stays valid: wait for the operator's approval and the emailed link to choose your password, sign in, then return to this page.</p>
+    <form method="post" action="/logout/">
+      {% csrf_token %}
+      <button type="submit">Sign out</button>
+    </form>
+    <p><a href="/login/?next=/firm-invite/{{ token }}/">Sign in as another account</a></p>
     <p><a href="/apply/">Apply as an accounting firm</a></p>
   {% else %}
     <p>Accepting lets your firm act for the company that invited you. Your accountants reach it only once the platform operator reviews and grants access.</p>

@@ -1,6 +1,6 @@
 """A client owner invites a firm by email and a firm administrator accepts (D67 (3)).
 
-Sending and accepting both run in a SECURITY DEFINER function (migration 0049), like the invitation link style
+Sending and accepting both run in a SECURITY DEFINER function (migration 0048), like the invitation link style
 of D40 (5): sending checks, inside the database, that the caller owns the company and that it has no firm yet;
 accepting is done by a firm administrator who has no `CompanyAccess` row for this company at all. Tokens are
 random and only their hashes are stored, as with every other single-use link (see `tokens`).
@@ -17,10 +17,11 @@ from . import ports
 from .db import scalar
 from .tokens import InvalidLink, hash_token, link, new_token
 
-# SQLSTATEs the functions of migration 0049 raise.
+# SQLSTATEs the functions of migration 0048 raise.
 ALREADY_HAS_FIRM = "55000"
 UNIQUE_VIOLATION = "23505"
 NOT_OWNER_OR_NOT_ADMIN = "42501"
+INVALID_LINK = "28000"
 
 
 class CompanyAlreadyHasFirm(Exception):
@@ -69,12 +70,16 @@ def accept(raw):
 
     Raises InvalidLink for a link that is unknown, expired, used or tampered with; the three are deliberately not
     told apart. Raises NotFirmAdministrator when the signed-in user is not a firm administrator of an approved
-    firm, so the view can offer registration instead of a plain "invalid link".
+    firm, so the view can offer registration instead of a plain "invalid link". Any other database error (a
+    deadlock, an outage) is re-raised rather than misreported as one of the two: it is not the invitation's fault.
     """
     try:
         with transaction.atomic():
             return scalar("SELECT accept_firm_invitation(%s)", [hash_token(raw)])
     except DatabaseError as error:
-        if getattr(error.__cause__, "sqlstate", None) == NOT_OWNER_OR_NOT_ADMIN:
+        sqlstate = getattr(error.__cause__, "sqlstate", None)
+        if sqlstate == NOT_OWNER_OR_NOT_ADMIN:
             raise NotFirmAdministrator from error
-        raise InvalidLink from error
+        if sqlstate == INVALID_LINK:
+            raise InvalidLink from error
+        raise

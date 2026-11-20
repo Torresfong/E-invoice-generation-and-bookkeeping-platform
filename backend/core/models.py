@@ -195,7 +195,9 @@ class SupplierDetails(models.Model):
     """
 
     MANDATORY, VOLUNTARY, EXEMPT = "mandatory", "voluntary", "exempt"
-    STATUS_CHOICES = [(MANDATORY, "Mandatory"), (VOLUNTARY, "Voluntary"), (EXEMPT, "Exempt")]
+    # Wrapped so `makemessages` can find them: `einvoice_setting.html` renders a label from this tuple with
+    # `{% trans label %}`, a dynamic value no extractor can see, so the msgid must be referenced here instead.
+    STATUS_CHOICES = [(MANDATORY, _("Mandatory")), (VOLUNTARY, _("Voluntary")), (EXEMPT, _("Exempt"))]
 
     einvoicing_enabled = models.BooleanField(default=False, db_default=False)
     # Empty until the exemption check of D63 has been done ("not yet checked").

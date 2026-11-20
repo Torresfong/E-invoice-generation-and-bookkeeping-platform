@@ -1,8 +1,13 @@
 """A client owner invites a firm by email and a firm administrator accepts (ticket #144; D67 (3), D40 (5)).
 
-Sending and accepting both run through SECURITY DEFINER functions (migration 0049): the service module is
+Sending and accepting both run through SECURITY DEFINER functions (migration 0048): the service module is
 exercised directly here, with `as_user` where the row-level security itself is under test, matching the style
 of test_firm_applications.py.
+
+Accepting never touches `Company.firm`: only the operator's later review does that (see migration 0048's
+comment). `services.create_accountant` grants a new accountant access to every company that already carries a
+firm's id, so setting it here would hand the firm's accountants access the moment anyone next adds one, before
+the operator ever reviews the pair.
 """
 
 import re
@@ -12,7 +17,7 @@ import pytest
 from django.db import DatabaseError, ProgrammingError, transaction
 from django.utils import timezone
 
-from core import firm_invitations
+from core import firm_invitations, services
 from core.models import AuditEntry, CompanyAccess, Firm, FirmAuditEntry, FirmInvitation
 
 from .factories import make_company, make_member, make_user
@@ -105,7 +110,7 @@ def make_firm_admin(email, firm_name="Lim & Partners"):
     return admin
 
 
-def test_a_firm_administrator_can_accept_and_the_company_gets_that_firm_with_no_companyaccess_granted(
+def test_a_firm_administrator_can_accept_and_the_company_keeps_no_firm_pending_operator_review(
     acme, fake_ports, as_user
 ):
     owner = acme.access.get(role=CompanyAccess.OWNER).user
@@ -118,7 +123,8 @@ def test_a_firm_administrator_can_accept_and_the_company_gets_that_firm_with_no_
         company_id = firm_invitations.accept(link.split("/")[-2])
 
     acme.refresh_from_db()
-    assert company_id == acme.pk and acme.firm == admin.firm
+    assert company_id == acme.pk
+    assert acme.firm is None  # the operator's review sets this, not acceptance (D67 (3))
     invitation = FirmInvitation.objects.get(company=acme)
     assert (invitation.status, invitation.accepted_by, invitation.accepted_firm) == (
         FirmInvitation.ACCEPTED,
@@ -126,6 +132,23 @@ def test_a_firm_administrator_can_accept_and_the_company_gets_that_firm_with_no_
         admin.firm,
     )
     assert not CompanyAccess.objects.filter(company=acme, user=admin).exists()
+
+
+def test_a_new_accountant_of_the_accepting_firm_still_gets_no_access_to_the_company(acme, fake_ports, as_user):
+    """The critical case: accepting must not let `create_accountant` reach this company (D67 (3))."""
+    owner = acme.access.get(role=CompanyAccess.OWNER).user
+    with as_user(owner):
+        firm_invitations.send(acme, FIRM_EMAIL)
+    link = invitation_link(fake_ports)
+    admin = make_firm_admin(FIRM_EMAIL)
+    with as_user(admin):
+        firm_invitations.accept(link.split("/")[-2])
+
+    accountant = services.create_accountant("acc@limpartners.example", admin.firm)
+
+    assert not CompanyAccess.objects.filter(company=acme, user=accountant).exists()
+    acme.refresh_from_db()
+    assert acme.firm is None
 
 
 def test_accepting_is_recorded_in_the_companys_trail_and_the_firms_trail(acme, fake_ports, as_user):
@@ -138,14 +161,33 @@ def test_accepting_is_recorded_in_the_companys_trail_and_the_firms_trail(acme, f
     with as_user(admin):
         firm_invitations.accept(link.split("/")[-2])
 
-    company_entry = AuditEntry.objects.get(company=acme, target_type="company")
-    assert (company_entry.action, company_entry.actor_id, company_entry.changed_fields) == (
+    invitation = FirmInvitation.objects.get(company=acme)
+    company_entry = AuditEntry.objects.get(company=acme, target_type="core_firminvitation", action=AuditEntry.UPDATE)
+    assert company_entry.actor_id == admin.pk
+    assert company_entry.target_id == str(invitation.pk)
+    firm_entry = FirmAuditEntry.objects.get(firm=admin.firm, target_type="firm_invitation")
+    assert (firm_entry.action, firm_entry.actor_id, firm_entry.changed_fields) == (
         AuditEntry.UPDATE,
         admin.pk,
-        ["firm"],
+        ["status"],
     )
-    firm_entry = FirmAuditEntry.objects.get(firm=admin.firm, target_type="company")
-    assert (firm_entry.action, firm_entry.actor_id, firm_entry.changed_fields) == (AuditEntry.UPDATE, admin.pk, ["firm"])
+
+
+def test_a_deactivated_firm_administrator_cannot_accept(acme, fake_ports, as_user):
+    owner = acme.access.get(role=CompanyAccess.OWNER).user
+    with as_user(owner):
+        firm_invitations.send(acme, FIRM_EMAIL)
+    link = invitation_link(fake_ports)
+    admin = make_firm_admin(FIRM_EMAIL)
+    admin.is_active = False
+    admin.save()
+
+    with as_user(admin), pytest.raises(firm_invitations.NotFirmAdministrator):
+        firm_invitations.accept(link.split("/")[-2])
+
+    acme.refresh_from_db()
+    assert acme.firm is None
+    assert not CompanyAccess.objects.filter(company=acme).exclude(user=owner).exists()
 
 
 def test_a_used_link_is_refused_the_second_time(acme, fake_ports, as_user):

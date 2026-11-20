@@ -102,7 +102,7 @@ def test_a_firm_administrator_accepts_and_no_companyaccess_row_is_created(client
     assert "Accept" in get_response.content.decode()
     assert post_response.status_code == 302 and post_response["Location"] == "/firm/?accepted=1"
     world["acme"].refresh_from_db()
-    assert world["acme"].firm == admin.firm
+    assert world["acme"].firm is None  # the operator's review sets this, not acceptance (D67 (3))
     assert not CompanyAccess.objects.filter(company=world["acme"], user=admin).exists()
 
 
@@ -117,7 +117,8 @@ def test_a_signed_out_visitor_is_offered_sign_in_or_registration(client, world, 
 
     assert response.status_code == 200
     body = response.content.decode()
-    assert "/login/" in body and "/apply/" in body and "<form" not in body
+    assert f"/login/?next=/firm-invite/{link.split('/')[-2]}/" in body
+    assert "/apply/" in body and "<form" not in body
 
 
 def test_a_signed_in_non_firm_admin_is_refused_and_offered_registration(client, world, fake_ports, as_production_connection):
@@ -133,6 +134,7 @@ def test_a_signed_in_non_firm_admin_is_refused_and_offered_registration(client, 
         post_response = wrong.post(link)
 
     assert "administrator" in get_response.content.decode()
+    assert 'action="/logout/"' in get_response.content.decode()
     assert post_response.status_code == 200 and "administrator" in post_response.content.decode()
     world["acme"].refresh_from_db()
     assert world["acme"].firm is None
@@ -146,3 +148,15 @@ def test_a_made_up_firm_invite_link_is_refused(client, world, as_production_conn
         response = accepting.post("/firm-invite/not-a-real-token/")
 
     assert response.status_code == 410
+
+
+def test_the_firm_side_invalid_link_page_stays_english_for_a_chinese_browser(client, world, as_production_connection):
+    """Firm-side pages are English only (D49), unlike the shared `link_invalid.html` the client side uses."""
+    admin = firm_admin_user(FIRM_EMAIL)
+    with as_production_connection():
+        accepting = Client()
+        sign_in(accepting, admin)
+        response = accepting.post("/firm-invite/not-a-real-token/", headers={"accept-language": "zh-hans"})
+
+    body = response.content.decode()
+    assert response.status_code == 410 and "This link no longer works" in body

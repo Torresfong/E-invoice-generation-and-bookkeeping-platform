@@ -33,16 +33,24 @@ def home(request):
     return render(request, "home.html")
 
 
+def _safe_next(raw):
+    """An internal path from `next`, or "/" when it is missing or could leave the site (D53-style host safety)."""
+    if raw and raw.startswith("/") and not raw.startswith("//"):
+        return raw
+    return "/"
+
+
 def sign_in(request):
+    next_url = _safe_next(request.GET.get("next") or request.POST.get("next"))
     if request.user.is_authenticated:
         # Sign out first to use another account: a signed-in session may only record its own sign-in events.
-        return redirect("/")
+        return redirect(next_url)
     if request.method != "POST":
-        return render(request, "login.html")
+        return render(request, "login.html", {"next": next_url})
 
     email = request.POST.get("email", "").strip()
     password = request.POST.get("password", "")
-    context = {"email": email}
+    context = {"email": email, "next": next_url}
 
     if not throttle.allow_attempt(email):
         context["error"] = _("Too many failed attempts. Try again in a few minutes.")
@@ -57,7 +65,7 @@ def sign_in(request):
     throttle.clear(email)
     complete_sign_in(request, user)
     audit.record_auth_event(AuditEntry.LOGIN)
-    return redirect("/")
+    return redirect(next_url)
 
 
 @require_POST
@@ -135,13 +143,15 @@ def _company_page(request, access, **extra):
         context["message"] = _("Invitation sent to the firm.")
     if permissions.can(request.user, "invite_firm", access.company):
         invitation = FirmInvitation.objects.filter(company=access.company).order_by("-created_at").first()
-        pending_and_live = (
+        live_pending = (
             invitation is not None
             and invitation.status == FirmInvitation.PENDING
             and invitation.expires_at > timezone.now()
         )
+        accepted = invitation is not None and invitation.status == FirmInvitation.ACCEPTED
         context["firm_invitation"] = invitation
-        context["can_invite_firm"] = access.company.firm_id is None and not pending_and_live
+        context["firm_invitation_is_live"] = live_pending
+        context["can_invite_firm"] = access.company.firm_id is None and not live_pending and not accepted
     return render(request, "company.html", context)
 
 
@@ -643,17 +653,17 @@ def accept_firm_invitation(request, token):
     if request.method not in ("GET", "HEAD", "POST"):
         return HttpResponse(status=405)
     if not request.user.is_authenticated:
-        return render(request, "firm_invite_accept.html", {"signed_in": False})
+        return render(request, "firm_invite_accept.html", {"signed_in": False, "token": token})
     if not permissions.is_firm_admin(request.user):
-        return render(request, "firm_invite_accept.html", {"signed_in": True, "wrong_account": True})
+        return render(request, "firm_invite_accept.html", {"signed_in": True, "wrong_account": True, "token": token})
     if request.method != "POST":
         return render(request, "firm_invite_accept.html", {"signed_in": True, "ready": True})
     try:
         firm_invitations.accept(token)
     except firm_invitations.NotFirmAdministrator:
-        return render(request, "firm_invite_accept.html", {"signed_in": True, "wrong_account": True})
+        return render(request, "firm_invite_accept.html", {"signed_in": True, "wrong_account": True, "token": token})
     except firm_invitations.InvalidLink:
-        return render(request, "link_invalid.html", status=410)
+        return render(request, "firm_invite_link_invalid.html", status=410)
     return redirect("/firm/?accepted=1")
 
 
