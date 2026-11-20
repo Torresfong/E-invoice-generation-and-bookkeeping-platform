@@ -39,7 +39,7 @@ def new_draft(world, books, customer=None):
         world["acme_owner"],
         world["acme"],
         customer_id=(customer or books["customer"]).pk,
-        lines=[{"item": books["item"].pk, "quantity": "2", "unit_price": "5"}],
+        lines=[{"item": books["item"].pk, "quantity": "2", "unit_price": "5", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
 
 
@@ -214,7 +214,8 @@ def test_a_company_without_a_sequence_cannot_approve(world):
         world["acme_owner"], world["acme"], name="W", classification_code=OTHERS, unit_code=ONE, default_tax_type=NOT_APPLICABLE
     )
     draft = invoices.create_draft(
-        world["acme_owner"], world["acme"], customer_id=customer.pk, lines=[{"item": item.pk, "quantity": "1", "unit_price": "1"}]
+        world["acme_owner"], world["acme"], customer_id=customer.pk,
+        lines=[{"item": item.pk, "quantity": "1", "unit_price": "1", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
 
     with pytest.raises(numbering.SequenceNotConfigured):

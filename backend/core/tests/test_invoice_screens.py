@@ -37,12 +37,16 @@ def make_item(user, company, name="Consulting hour"):
 
 
 def draft_form(customer, *lines):
-    """The posted form. Each line is (item, quantity, unit_price); the fields repeat once per line."""
+    """The posted form. Each line is (item, quantity, unit_price) or (item, quantity, unit_price, tax_type, tax_rate);
+    the fields repeat once per line. A line without a tax type and rate defaults to LHDN's "Not Applicable" at 0%."""
+    full = [line if len(line) == 5 else (*line, NOT_APPLICABLE, "0") for line in lines]
     return {
         "customer": customer.pk,
-        "item": [line[0].pk for line in lines],
-        "quantity": [line[1] for line in lines],
-        "unit_price": [line[2] for line in lines],
+        "item": [line[0].pk for line in full],
+        "quantity": [line[1] for line in full],
+        "unit_price": [line[2] for line in full],
+        "tax_type": [line[3] for line in full],
+        "tax_rate": [line[4] for line in full],
     }
 
 
@@ -79,7 +83,8 @@ def test_the_owner_and_staff_draft_an_invoice_with_no_number(client, world, stoc
 def make_draft(user, company, stock, customer="customer", item="item"):
     """A one-line draft (quantity 1, unit price 5) made as `user`, named by the `stock` keys of its customer and item."""
     return invoices.create_draft(
-        user, company, customer_id=stock[customer].pk, lines=[{"item": stock[item].pk, "quantity": "1", "unit_price": "5"}]
+        user, company, customer_id=stock[customer].pk,
+        lines=[{"item": stock[item].pk, "quantity": "1", "unit_price": "5", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
 
 
@@ -112,6 +117,33 @@ def test_the_owner_and_staff_delete_a_draft_with_its_lines(client, world, stock,
     assert deleted.status_code == 302 and deleted["Location"] == invoices_url(world["acme"]) + "?deleted=1"
     assert not Invoice.objects.filter(company=world["acme"]).exists()
     assert not InvoiceLine.objects.filter(company=world["acme"]).exists()
+
+
+def test_the_owner_picks_a_real_tax_type_and_rate_and_the_page_shows_the_calculated_totals(
+    client, world, stock, as_production_connection
+):
+    form = draft_form(stock["customer"], (stock["item"], "2", "10.00", "02", "6"))
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        created = client.post(invoices_url(world["acme"], "new"), form)
+        page = client.get(created["Location"]).content.decode()
+
+    assert created.status_code == 302
+    line = InvoiceLine.objects.get(invoice__company=world["acme"])
+    assert (line.tax_type, line.tax_rate) == ("02", Decimal("6"))
+    # 2 x 10.00 = 20.00 subtotal; 6% of 20.00 = 1.20 tax; 21.20 total.
+    assert "20.00" in page and "1.20" in page and "21.20" in page
+
+
+def test_a_missing_tax_type_is_refused_and_named_rather_than_guessed(client, world, stock, as_production_connection):
+    form = draft_form(stock["customer"], (stock["item"], "1", "10", "", "0"))
+    with as_production_connection():
+        sign_in(client, world["acme_owner"])
+        response = client.post(invoices_url(world["acme"], "new"), form)
+
+    page = response.content.decode()
+    assert response.status_code == 200 and 'role="alert"' in page and "tax type" in page
+    assert not Invoice.objects.exists()
 
 
 def test_a_bad_draft_shows_an_error_keeps_what_was_typed_and_saves_nothing(client, world, stock, as_production_connection):
@@ -255,7 +287,7 @@ def test_the_company_page_links_to_the_invoices(client, world, as_production_con
 def test_a_free_line_survives_opening_and_saving_the_draft_unchanged(client, world, stock, as_production_connection):
     free = invoices.create_draft(
         world["acme_owner"], world["acme"], customer_id=stock["customer"].pk,
-        lines=[{"item": stock["item"].pk, "quantity": "1", "unit_price": "0"}],
+        lines=[{"item": stock["item"].pk, "quantity": "1", "unit_price": "0", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     with as_production_connection():
         sign_in(client, world["acme_owner"])

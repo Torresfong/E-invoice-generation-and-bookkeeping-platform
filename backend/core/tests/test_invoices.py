@@ -36,7 +36,10 @@ def stock(world):
 
 
 def line(stock, quantity="1", unit_price="5", **overrides):
-    return {"item": stock["item"].pk, "quantity": quantity, "unit_price": unit_price, **overrides}
+    return {
+        "item": stock["item"].pk, "quantity": quantity, "unit_price": unit_price,
+        "tax_type": NOT_APPLICABLE, "tax_rate": "0", **overrides,
+    }
 
 
 def draft(world, stock, *lines, user="acme_owner"):
@@ -300,6 +303,96 @@ def test_a_completed_buyer_can_be_drafted_after_the_owner_or_staff_fills_the_new
     )
 
     assert draft(world, stock, user="acme_staff").customer == stock["customer"]
+
+
+@pytest.mark.parametrize("bad", ["", " ", "99", "none"])
+def test_a_tax_type_must_be_on_lhdns_list_and_is_never_guessed_from_the_item(world, stock, bad):
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        draft(world, stock, line(stock), line(stock, tax_type=bad))
+
+    assert "tax type" in str(refused.value) and "line 2" in str(refused.value)
+    assert not Invoice.objects.exists()
+
+
+@pytest.mark.parametrize("bad", ["-1", "100.01", "101", "abc", "", "1e3", "NaN", "Infinity"])
+def test_a_tax_rate_must_be_from_0_to_100(world, stock, bad):
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        draft(world, stock, line(stock), line(stock, tax_rate=bad))
+
+    assert "tax rate" in str(refused.value) and "line 2" in str(refused.value)
+    assert not Invoice.objects.exists()
+
+
+def test_a_line_may_carry_a_real_tax_type_and_rate(world, stock):
+    saved = draft(world, stock, line(stock, "2", "10.50", tax_type="02", tax_rate="6"))
+
+    line_row = saved.lines.get()
+    assert line_row.tax_type == "02" and line_row.tax_rate == Decimal("6")
+
+
+@pytest.mark.parametrize("bad", ["6.125", "0.001", "100.001"])
+def test_a_tax_rate_with_more_than_two_decimal_places_is_refused_not_silently_rounded(world, stock, bad):
+    # InvoiceLine.tax_rate is NUMERIC(5, 2): a third fractional digit would otherwise be rounded away silently
+    # on save, changing the rate the owner typed without telling them (Codex's review of PR #196).
+    with pytest.raises(invoices.InvalidInvoice) as refused:
+        draft(world, stock, line(stock), line(stock, tax_rate=bad))
+
+    assert "tax rate" in str(refused.value) and "line 2" in str(refused.value)
+    assert not Invoice.objects.exists()
+
+
+def test_a_tax_rate_with_exactly_two_decimal_places_is_kept_exactly(world, stock):
+    saved = draft(world, stock, line(stock, tax_type="02", tax_rate="6.12"))
+
+    assert saved.lines.get().tax_rate == Decimal("6.12")
+
+
+def test_line_totals_calculate_the_subtotal_tax_and_total_from_decimal_arithmetic(world, stock):
+    saved = draft(world, stock, line(stock, "3", "10.00", tax_type="02", tax_rate="6"))
+
+    totals = invoices.line_totals(saved.lines.get())
+
+    # 3 x 10.00 = 30.00; 6% of 30.00 = 1.80; hand-computed, not re-derived the way the code does it.
+    assert totals == {"subtotal": Decimal("30.00"), "tax_amount": Decimal("1.80"), "total": Decimal("31.80")}
+
+
+def test_a_tax_amount_rounds_half_a_sen_up(world, stock):
+    saved = draft(world, stock, line(stock, "1", "0.50", tax_type="02", tax_rate="5"))
+
+    # 0.50 x 5% = 0.025, which rounds up to 0.03 under ROUND_HALF_UP, not down to 0.02.
+    assert invoices.line_totals(saved.lines.get())["tax_amount"] == Decimal("0.03")
+
+
+def test_a_large_total_keeps_its_precision_past_the_subtotal_and_tax(world, stock):
+    # Codex's review of PR #196: the final `subtotal + tax_amount` ran outside the widened Decimal context, so a
+    # total needing more than the default 28-digit precision to add exactly was silently rounded. Quantity and
+    # unit price are each NUMERIC(18,4) (core/models.py), so this is reachable, not a theoretical maximum; the
+    # expected value below was computed independently, in a fresh Decimal context at 80-digit precision, not by
+    # calling `line_totals` itself.
+    saved = draft(world, stock, line(stock, "99999999999999.1234", "99999999999999.5678", tax_type="02", tax_rate="6"))
+
+    totals = invoices.line_totals(saved.lines.get())
+
+    assert totals == {
+        "subtotal": Decimal("9999999999999869120000000000.38"),
+        "tax_amount": Decimal("599999999999992147200000000.02"),
+        "total": Decimal("10599999999999861267200000000.40"),
+    }
+
+
+def test_invoice_totals_sum_every_lines_subtotal_tax_and_total(world, stock):
+    saved = draft(
+        world, stock,
+        line(stock, "2", "10.00", tax_type="02", tax_rate="6"),
+        line(stock, "1", "5.00", tax_type="06", tax_rate="0"),
+    )
+
+    totals = invoices.invoice_totals(saved)
+
+    # Line 1: 20.00 subtotal, 1.20 tax. Line 2: 5.00 subtotal, 0 tax. Hand-summed, not re-derived.
+    assert totals == {
+        "total_excluding_tax": Decimal("25.00"), "total_tax": Decimal("1.20"), "total_including_tax": Decimal("26.20"),
+    }
 
 
 def test_one_retained_line_of_a_deactivated_item_cannot_become_two(world, stock):

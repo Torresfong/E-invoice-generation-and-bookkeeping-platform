@@ -48,7 +48,7 @@ def approved_invoice(world, books, *, lines=None, user="acme_owner"):
     owner, acme = world[user], world["acme"]
     draft = invoices.create_draft(
         owner, acme, customer_id=books["customer"].pk,
-        lines=lines or [{"item": books["item"].pk, "quantity": "2", "unit_price": "5.50"}],
+        lines=lines or [{"item": books["item"].pk, "quantity": "2", "unit_price": "5.50", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     return invoices.approve_invoice(owner, draft)
 
@@ -78,7 +78,7 @@ def force_approved_invoice(world, books, *, buyer_overrides=None, invoice_overri
     owner, acme = world["acme_owner"], world["acme"]
     draft = invoices.create_draft(
         owner, acme, customer_id=books["customer"].pk,
-        lines=lines or [{"item": books["item"].pk, "quantity": "1", "unit_price": "10.00"}],
+        lines=lines or [{"item": books["item"].pk, "quantity": "1", "unit_price": "10.00", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     for line in draft.lines.select_related("item"):
         line.item_name = line.item.name
@@ -179,7 +179,10 @@ def test_the_buyer_is_the_locked_snapshot_never_the_live_customer(world, books):
 
 
 def test_a_single_line_maps_its_item_and_amounts(world, books):
-    invoice = approved_invoice(world, books, lines=[{"item": books["item"].pk, "quantity": "2", "unit_price": "5.50"}])
+    invoice = approved_invoice(
+        world, books,
+        lines=[{"item": books["item"].pk, "quantity": "2", "unit_price": "5.50", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
+    )
 
     (inv,) = decode(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
     (line,) = inv["InvoiceLine"]
@@ -216,8 +219,8 @@ def test_a_multi_line_invoice_sums_its_totals(world, books):
         default_tax_type=NOT_APPLICABLE,
     )
     invoice = approved_invoice(world, books, lines=[
-        {"item": books["item"].pk, "quantity": "2", "unit_price": "5.50"},
-        {"item": second.pk, "quantity": "3", "unit_price": "1.25"},
+        {"item": books["item"].pk, "quantity": "2", "unit_price": "5.50", "tax_type": NOT_APPLICABLE, "tax_rate": "0"},
+        {"item": second.pk, "quantity": "3", "unit_price": "1.25", "tax_type": NOT_APPLICABLE, "tax_rate": "0"},
     ])
 
     (inv,) = decode(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
@@ -333,7 +336,10 @@ def test_a_line_amount_rounds_half_a_sen_up(world, books):
     # The first amount calculation in the codebase (InvoiceLine stores none of its own); pinned at the boundary
     # that distinguishes ROUND_HALF_UP from ROUND_HALF_EVEN or truncation, raised for Torres on PR #191 as a
     # choice no D-number records yet (see `_line_details`'s docstring).
-    invoice = approved_invoice(world, books, lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "0.005"}])
+    invoice = approved_invoice(
+        world, books,
+        lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "0.005", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
+    )
 
     (inv,) = decode(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
 
@@ -355,7 +361,10 @@ def test_a_large_line_amount_rounds_correctly_despite_pythons_default_decimal_pr
     # become the *same* float and the assertion could not actually tell them apart. `decode_exact()` keeps every
     # number as a `Decimal`, so the comparison below is exact.
     invoice = approved_invoice(world, books, lines=[
-        {"item": books["item"].pk, "quantity": "70442201917.6046", "unit_price": "55353191799.5913"},
+        {
+            "item": books["item"].pk, "quantity": "70442201917.6046", "unit_price": "55353191799.5913",
+            "tax_type": NOT_APPLICABLE, "tax_rate": "0",
+        },
     ])
 
     (inv,) = decode_exact(map_invoice(invoice, document_version="1.1", now=invoice.approved_at))["Invoice"]
@@ -372,7 +381,10 @@ def test_a_large_document_total_keeps_its_precision_past_the_line_amount(world, 
     # `total_excluding_tax + total_tax` addition in `_build` still ran in the default 28-digit context, silently
     # dropping digits a second time on the way from a (now correct) line amount to the document's own totals.
     invoice = approved_invoice(world, books, lines=[
-        {"item": books["item"].pk, "quantity": "99999999999999.1234", "unit_price": "99999999999999.5678"},
+        {
+            "item": books["item"].pk, "quantity": "99999999999999.1234", "unit_price": "99999999999999.5678",
+            "tax_type": NOT_APPLICABLE, "tax_rate": "0",
+        },
     ])
     expected = Decimal("9999999999999869120000000000.38")
 
@@ -391,7 +403,7 @@ def test_a_draft_invoice_is_refused(world, books):
     owner, acme = world["acme_owner"], world["acme"]
     draft = invoices.create_draft(
         owner, acme, customer_id=books["customer"].pk,
-        lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "10.00"}],
+        lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "10.00", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
 
     with pytest.raises(InvalidDocument) as refused:
@@ -406,7 +418,8 @@ def test_a_normal_invoice_is_refused(world, books):
     einvoicing.update_setting(owner, acme, einvoicing_enabled=False, status="voluntary", effective_from=date(2020, 1, 1))
     bare = customers.create_customer(owner, acme, legal_name="Walk-in Buyer")
     draft = invoices.create_draft(
-        owner, acme, customer_id=bare.pk, lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "10.00"}],
+        owner, acme, customer_id=bare.pk,
+        lines=[{"item": books["item"].pk, "quantity": "1", "unit_price": "10.00", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     invoice = invoices.approve_invoice(owner, draft)
     assert invoice.is_einvoice is False
@@ -457,7 +470,7 @@ def test_a_cross_company_mapping_never_leaks_the_other_companys_supplier_or_buye
     )
     beta_draft = invoices.create_draft(
         beta_owner, beta, customer_id=beta_customer.pk,
-        lines=[{"item": beta_item.pk, "quantity": "1", "unit_price": "1.00"}],
+        lines=[{"item": beta_item.pk, "quantity": "1", "unit_price": "1.00", "tax_type": NOT_APPLICABLE, "tax_rate": "0"}],
     )
     beta_invoice = invoices.approve_invoice(beta_owner, beta_draft)
     acme_invoice = approved_invoice(world, books)
@@ -501,8 +514,8 @@ def test_a_multi_line_invoice_matches_lhdns_published_sample_structure(world, bo
         default_tax_type=NOT_APPLICABLE,
     )
     invoice = approved_invoice(world, books, lines=[
-        {"item": books["item"].pk, "quantity": "2", "unit_price": "5.50"},
-        {"item": second.pk, "quantity": "3", "unit_price": "1.25"},
+        {"item": books["item"].pk, "quantity": "2", "unit_price": "5.50", "tax_type": NOT_APPLICABLE, "tax_rate": "0"},
+        {"item": second.pk, "quantity": "3", "unit_price": "1.25", "tax_type": NOT_APPLICABLE, "tax_rate": "0"},
     ])
     frozen_issue_time = datetime(2026, 1, 15, 8, 0, 0, tzinfo=dt_timezone.utc)
     Invoice.objects.filter(pk=invoice.pk).update(approved_at=frozen_issue_time)

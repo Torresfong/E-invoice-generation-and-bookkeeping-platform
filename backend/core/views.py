@@ -409,16 +409,18 @@ def _invoices_url(company_id, *rest):
 def _invoice_fields(post):
     """The draft form as `invoices` arguments: the customer and one dict per line that has anything typed in it."""
     rows = [
-        {"item": item.strip(), "quantity": quantity.strip(), "unit_price": price.strip()}
-        for item, quantity, price in zip_longest(
-            post.getlist("item"), post.getlist("quantity"), post.getlist("unit_price"), fillvalue=""
+        {"item": item.strip(), "quantity": quantity.strip(), "unit_price": price.strip(), "tax_type": tax_type.strip(), "tax_rate": tax_rate.strip()}
+        for item, quantity, price, tax_type, tax_rate in zip_longest(
+            post.getlist("item"), post.getlist("quantity"), post.getlist("unit_price"),
+            post.getlist("tax_type"), post.getlist("tax_rate"), fillvalue="",
         )
     ]
     return {"customer_id": post.get("customer", "").strip(), "lines": [row for row in rows if any(row.values())]}
 
 
 def _invoice_context(access, invoice=None, **extra):
-    """The draft form: the customers and items that may be chosen, and the typed (or saved) lines plus blank rows."""
+    """The draft form: the customers, items and tax types that may be chosen, the typed (or saved) lines plus blank
+    rows, and the saved draft's totals (D59 (9), ticket #52)."""
     company = access.company
     kept_items = set(invoice.lines.values_list("item_id", flat=True)) if invoice else set()
     chosen = invoice.customer_id if invoice else None
@@ -427,7 +429,10 @@ def _invoice_context(access, invoice=None, **extra):
         form = {
             "customer_id": chosen or "",
             "lines": [
-                {"item": line.item_id, "quantity": line.quantity, "unit_price": line.unit_price}
+                {
+                    "item": line.item_id, "quantity": line.quantity, "unit_price": line.unit_price,
+                    "tax_type": line.tax_type, "tax_rate": line.tax_rate,
+                }
                 for line in invoice.lines.all()
             ]
             if invoice
@@ -440,8 +445,11 @@ def _invoice_context(access, invoice=None, **extra):
         "invoice": invoice,
         "customers": [c for c in customers.list_customers(company) if c.is_active or c.pk == chosen],
         "items": [i for i in items.list_items(company) if i.is_active or i.pk in kept_items],
+        "tax_types": sorted(items.tax_types().items()),
         "form": form,
         "rows": [*form["lines"], *({} for _ in range(blanks))],
+        "lines_with_totals": [(line, invoices.line_totals(line)) for line in invoice.lines.all()] if invoice else [],
+        "totals": invoices.invoice_totals(invoice) if invoice else None,
         **extra,
     }
 
