@@ -26,6 +26,22 @@ def test_a_user_signs_in_with_email_and_password_and_reaches_the_home_page(clien
         assert client.get("/").status_code == 200
 
 
+def test_signing_in_with_next_set_returns_there_instead_of_home(client, acme_owner, as_production_connection):
+    with as_production_connection():
+        response = client.post("/login/?next=/firm-invite/abc/", {"email": "owner@acme.example", "password": PASSWORD})
+
+    assert response.status_code == 302 and response["Location"] == "/firm-invite/abc/"
+
+
+def test_an_external_next_is_ignored_and_sign_in_still_goes_home(client, acme_owner, as_production_connection):
+    with as_production_connection():
+        response = client.post(
+            "/login/?next=https://evil.example/", {"email": "owner@acme.example", "password": PASSWORD}
+        )
+
+    assert response.status_code == 302 and response["Location"] == "/"
+
+
 def test_the_email_is_matched_ignoring_letter_case(client, acme_owner, as_production_connection):
     with as_production_connection():
         assert sign_in(client, "Owner@ACME.example", PASSWORD).status_code == 302

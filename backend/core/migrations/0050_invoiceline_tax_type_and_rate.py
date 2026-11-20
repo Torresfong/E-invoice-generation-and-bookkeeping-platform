@@ -12,7 +12,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('core', '0048_worker_owner_email'),
+        ('core', '0049_firm_invitation'),
     ]
 
     operations = [

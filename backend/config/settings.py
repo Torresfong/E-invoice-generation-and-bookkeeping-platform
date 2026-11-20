@@ -94,6 +94,8 @@ RESET_LINK_HOURS = 1
 # The link a new firm administrator or accountant gets to choose a first password (D49).
 SETUP_LINK_HOURS = 24
 INVITE_LINK_DAYS = 7
+# A firm invitation (D67 (3)) lasts a week, like a staff invitation.
+FIRM_INVITATION_LINK_DAYS = 7
 # Owner self-registration (D48, D49). A firm's sign-up link lasts a week, the emailed verification link a day.
 SIGNUP_LINK_DAYS = 7
 REGISTRATION_LINK_HOURS = 24
